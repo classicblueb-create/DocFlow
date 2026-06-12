@@ -26,6 +26,43 @@ export function TaskModal({ isOpen, onClose, onSave, initialTask }: TaskModalPro
   const [aiSubtasksEnabled, setAiSubtasksEnabled] = useState(false);
 
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isEvaluating, setIsEvaluating] = useState(false);
+
+  const handleAiEvaluate = async () => {
+    if (!name.trim()) {
+      alert("กรุณากรอกชื่องานก่อนประเมินค่ะ");
+      return;
+    }
+    setIsEvaluating(true);
+    try {
+      const response = await fetch("/api/ai/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "evaluate",
+          taskName: name,
+          details: details,
+          priority: priority,
+          customer: customer
+        })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to evaluate task");
+      }
+      
+      const evalResult = data.result;
+      if (evalResult) {
+        if (evalResult.priority) setPriority(evalResult.priority);
+        if (evalResult.tags) setTags(evalResult.tags);
+      }
+    } catch (e: any) {
+      console.error(e);
+      alert(`ไม่สามารถให้ AI ประเมินได้: ${e.message}`);
+    } finally {
+      setIsEvaluating(false);
+    }
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -208,12 +245,18 @@ export function TaskModal({ isOpen, onClose, onSave, initialTask }: TaskModalPro
             </div>
 
             <div>
-               <div className="flex justify-between items-center mb-2">
-                   <label className="text-sm font-bold text-gray-700">รายละเอียดงาน</label>
-                   <button className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1.5 rounded-md transition-colors border border-indigo-100/50">
-                       <Sparkles className="w-3.5 h-3.5" /> AI ประเมิน Priority & แท็ก
-                   </button>
-               </div>
+                <div className="flex justify-between items-center mb-2">
+                    <label className="text-sm font-bold text-gray-700">รายละเอียดงาน</label>
+                    <button 
+                      type="button"
+                      onClick={handleAiEvaluate}
+                      disabled={isEvaluating}
+                      className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1.5 rounded-md transition-colors border border-indigo-100/50 disabled:opacity-50"
+                    >
+                        <Sparkles className="w-3.5 h-3.5" /> 
+                        {isEvaluating ? "กำลังประเมิน..." : "AI ประเมิน Priority & แท็ก"}
+                    </button>
+                </div>
                <textarea value={details} onChange={e=>setDetails(e.target.value)} rows={4} placeholder="อธิบายรายละเอียด ข้อกำหนด หรือข้อมูลที่จำเป็น..." className="w-full border border-gray-300 rounded-lg px-3 py-2.5 outline-none transition-shadow text-gray-800 placeholder-gray-400 resize-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400"></textarea>
             </div>
 

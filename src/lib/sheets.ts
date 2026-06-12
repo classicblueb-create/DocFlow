@@ -42,14 +42,18 @@ export async function createSpreadsheet(): Promise<string> {
   const id = data.spreadsheetId;
   localStorage.setItem(SPREADSHEET_ID_KEY, id);
   
-  // Initialize headers
+  const tasksSheetId = data.sheets.find((s: any) => s.properties.title === 'Tasks')?.properties.sheetId;
+  const clientsSheetId = data.sheets.find((s: any) => s.properties.title === 'Clients')?.properties.sheetId;
+  const templatesSheetId = data.sheets.find((s: any) => s.properties.title === 'Templates')?.properties.sheetId;
+
+  // Initialize headers for all sheets
   await fetchGoogleAPI(`https://sheets.googleapis.com/v4/spreadsheets/${id}:batchUpdate`, {
     method: 'POST',
     body: JSON.stringify({
       requests: [
         {
           updateCells: {
-            range: { sheetId: data.sheets[0].properties.sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: 11 },
+            range: { sheetId: tasksSheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: 11 },
             rows: [{
               values: [
                 { userEnteredValue: { stringValue: 'id' } },
@@ -63,6 +67,36 @@ export async function createSpreadsheet(): Promise<string> {
                 { userEnteredValue: { stringValue: 'details' } },
                 { userEnteredValue: { stringValue: 'subtasks' } },
                 { userEnteredValue: { stringValue: 'priority' } },
+              ]
+            }],
+            fields: 'userEnteredValue'
+          }
+        },
+        {
+          updateCells: {
+            range: { sheetId: clientsSheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: 6 },
+            rows: [{
+              values: [
+                { userEnteredValue: { stringValue: 'id' } },
+                { userEnteredValue: { stringValue: 'name' } },
+                { userEnteredValue: { stringValue: 'address' } },
+                { userEnteredValue: { stringValue: 'taxId' } },
+                { userEnteredValue: { stringValue: 'targetBudget' } },
+                { userEnteredValue: { stringValue: 'color' } },
+              ]
+            }],
+            fields: 'userEnteredValue'
+          }
+        },
+        {
+          updateCells: {
+            range: { sheetId: templatesSheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: 4 },
+            rows: [{
+              values: [
+                { userEnteredValue: { stringValue: 'id' } },
+                { userEnteredValue: { stringValue: 'name' } },
+                { userEnteredValue: { stringValue: 'price' } },
+                { userEnteredValue: { stringValue: 'details' } },
               ]
             }],
             fields: 'userEnteredValue'
@@ -111,11 +145,7 @@ export async function fetchTasksFromSheet(): Promise<Task[]> {
 
 export async function saveTaskToSheet(task: Task) {
   const id = await getSpreadsheetId();
-  
-  // First, find the row index of the task. Wait, this requires fetching all tasks and finding the ID.
-  // Alternatively, just append if it's new. Wait, the easiest way for full sync is to overwrite all tasks.
-  // Let's implement full sync of all tasks because replacing specific ranges is complex without row index.
-  // We'll see how `saveTaskToSheet` was used.
+  // Deprecated, use syncAllTasksToSheet instead
 }
 
 export async function syncAllTasksToSheet(tasks: Task[]) {
@@ -135,6 +165,97 @@ export async function syncAllTasksToSheet(tasks: Task[]) {
   ]);
   
   await fetchGoogleAPI(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/Tasks!A2:K?valueInputOption=USER_ENTERED`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      values
+    })
+  });
+}
+
+export async function fetchClientsFromSheet(): Promise<Client[]> {
+  const id = await getSpreadsheetId();
+  try {
+    const data = await fetchGoogleAPI(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/Clients!A2:F`);
+    if (!data.values) return [];
+    
+    return data.values.map((row: any[]) => ({
+      id: row[0],
+      name: row[1],
+      address: row[2] || '',
+      taxId: row[3] || '',
+      targetBudget: parseFloat(row[4]) || 0,
+      color: row[5] || 'blue'
+    }));
+  } catch (e: any) {
+    console.error("Error fetching clients:", e);
+    // Return empty array if tab exists but fetching fails due to missing rows
+    if (e.message?.includes('400') || e.message?.includes('INVALID_ARGUMENT')) {
+      return [];
+    }
+    throw e;
+  }
+}
+
+export async function syncAllClientsToSheet(clients: Client[]) {
+  const id = await getSpreadsheetId();
+  
+  // Clear existing clients
+  await fetchGoogleAPI(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/Clients!A2:Z:clear`, {
+    method: 'POST',
+    body: JSON.stringify({})
+  });
+
+  if (clients.length === 0) return;
+
+  const values = clients.map(c => [
+    c.id, c.name, c.address || '', c.taxId || '', (c.targetBudget || 0).toString(), c.color || 'blue'
+  ]);
+  
+  await fetchGoogleAPI(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/Clients!A2:F?valueInputOption=USER_ENTERED`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      values
+    })
+  });
+}
+
+export async function fetchTemplatesFromSheet(): Promise<Template[]> {
+  const id = await getSpreadsheetId();
+  try {
+    const data = await fetchGoogleAPI(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/Templates!A2:D`);
+    if (!data.values) return [];
+    
+    return data.values.map((row: any[]) => ({
+      id: row[0],
+      name: row[1],
+      price: parseFloat(row[2]) || 0,
+      details: row[3] || ''
+    }));
+  } catch (e: any) {
+    console.error("Error fetching templates:", e);
+    if (e.message?.includes('400') || e.message?.includes('INVALID_ARGUMENT')) {
+      return [];
+    }
+    throw e;
+  }
+}
+
+export async function syncAllTemplatesToSheet(templates: Template[]) {
+  const id = await getSpreadsheetId();
+  
+  // Clear existing templates
+  await fetchGoogleAPI(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/Templates!A2:Z:clear`, {
+    method: 'POST',
+    body: JSON.stringify({})
+  });
+
+  if (templates.length === 0) return;
+
+  const values = templates.map(t => [
+    t.id, t.name, (t.price || 0).toString(), t.details || ''
+  ]);
+  
+  await fetchGoogleAPI(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/Templates!A2:D?valueInputOption=USER_ENTERED`, {
     method: 'PUT',
     body: JSON.stringify({
       values

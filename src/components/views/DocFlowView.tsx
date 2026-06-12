@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { Settings, Send, Plus, FileCheck2, Link, Trash2 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
@@ -36,10 +36,60 @@ export function DocFlowView({ onOpenSettings, showNotification, clients, setting
   const vat = includeVat ? subtotal * 0.07 : 0;
   const total = subtotal + vat;
 
-  const handleAiSend = () => {
+  const handleAiSend = async () => {
     if(!aiInput.trim()) return;
-    showNotification('ระบบ AI วิเคราะห์เอกสารทำงานอยู่เบื้องหลังค่ะ');
+    showNotification('ระบบ AI กำลังวิเคราะห์สเปกคำสั่งเอกสารของคุณค่ะ...');
+    const originalInput = aiInput;
     setAiInput('');
+
+    try {
+      const response = await fetch("/api/ai/generate-doc", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: originalInput,
+          clients: clients
+        })
+      });
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to generate document details");
+      }
+      
+      const doc = data.result;
+      if (doc) {
+        if (doc.docType) setDocType(doc.docType);
+        if (doc.customerName) {
+          setCustomerName(doc.customerName);
+          // Match with existing clients list if possible
+          const matchedClient = clients.find(c => c.name.toLowerCase().includes(doc.customerName.toLowerCase()) || doc.customerName.toLowerCase().includes(c.name.toLowerCase()));
+          if (matchedClient) {
+            setSelectedClientId(matchedClient.id);
+            setCustomerAddress(matchedClient.address);
+            setCustomerTaxId(matchedClient.taxId);
+          } else {
+            setSelectedClientId('');
+            if (doc.customerAddress) setCustomerAddress(doc.customerAddress);
+            if (doc.customerTaxId) setCustomerTaxId(doc.customerTaxId);
+          }
+        }
+        if (doc.items && Array.isArray(doc.items)) {
+          setItems(doc.items.map((it: any, idx: number) => ({
+            id: idx + 1,
+            desc: it.desc || it.description || 'รายการสินค้า',
+            qty: Number(it.qty) || 1,
+            price: Number(it.price) || 0
+          })));
+        }
+        if (doc.docNotes) setDocNotes(doc.docNotes);
+        if (doc.docConditions) setDocConditions(doc.docConditions);
+        showNotification('วิเคราะห์และป้อนข้อมูลเอกสารสำเร็จแล้วค่ะ');
+      }
+    } catch (e: any) {
+      console.error(e);
+      showNotification(`เกิดข้อผิดพลาดในการประมวลผลด้วย AI: ${e.message || 'กรุณาลองใหม่อีกครั้ง'}`, true);
+    }
   };
 
   const handleGeneratePdf = async () => {

@@ -32,16 +32,45 @@ export function AgentModal({ agentId, onClose }: AgentModalProps) {
 
   if (!agentId) return null;
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim()) return;
     const newMessages = [...messages, { role: 'user' as const, text: input }];
     setMessages(newMessages);
     setInput('');
     
-    // Mock response
-    setTimeout(() => {
-      setMessages([...newMessages, { role: 'agent', text: `รับทราบคำสั่งค่ะ! มดตี้ในโหมด <b>${agent.title}</b> กำลังประมวลผลข้อมูลหลังบ้านให้คุณนะคะ 😊 (จำลองการตอบ)` }]);
-    }, 1000);
+    // Add temporary thinking indicator
+    const placeholderIndex = newMessages.length;
+    setMessages(prev => [...prev, { role: 'agent', text: `<i>กำลังประมวลผลข้อมูลด้วย AI...</i>` }]);
+
+    try {
+      const response = await fetch("/api/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: newMessages,
+          agentTitle: agent.title,
+          agentInstructions: agent.text
+        })
+      });
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to chat with AI");
+      }
+      
+      setMessages(prev => {
+        const updated = [...prev];
+        updated[placeholderIndex] = { role: 'agent', text: data.result };
+        return updated;
+      });
+    } catch (e: any) {
+      console.error(e);
+      setMessages(prev => {
+        const updated = [...prev];
+        updated[placeholderIndex] = { role: 'agent', text: `<span class="text-red-500">[เกิดข้อผิดพลาด: ${e.message || 'กรุณาลองใหม่อีกครั้ง'}]</span>` };
+        return updated;
+      });
+    }
   };
 
   return (

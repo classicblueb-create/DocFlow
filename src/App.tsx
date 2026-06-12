@@ -50,9 +50,30 @@ export default function App() {
   const [isDocSettingsOpen, setIsDocSettingsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [clients, setClients] = useState<Client[]>([]);
-  const [templates, setTemplates] = useState<Template[]>([]);
+  const [tasks, setTasks] = useState<Task[]>(() => {
+    try {
+      const local = localStorage.getItem('docflow_local_tasks');
+      return local ? JSON.parse(local) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [clients, setClients] = useState<Client[]>(() => {
+    try {
+      const local = localStorage.getItem('docflow_local_clients');
+      return local ? JSON.parse(local) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [templates, setTemplates] = useState<Template[]>(() => {
+    try {
+      const local = localStorage.getItem('docflow_local_templates');
+      return local ? JSON.parse(local) : [];
+    } catch {
+      return [];
+    }
+  });
   const [settingsVersion, setSettingsVersion] = useState(0);
 
   useEffect(() => {
@@ -63,25 +84,64 @@ export default function App() {
         setNeedsAuth(false);
         setIsSyncing(true);
         try {
-          const { fetchTasksFromSheet } = await import('./lib/sheets');
+          const { 
+            fetchTasksFromSheet, 
+            fetchClientsFromSheet, 
+            fetchTemplatesFromSheet,
+            syncAllTasksToSheet,
+            syncAllClientsToSheet,
+            syncAllTemplatesToSheet 
+          } = await import('./lib/sheets');
+
+          // 1. Sync Tasks
           const fetchedTasks = await fetchTasksFromSheet();
           if (fetchedTasks.length > 0) {
             setTasks(fetchedTasks);
+            localStorage.setItem('docflow_local_tasks', JSON.stringify(fetchedTasks));
           } else {
-             // Mock data if sheet is empty
-             setTasks([
-              { id: '1', name: 'รีวิว Tiktok 1 คลิป คอร์ส RAG AI', status: 'To Do', price: 7009.35 },
-              { id: '2', name: 'เขียนบทความ SEO', status: 'In Progress', price: 3500 },
-              { id: '3', name: 'ระบบเชื่อม Google Sheets', status: 'Done', price: 15000 },
-             ]);
+            // Sheet is empty - use local cache or fallback mocks and sync up
+            const localTasksVal = localStorage.getItem('docflow_local_tasks');
+            const tasksToSync = localTasksVal ? JSON.parse(localTasksVal) : [
+              { id: '1', name: 'รีวิว Tiktok 1 คลิป คอร์ส RAG AI', status: 'To Do', price: 7009.35, priority: 'สูง (High)' },
+              { id: '2', name: 'เขียนบทความ SEO', status: 'In Progress', price: 3500, priority: 'ปานกลาง (Medium)' },
+              { id: '3', name: 'ระบบเชื่อม Google Sheets', status: 'Done', price: 15000, priority: 'ด่วน (Urgent)' },
+            ];
+            setTasks(tasksToSync);
+            localStorage.setItem('docflow_local_tasks', JSON.stringify(tasksToSync));
+            await syncAllTasksToSheet(tasksToSync);
           }
-          setClients([
-            { id: 'C001', name: 'บริษัท ไลค์มี เอ็กซ์ จำกัด', address: 'กรุงเทพมหานคร', taxId: '0105562056070', targetBudget: 50000, color: 'blue' },
-            { id: 'C002', name: 'Shipify Logistics', address: 'กรุงเทพฯ', taxId: '0105512345678', targetBudget: 65000, color: 'indigo' }
-          ]);
-          setTemplates([
-            { id: 'T001', name: 'สร้างเว็บไซต์ E-commerce', price: 45000, details: 'พัฒนาหน้า Storefront' }
-          ]);
+
+          // 2. Sync Clients
+          const fetchedClients = await fetchClientsFromSheet();
+          if (fetchedClients.length > 0) {
+            setClients(fetchedClients);
+            localStorage.setItem('docflow_local_clients', JSON.stringify(fetchedClients));
+          } else {
+            const localClientsVal = localStorage.getItem('docflow_local_clients');
+            const clientsToSync = localClientsVal ? JSON.parse(localClientsVal) : [
+              { id: 'C001', name: 'บริษัท ไลค์มี เอ็กซ์ จำกัด', address: 'กรุงเทพมหานคร', taxId: '0105562056070', targetBudget: 50000, color: 'blue' },
+              { id: 'C002', name: 'Shipify Logistics', address: 'กรุงเทพฯ', taxId: '0105512345678', targetBudget: 65000, color: 'indigo' }
+            ];
+            setClients(clientsToSync);
+            localStorage.setItem('docflow_local_clients', JSON.stringify(clientsToSync));
+            await syncAllClientsToSheet(clientsToSync);
+          }
+
+          // 3. Sync Templates
+          const fetchedTemplates = await fetchTemplatesFromSheet();
+          if (fetchedTemplates.length > 0) {
+            setTemplates(fetchedTemplates);
+            localStorage.setItem('docflow_local_templates', JSON.stringify(fetchedTemplates));
+          } else {
+            const localTemplatesVal = localStorage.getItem('docflow_local_templates');
+            const templatesToSync = localTemplatesVal ? JSON.parse(localTemplatesVal) : [
+              { id: 'T001', name: 'สร้างเว็บไซต์ E-commerce', price: 45000, details: 'พัฒนาหน้า Storefront' }
+            ];
+            setTemplates(templatesToSync);
+            localStorage.setItem('docflow_local_templates', JSON.stringify(templatesToSync));
+            await syncAllTemplatesToSheet(templatesToSync);
+          }
+
           setSyncStatus('Data Synced Successfully');
         } catch (e: any) {
            console.error("Sheets sync error:", e);
@@ -146,6 +206,7 @@ export default function App() {
   const handleTaskDrop = async (taskId: string, targetStatus: string) => {
     const updatedTasks = tasks.map(t => t.id.toString() === taskId ? { ...t, status: targetStatus } : t);
     setTasks(updatedTasks);
+    localStorage.setItem('docflow_local_tasks', JSON.stringify(updatedTasks));
     
     // Background sync
     try {
@@ -163,6 +224,7 @@ export default function App() {
     if (editingTask) {
         updatedTasks = tasks.map(t => t.id === editingTask.id ? { ...t, ...taskData } : t);
         setTasks(updatedTasks);
+        localStorage.setItem('docflow_local_tasks', JSON.stringify(updatedTasks));
         showNotification('อัปเดตข้อมูลเรียบร้อย');
         setEditingTask(null);
     } else {
@@ -184,6 +246,7 @@ export default function App() {
         };
         updatedTasks = [...tasks, newTask];
         setTasks(updatedTasks);
+        localStorage.setItem('docflow_local_tasks', JSON.stringify(updatedTasks));
         showNotification('บันทึกเรียบร้อย');
     }
 
@@ -212,6 +275,7 @@ export default function App() {
 
       const updatedTasks = tasks.filter(t => t.id !== id);
       setTasks(updatedTasks);
+      localStorage.setItem('docflow_local_tasks', JSON.stringify(updatedTasks));
       showNotification('ลบเรียบร้อย');
 
       try {
@@ -227,9 +291,87 @@ export default function App() {
       }
   };
 
-  const handleSaveTemplate = (temp: Template) => {
-      setTemplates(prev => [...prev, temp]);
+  const handleSaveTemplate = async (temp: Template) => {
+      const updated = [...templates, temp];
+      setTemplates(updated);
+      localStorage.setItem('docflow_local_templates', JSON.stringify(updated));
       showNotification('บันทึกเป็นเทมเพลตเรียบร้อย');
+      try {
+        const { syncAllTemplatesToSheet } = await import('./lib/sheets');
+        await syncAllTemplatesToSheet(updated);
+      } catch (e) {
+        console.error("Failed to sync templates:", e);
+      }
+  };
+
+  const handleCreateClient = async (clientData: Partial<Client>) => {
+    const newClient: Client = {
+      id: clientData.id || `C-${Date.now()}`,
+      name: clientData.name || 'ลูกค้าใหม่',
+      address: clientData.address || '',
+      taxId: clientData.taxId || '',
+      targetBudget: clientData.targetBudget || 0,
+      color: clientData.color || 'blue'
+    };
+    const updated = [...clients, newClient];
+    setClients(updated);
+    localStorage.setItem('docflow_local_clients', JSON.stringify(updated));
+    showNotification('เพิ่มรายชื่อลูกค้าเรียบร้อย');
+    try {
+      const { syncAllClientsToSheet } = await import('./lib/sheets');
+      await syncAllClientsToSheet(updated);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDeleteClient = async (id: string) => {
+    const confirmed = window.confirm("Are you sure you want to delete this client?");
+    if (!confirmed) return;
+    const updated = clients.filter(c => c.id !== id);
+    setClients(updated);
+    localStorage.setItem('docflow_local_clients', JSON.stringify(updated));
+    showNotification('ลบข้อมูลลูกค้าเรียบร้อย');
+    try {
+      const { syncAllClientsToSheet } = await import('./lib/sheets');
+      await syncAllClientsToSheet(updated);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleCreateTemplate = async (templateData: Partial<Template>) => {
+    const newTemplate: Template = {
+      id: templateData.id || `T-${Date.now()}`,
+      name: templateData.name || 'เทมเพลตใหม่',
+      price: templateData.price || 0,
+      details: templateData.details || ''
+    };
+    const updated = [...templates, newTemplate];
+    setTemplates(updated);
+    localStorage.setItem('docflow_local_templates', JSON.stringify(updated));
+    showNotification('เพิ่มเทมเพลตเรียบร้อย');
+    try {
+      const { syncAllTemplatesToSheet } = await import('./lib/sheets');
+      await syncAllTemplatesToSheet(updated);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleDeleteTemplate = async (id: string) => {
+    const confirmed = window.confirm("Are you sure you want to delete this template?");
+    if (!confirmed) return;
+    const updated = templates.filter(t => t.id !== id);
+    setTemplates(updated);
+    localStorage.setItem('docflow_local_templates', JSON.stringify(updated));
+    showNotification('ลบเทมเพลตเรียบร้อย');
+    try {
+      const { syncAllTemplatesToSheet } = await import('./lib/sheets');
+      await syncAllTemplatesToSheet(updated);
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const filteredTasks = tasks.filter(t => 
@@ -252,8 +394,8 @@ export default function App() {
       case 'gantt': return <GanttView tasks={tasks} />;
       case 'calendar': return <CalendarView tasks={tasks} />;
       case 'dashboard': return <DashboardView tasks={tasks} />;
-      case 'clients': return <ClientsView clients={filteredClients} />;
-      case 'templates': return <TemplatesView templates={filteredTemplates} />;
+      case 'clients': return <ClientsView clients={filteredClients} onCreateClient={handleCreateClient} onDeleteClient={handleDeleteClient} />;
+      case 'templates': return <TemplatesView templates={filteredTemplates} onCreateTemplate={handleCreateTemplate} onDeleteTemplate={handleDeleteTemplate} />;
       case 'docflow': return <DocFlowView onOpenSettings={() => setIsDocSettingsOpen(true)} showNotification={showNotification} clients={filteredClients} settingsVersion={settingsVersion} />;
       case 'agents': return <AgentsView onAgentClick={setSelectedAgent} />;
       default: return <BoardView tasks={filteredTasks} onTaskDrop={handleTaskDrop} onTaskClick={setSelectedTask} />;
@@ -317,7 +459,7 @@ export default function App() {
         onEdit={handleEditClick}
       />
       <AgentModal agentId={selectedAgent} onClose={() => setSelectedAgent(null)} />
-      <StandupModal isOpen={isStandupModalOpen} onClose={() => setIsStandupModalOpen(false)} />
+      <StandupModal isOpen={isStandupModalOpen} onClose={() => setIsStandupModalOpen(false)} tasks={tasks} />
       <DocSettingsModal isOpen={isDocSettingsOpen} onClose={() => setIsDocSettingsOpen(false)} onSave={() => { setSettingsVersion(v => v + 1); showNotification("บันทึกการตั้งค่าแล้วค่ะ"); }} />
     </div>
   );

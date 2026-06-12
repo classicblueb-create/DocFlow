@@ -13,6 +13,8 @@ let isSigningIn = false;
 // Cache the access token in memory.
 let cachedAccessToken: string | null = null;
 
+const GOOGLE_TOKEN_KEY = 'docflow_google_access_token';
+
 // Initialize auth state listener. Call this on app load.
 export const initAuth = (
   onAuthSuccess?: (user: User, token: string) => void,
@@ -20,7 +22,12 @@ export const initAuth = (
 ) => {
   return onAuthStateChanged(auth, async (user: User | null) => {
     if (user) {
-      if (cachedAccessToken) {
+      const savedToken = localStorage.getItem(GOOGLE_TOKEN_KEY);
+      if (savedToken) {
+        cachedAccessToken = savedToken;
+        if (onAuthSuccess) onAuthSuccess(user, savedToken);
+      } else if (cachedAccessToken) {
+        localStorage.setItem(GOOGLE_TOKEN_KEY, cachedAccessToken);
         if (onAuthSuccess) onAuthSuccess(user, cachedAccessToken);
       } else if (!isSigningIn) {
         cachedAccessToken = null;
@@ -28,6 +35,7 @@ export const initAuth = (
       }
     } else {
       cachedAccessToken = null;
+      localStorage.removeItem(GOOGLE_TOKEN_KEY);
       if (onAuthFailure) onAuthFailure();
     }
   });
@@ -44,6 +52,7 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
     }
 
     cachedAccessToken = credential.accessToken;
+    localStorage.setItem(GOOGLE_TOKEN_KEY, cachedAccessToken);
     return { user: result.user, accessToken: cachedAccessToken };
   } catch (error: any) {
     console.error('Sign in error:', error);
@@ -54,10 +63,15 @@ export const googleSignIn = async (): Promise<{ user: User; accessToken: string 
 };
 
 export const getAccessToken = async (): Promise<string | null> => {
+  if (!cachedAccessToken) {
+    cachedAccessToken = localStorage.getItem(GOOGLE_TOKEN_KEY);
+  }
   return cachedAccessToken;
 };
 
 export const logout = async () => {
   await auth.signOut();
   cachedAccessToken = null;
+  localStorage.removeItem(GOOGLE_TOKEN_KEY);
 };
+

@@ -1,5 +1,5 @@
+import React, { useState } from 'react';
 import { X, Settings } from 'lucide-react';
-import { useState } from 'react';
 
 interface DocSettingsModalProps {
   isOpen: boolean;

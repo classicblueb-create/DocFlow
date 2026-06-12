@@ -13,21 +13,73 @@ async function startServer() {
   app.use(express.json());
 
   // Gemini Setup
-  const ai = new GoogleGenAI({
-    apiKey: process.env.GEMINI_API_KEY,
-    httpOptions: {
-      headers: {
-        'User-Agent': 'aistudio-build',
+  let ai: any = null;
+  if (process.env.GEMINI_API_KEY) {
+    ai = new GoogleGenAI({
+      apiKey: process.env.GEMINI_API_KEY,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
       }
+    });
+  }
+
+  // Helper function to call AI (supports OpenRouter and Gemini SDK)
+  async function generateWithAI(systemInstruction: string, prompt: string): Promise<string> {
+    if (process.env.OPENROUTER_API_KEY) {
+      const model = process.env.OPENROUTER_MODEL || "google/gemini-2.5-flash";
+      try {
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://github.com/classicblueb-create/DocFlow",
+            "X-Title": "DocFlow",
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: [
+              { role: "system", content: systemInstruction },
+              { role: "user", content: prompt }
+            ],
+            temperature: 0.7,
+          })
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`OpenRouter API Error: ${response.status} - ${errText}`);
+        }
+
+        const data: any = await response.json();
+        return data.choices?.[0]?.message?.content || "";
+      } catch (e: any) {
+        console.error("OpenRouter Error:", e);
+        throw e;
+      }
+    } else if (process.env.GEMINI_API_KEY) {
+      const response = await ai.models.generateContent({
+        model: "gemini-2.0-flash",
+        contents: prompt,
+        config: {
+          systemInstruction,
+          temperature: 0.7,
+        },
+      });
+      return response.text || "";
+    } else {
+      throw new Error("No API keys configured. Please set OPENROUTER_API_KEY or GEMINI_API_KEY.");
     }
-  });
+  }
 
   // AI API routes
   app.post("/api/ai/generate", async (req, res) => {
     const { type, taskName, details, priority, customer } = req.body;
 
-    if (!process.env.GEMINI_API_KEY) {
-      return res.status(500).json({ error: "Gemini API key is not configured" });
+    if (!process.env.GEMINI_API_KEY && !process.env.OPENROUTER_API_KEY) {
+      return res.status(500).json({ error: "AI API key is not configured" });
     }
 
     let systemInstruction = "";
@@ -77,21 +129,26 @@ async function startServer() {
         ให้ตอบเป็น JSON array ของข้อความสั้นๆ เท่านั้น (เช่น ["ขั้นที่ 1", "ขั้นที่ 2"])`;
         break;
 
+      case "evaluate":
+        systemInstruction = "You are a task management expert. Analyze the task and determine its priority level and suggested tag keywords. Output ONLY a valid JSON string.";
+        prompt = `วิเคราะห์งานนี้:
+        ชื่องาน: ${taskName}
+        รายละเอียด: ${details || 'ไม่ได้ระบุ'}
+        
+        กรุณาจัดระดับความสำคัญ (Priority) และแนะนำแท็ก (Tags):
+        ให้ตอบเป็น JSON object รูปแบบนี้เท่านั้น (ห้ามใส่ markdown block):
+        {
+          "priority": "ต่ำ (Low)" | "ปานกลาง (Medium)" | "สูง (High)" | "ด่วน (Urgent)",
+          "tags": "แท็ก1, แท็ก2, แท็ก3"
+        }`;
+        break;
+
       default:
         return res.status(400).json({ error: "Invalid generation type" });
     }
 
     try {
-      const response = await ai.models.generateContent({
-        model: "gemini-2.0-flash",
-        contents: prompt,
-        config: {
-          systemInstruction,
-          temperature: 0.7,
-        },
-      });
-
-      let text = response.text || "";
+      let text = await generateWithAI(systemInstruction, prompt);
       
       // If subtasks, try to parse JSON if it's not clean
       if (type === "subtasks") {
@@ -104,6 +161,16 @@ async function startServer() {
           // Fallback if parsing fails - split by newlines
           const lines = text.split('\n').filter(l => l.trim().length > 2).map(l => l.replace(/^[0-9.-]\s*/, '').trim());
           return res.json({ result: lines });
+        }
+      }
+
+      if (type === "evaluate") {
+        try {
+          const cleanJson = text.replace(/```json|```/g, "").trim();
+          const parsed = JSON.parse(cleanJson);
+          return res.json({ result: parsed });
+        } catch (e) {
+          return res.json({ result: { priority: "ปานกลาง (Medium)", tags: "" } });
         }
       }
 
@@ -126,6 +193,165 @@ async function startServer() {
       }
 
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // AI Chat API
+  app.post("/api/ai/chat", async (req, res) => {
+    const { messages, agentTitle, agentInstructions } = req.body;
+    
+    if (!messages || !Array.isArray(messages)) {
+      return res.status(400).json({ error: "Invalid chat history" });
+    }
+
+    if (!process.env.GEMINI_API_KEY && !process.env.OPENROUTER_API_KEY) {
+      return res.status(500).json({ error: "AI API key is not configured" });
+    }
+
+    const systemInstruction = `You are a professional AI Assistant specializing as a ${agentTitle || 'assistant'}. ${agentInstructions || ''}. Always reply politely in Thai. Use HTML tags for formatting if needed (like <br/>, <b>, etc.) to make the text structured and easy to read.`;
+    
+    const openAiMessages = messages.map((m: any) => ({
+      role: m.role === 'agent' ? 'assistant' : 'user',
+      content: m.text.replace(/<br\s*\/?>/gi, '\n').replace(/<\/?[^>]+(>|$)/g, "")
+    }));
+
+    try {
+      let reply = "";
+      if (process.env.OPENROUTER_API_KEY) {
+        const model = process.env.OPENROUTER_MODEL || "google/gemini-2.5-flash";
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://github.com/classicblueb-create/DocFlow",
+            "X-Title": "DocFlow",
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: [
+              { role: "system", content: systemInstruction },
+              ...openAiMessages
+            ],
+            temperature: 0.7,
+          })
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`OpenRouter API Error: ${response.status} - ${errText}`);
+        }
+
+        const data: any = await response.json();
+        reply = data.choices?.[0]?.message?.content || "";
+      } else if (process.env.GEMINI_API_KEY) {
+        const contents = openAiMessages.map((m: any) => ({
+          role: m.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: m.content }]
+        }));
+        const response = await ai.models.generateContent({
+          model: "gemini-2.0-flash",
+          contents: contents,
+          config: {
+            systemInstruction,
+            temperature: 0.7,
+          }
+        });
+        reply = response.text || "";
+      }
+
+      const formattedReply = reply.trim().replace(/\n/g, "<br/>");
+      res.json({ result: formattedReply });
+    } catch (e: any) {
+      console.error("Chat Error:", e);
+      res.status(500).json({ error: e.message || "Failed to generate AI response" });
+    }
+  });
+
+  // AI Document Generator API
+  app.post("/api/ai/generate-doc", async (req, res) => {
+    const { prompt, clients } = req.body;
+    
+    if (!prompt) {
+      return res.status(400).json({ error: "Prompt is required" });
+    }
+
+    if (!process.env.GEMINI_API_KEY && !process.env.OPENROUTER_API_KEY) {
+      return res.status(500).json({ error: "AI API key is not configured" });
+    }
+
+    const systemInstruction = `You are a document extraction assistant. Analyze the user's request (in Thai) and extract the invoice/quotation details.
+    Return ONLY a valid JSON object matching the schema below. Do not wrap it in markdown code blocks.
+    
+    Available Clients in database:
+    ${JSON.stringify(clients || [])}
+    
+    If a customer name mentioned in the prompt matches or is very similar to one of the Available Clients, use their name, address, and taxId exactly.
+    Otherwise, extract whatever customer name, address, and taxId is mentioned or implied.
+    
+    Schema:
+    {
+      "docType": "Quotation" | "Invoice",
+      "customerName": string,
+      "customerAddress": string,
+      "customerTaxId": string,
+      "items": [
+        { "desc": string, "qty": number, "price": number }
+      ],
+      "docNotes": string (optional notes, e.g. payment terms),
+      "docConditions": string (optional payment conditions)
+    }
+    
+    Return only the raw JSON.`;
+
+    try {
+      let resultText = "";
+      if (process.env.OPENROUTER_API_KEY) {
+        const model = process.env.OPENROUTER_MODEL || "google/gemini-2.5-flash";
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://github.com/classicblueb-create/DocFlow",
+            "X-Title": "DocFlow",
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: [
+              { role: "system", content: systemInstruction },
+              { role: "user", content: prompt }
+            ],
+            temperature: 0.2,
+          })
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`OpenRouter API Error: ${response.status} - ${errText}`);
+        }
+
+        const data: any = await response.json();
+        resultText = data.choices?.[0]?.message?.content || "";
+      } else if (process.env.GEMINI_API_KEY) {
+        const response = await ai.models.generateContent({
+          model: "gemini-2.0-flash",
+          contents: prompt,
+          config: {
+            systemInstruction,
+            temperature: 0.2,
+            responseMimeType: "application/json"
+          }
+        });
+        resultText = response.text || "";
+      }
+
+      const cleanJson = resultText.replace(/```json|```/g, "").trim();
+      const parsed = JSON.parse(cleanJson);
+      res.json({ result: parsed });
+    } catch (e: any) {
+      console.error("Generate Doc Error:", e);
+      res.status(500).json({ error: e.message || "Failed to parse document request" });
     }
   });
 
