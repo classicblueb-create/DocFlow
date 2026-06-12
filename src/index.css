@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+@theme {
+  --color-claude-accent: #d97757;
+  --color-claude-border: #e5e7eb;
+  --color-claude-card: #ffffff;
+  --color-claude-subtext: #6b7280;
+  --color-clickup-sidebar: #2A2E35;
+  --color-clickup-hover: #3A3F48;
+  --color-clickup-active: #e2e8f0;
+  --color-clickup-purple: #7B68EE;
+
+  --font-sans: "Sarabun", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Sarabun", ui-serif, Georgia, serif;
+}
+
+body {
+  font-family: 'Sarabun', sans-serif;
+  background-color: #f9fafb;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.kanban-column {
+  min-height: 500px;
+}
+.drag-over {
+  background-color: #f3f4f6;
+  border: 2px dashed #7B68EE;
+}
