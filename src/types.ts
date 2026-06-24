@@ -103,6 +103,8 @@ export interface ContentPlan {
   aiHashtags?: string;
   publishDate?: string;
   createdAt: string;
+  notionPageId?: string;
+  notionUrl?: string;
 }
 
 export interface PaymentPhase {

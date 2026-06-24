@@ -1,36 +1,82 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
-  AreaChart, Area, BarChart, Bar, LineChart, Line,
+  BarChart, Bar, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart as RechartsPie, Pie, Cell
+  PieChart as RechartsPie, Pie, Cell, Area, AreaChart,
 } from 'recharts';
 import { Task } from '../../types';
-import { TrendingUp, DollarSign, CheckCircle, Clock } from 'lucide-react';
+import { TrendingUp, CheckCircle, Clock } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 interface DashboardViewProps {
   tasks: Task[];
 }
 
-function KpiCard({ label, value, sub, color }: { label: string; value: string; sub: string; color: string }) {
-  const glassColorMap: Record<string, string> = {
-    'bg-gradient-to-br from-indigo-600 to-indigo-400': 'bg-gradient-to-br from-indigo-550/20 to-indigo-400/5 border-indigo-500/20 text-indigo-900',
-    'bg-gradient-to-br from-emerald-600 to-emerald-400': 'bg-gradient-to-br from-emerald-550/20 to-emerald-400/5 border-emerald-500/20 text-emerald-900',
-    'bg-gradient-to-br from-amber-600 to-amber-400': 'bg-gradient-to-br from-amber-550/20 to-amber-400/5 border-amber-500/20 text-amber-900',
-    'bg-gradient-to-br from-slate-700 to-slate-500': 'bg-gradient-to-br from-slate-550/20 to-slate-500/5 border-slate-500/20 text-slate-900',
+// ── Stripe-style metric card with line chart ──────────────────────────────────
+function MetricCard({
+  label, total, data, dataKey, color, formatter,
+}: {
+  label: string;
+  total: string;
+  data: { month: string; [k: string]: number | string }[];
+  dataKey: string;
+  color: string;
+  formatter?: (v: number) => string;
+}) {
+  const CustomTooltip = ({ active, payload, label: lbl }: any) => {
+    if (!active || !payload?.length) return null;
+    const val = payload[0]?.value ?? 0;
+    return (
+      <div className="bg-white border border-slate-100 rounded-xl shadow-lg px-3 py-2 text-xs">
+        <p className="text-slate-400 font-semibold mb-0.5">{lbl}</p>
+        <p className="font-black text-slate-800">{formatter ? formatter(val) : val}</p>
+      </div>
+    );
   };
-  const glassColor = glassColorMap[color] || 'bg-white/40 border-white/20 text-slate-800';
 
   return (
-    <div className={cn(
-      'rounded-2xl p-5 flex flex-col justify-between h-28 border backdrop-blur-md shadow-sm',
-      glassColor
-    )}>
-      <p className="text-[10px] font-bold opacity-75 uppercase tracking-wider">{label}</p>
+    <div className="glass-card rounded-2xl p-5 flex flex-col gap-3">
       <div>
-        <p className="text-2xl font-black leading-none mb-1">{value}</p>
-        <p className="text-[10px] opacity-65 font-semibold">{sub}</p>
+        <p className="text-xs font-semibold text-slate-400 mb-1">{label}</p>
+        <p className="text-2xl font-black text-slate-900 leading-none">{total}</p>
       </div>
+      <ResponsiveContainer width="100%" height={80}>
+        <AreaChart data={data} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id={`grad-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={color} stopOpacity={0.18} />
+              <stop offset="100%" stopColor={color} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <XAxis
+            dataKey="month"
+            axisLine={false}
+            tickLine={false}
+            tick={{ fontSize: 9, fill: '#94a3b8' }}
+          />
+          <Tooltip content={<CustomTooltip />} />
+          <Area
+            type="monotone"
+            dataKey={dataKey}
+            stroke={color}
+            strokeWidth={2}
+            fill={`url(#grad-${dataKey})`}
+            dot={false}
+            activeDot={{ r: 4, fill: color, strokeWidth: 0 }}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+// ── Small KPI chip ────────────────────────────────────────────────────────────
+function KpiChip({ label, value, sub, accent }: { label: string; value: string; sub: string; accent: string }) {
+  return (
+    <div className={cn('glass-card rounded-2xl p-4 border-l-4', accent)}>
+      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{label}</p>
+      <p className="text-xl font-black text-slate-900 leading-none">{value}</p>
+      <p className="text-[10px] text-slate-400 font-semibold mt-1">{sub}</p>
     </div>
   );
 }
@@ -40,11 +86,74 @@ export function DashboardView({ tasks }: DashboardViewProps) {
   const inProgressCount = tasks.filter(t => t.status === 'In Progress' || t.status === 'กำลังทำ').length;
   const doneCount       = tasks.filter(t => t.status === 'Done' || t.status === 'เสร็จสิ้น').length;
 
-  const totalRevenue  = tasks.reduce((s, t) => s + Number(t.price || 0), 0);
-  const earnedRevenue = tasks.filter(t => t.status === 'Done' || t.status === 'เสร็จสิ้น')
-                             .reduce((s, t) => s + Number(t.price || 0), 0);
+  const totalRevenue   = tasks.reduce((s, t) => s + Number(t.price || 0), 0);
+  const earnedRevenue  = tasks.filter(t => t.status === 'Done' || t.status === 'เสร็จสิ้น')
+                              .reduce((s, t) => s + Number(t.price || 0), 0);
   const pendingRevenue = totalRevenue - earnedRevenue;
+  const totalDevCost   = tasks.reduce((s, t) => s + Number(t.devCost || 0), 0);
+  const totalProfit    = tasks.reduce((s, t) => {
+    const p = Number(t.price || 0);
+    const d = Number(t.devCost || 0);
+    return s + (t.myIncome !== undefined ? Number(t.myIncome) : p - d);
+  }, 0);
 
+  // ── Build monthly time-series (last 12 months) ──────────────────────────────
+  const { grossData, netData, customerData } = useMemo(() => {
+    // Generate last 12 month keys
+    const now = new Date();
+    const keys: string[] = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      keys.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    }
+
+    const gross: Record<string, number> = {};
+    const net: Record<string, number> = {};
+    const newCust: Record<string, Set<string>> = {};
+    const firstSeen: Record<string, string> = {}; // customer → first month
+
+    keys.forEach(k => { gross[k] = 0; net[k] = 0; newCust[k] = new Set(); });
+
+    tasks.forEach(t => {
+      const d = t.startDate || t.endDate;
+      const key = d?.slice(0, 7);
+      if (!key || !gross.hasOwnProperty(key)) return;
+
+      const price  = Number(t.price || 0);
+      const dc     = Number(t.devCost || 0);
+      const profit = t.myIncome !== undefined ? Number(t.myIncome) : price - dc;
+
+      gross[key] += price;
+      net[key]   += profit;
+
+      if (t.customer) {
+        if (!firstSeen[t.customer]) {
+          firstSeen[t.customer] = key;
+          newCust[key].add(t.customer);
+        }
+      }
+    });
+
+    const label = (k: string) => {
+      const [, m] = k.split('-');
+      const names = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+      return names[parseInt(m, 10) - 1] || m;
+    };
+
+    return {
+      grossData:    keys.map(k => ({ month: label(k), gross: gross[k] })),
+      netData:      keys.map(k => ({ month: label(k), net:   net[k] })),
+      customerData: keys.map(k => ({ month: label(k), newCustomers: newCust[k].size })),
+    };
+  }, [tasks]);
+
+  const totalNewCustomers = useMemo(() => {
+    const seen = new Set<string>();
+    tasks.forEach(t => { if (t.customer) seen.add(t.customer); });
+    return seen.size;
+  }, [tasks]);
+
+  // ── Other chart data ────────────────────────────────────────────────────────
   const statusData = [
     { name: 'To Do',       value: todoCount,       color: '#94a3b8' },
     { name: 'In Progress', value: inProgressCount, color: '#818cf8' },
@@ -52,55 +161,71 @@ export function DashboardView({ tasks }: DashboardViewProps) {
   ].filter(d => d.value > 0);
 
   const priorityData = useMemo(() => [
-    { name: 'ด่วน',   Tasks: tasks.filter(t => t.priority?.includes('ด่วน') || t.priority?.includes('Urgent')).length },
-    { name: 'สูง',    Tasks: tasks.filter(t => t.priority?.includes('สูง')   || t.priority?.includes('High')).length },
-    { name: 'กลาง',   Tasks: tasks.filter(t => t.priority?.includes('ปานกลาง') || t.priority?.includes('Medium') || !t.priority).length },
-    { name: 'ต่ำ',    Tasks: tasks.filter(t => t.priority?.includes('ต่ำ')   || t.priority?.includes('Low')).length },
+    { name: 'ด่วน',  Tasks: tasks.filter(t => t.priority?.includes('ด่วน')     || t.priority?.includes('Urgent')).length },
+    { name: 'สูง',   Tasks: tasks.filter(t => t.priority?.includes('สูง')      || t.priority?.includes('High')).length },
+    { name: 'กลาง',  Tasks: tasks.filter(t => t.priority?.includes('ปานกลาง') || t.priority?.includes('Medium') || !t.priority).length },
+    { name: 'ต่ำ',   Tasks: tasks.filter(t => t.priority?.includes('ต่ำ')      || t.priority?.includes('Low')).length },
   ], [tasks]);
 
-  // Monthly revenue mock from task data
-  const monthlyData = useMemo(() => {
-    const months: Record<string, number> = {};
-    tasks.filter(t => t.status === 'Done' || t.status === 'เสร็จสิ้น').forEach(t => {
-      const d = t.endDate || t.startDate;
-      if (!d) return;
-      const key = d.slice(0, 7); // YYYY-MM
-      months[key] = (months[key] || 0) + Number(t.price || 0);
-    });
-    return Object.entries(months).sort().slice(-6).map(([month, revenue]) => ({
-      month: month.slice(5), revenue
-    }));
-  }, [tasks]);
-
   const assigneeData = useMemo(() => [
-    { name: 'Fan',  value: tasks.filter(t => t.assignee === 'Fan').length },
-    { name: 'Mod',  value: tasks.filter(t => t.assignee === 'Mod').length },
+    { name: 'Fan', value: tasks.filter(t => t.assignee === 'Fan').length },
+    { name: 'Mod', value: tasks.filter(t => t.assignee === 'Mod').length },
     { name: 'ไม่ระบุ', value: tasks.filter(t => !t.assignee).length },
   ].filter(d => d.value > 0), [tasks]);
 
   const ASSIGNEE_COLORS = ['#8b5cf6', '#10b981', '#94a3b8'];
 
+  const thb = (v: number) => `฿${v.toLocaleString()}`;
+
   return (
     <div className="flex-1 overflow-y-auto hide-scrollbar p-4 md:p-6">
       <div className="max-w-6xl w-full mx-auto space-y-6">
 
-        {/* KPI row */}
+        {/* Stripe-style metric line charts */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <MetricCard
+            label="Gross Volume"
+            total={`฿${totalRevenue.toLocaleString()}`}
+            data={grossData}
+            dataKey="gross"
+            color="#6366f1"
+            formatter={thb}
+          />
+          <MetricCard
+            label="Net Volume (กำไรสุทธิ)"
+            total={`฿${totalProfit.toLocaleString()}`}
+            data={netData}
+            dataKey="net"
+            color="#10b981"
+            formatter={thb}
+          />
+          <MetricCard
+            label="New Customers"
+            total={`${totalNewCustomers} ราย`}
+            data={customerData}
+            dataKey="newCustomers"
+            color="#8b5cf6"
+            formatter={v => `${v} ราย`}
+          />
+        </div>
+
+        {/* KPI chips */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <KpiCard label="รายได้รวม"       value={`฿${totalRevenue.toLocaleString()}`}  sub="งานทั้งหมด"    color="bg-gradient-to-br from-indigo-600 to-indigo-400" />
-          <KpiCard label="รับแล้ว"          value={`฿${earnedRevenue.toLocaleString()}`} sub="งานเสร็จสิ้น"  color="bg-gradient-to-br from-emerald-600 to-emerald-400" />
-          <KpiCard label="ค้างรับ"          value={`฿${pendingRevenue.toLocaleString()}`} sub="ยังไม่เสร็จ"  color="bg-gradient-to-br from-amber-600 to-amber-400" />
-          <KpiCard label="งานทั้งหมด"       value={`${tasks.length}`}                   sub={`เสร็จ ${doneCount} รายการ`} color="bg-gradient-to-br from-slate-700 to-slate-500" />
+          <KpiChip label="รับแล้ว"      value={`฿${earnedRevenue.toLocaleString()}`}  sub="งานเสร็จสิ้น"            accent="border-emerald-400" />
+          <KpiChip label="ค้างรับ"      value={`฿${pendingRevenue.toLocaleString()}`} sub="ยังไม่เสร็จ"              accent="border-amber-400" />
+          <KpiChip label="ต้นทุน Dev"   value={`฿${totalDevCost.toLocaleString()}`}   sub="ค่าจ้าง Dev รวม"          accent="border-rose-400" />
+          <KpiChip label="งานทั้งหมด"   value={`${tasks.length}`}                     sub={`เสร็จ ${doneCount} งาน`} accent="border-indigo-400" />
         </div>
 
         {/* Status counts */}
         <div className="grid grid-cols-3 gap-3">
           {[
-            { icon: Clock,       label: 'รอดำเนินการ',  count: todoCount,       color: 'text-slate-655',  bg: 'bg-slate-500/10 border-slate-500/20'   },
-            { icon: TrendingUp,  label: 'กำลังทำ',       count: inProgressCount, color: 'text-indigo-655', bg: 'bg-indigo-500/10 border-indigo-500/20'  },
-            { icon: CheckCircle, label: 'เสร็จสิ้น',     count: doneCount,       color: 'text-emerald-655',bg: 'bg-emerald-500/10 border-emerald-500/20' },
+            { icon: Clock,       label: 'รอดำเนินการ', count: todoCount,       color: 'text-slate-600',  bg: 'bg-slate-500/10 border-slate-500/20'   },
+            { icon: TrendingUp,  label: 'กำลังทำ',      count: inProgressCount, color: 'text-indigo-600', bg: 'bg-indigo-500/10 border-indigo-500/20'  },
+            { icon: CheckCircle, label: 'เสร็จสิ้น',    count: doneCount,       color: 'text-emerald-600',bg: 'bg-emerald-500/10 border-emerald-500/20' },
           ].map(item => (
             <div key={item.label} className={cn('border rounded-2xl p-4 flex items-center gap-3 backdrop-blur-md', item.bg)}>
-              <item.icon className={cn('w-8 h-8', item.color)} />
+              <item.icon className={cn('w-7 h-7', item.color)} />
               <div>
                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{item.label}</p>
                 <p className={cn('text-2xl font-black', item.color)}>{item.count}</p>
@@ -112,32 +237,27 @@ export function DashboardView({ tasks }: DashboardViewProps) {
         {/* Charts row */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 
-          {/* Monthly revenue area chart */}
+          {/* Revenue breakdown bar chart */}
           <div className="glass-card rounded-2xl p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <DollarSign className="w-4 h-4 text-indigo-500" />
-              <h3 className="font-bold text-sm text-slate-700">รายได้รายเดือน</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-sm text-slate-700">รายรับรายเดือน (Gross / Net)</h3>
+              <div className="flex gap-3 text-[10px] font-semibold text-slate-500">
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-indigo-400 inline-block" />Gross</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />Net</span>
+              </div>
             </div>
-            {monthlyData.length > 0 ? (
+            {grossData.some(d => d.gross > 0) ? (
               <ResponsiveContainer width="100%" height={140}>
-                <AreaChart data={monthlyData}>
-                  <defs>
-                    <linearGradient id="revenueGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
+                <BarChart data={grossData.slice(-6)}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                   <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
                   <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                  <Tooltip />
-                  <Area type="monotone" dataKey="revenue" stroke="#6366f1" fill="url(#revenueGrad)" strokeWidth={2} />
-                </AreaChart>
+                  <Tooltip formatter={(v: any) => `฿${Number(v).toLocaleString()}`} />
+                  <Bar dataKey="gross" name="Gross" fill="#818cf8" radius={[4, 4, 0, 0]} />
+                </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-[140px] flex items-center justify-center text-xs text-slate-400 font-semibold">
-                ยังไม่มีข้อมูลรายได้
-              </div>
+              <div className="h-[140px] flex items-center justify-center text-xs text-slate-400 font-semibold">ยังไม่มีข้อมูลรายได้</div>
             )}
           </div>
 
@@ -148,7 +268,7 @@ export function DashboardView({ tasks }: DashboardViewProps) {
               <BarChart data={priorityData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} allowDecimals={false} />
                 <Tooltip cursor={{ fill: 'rgba(255,255,255,0.1)' }} />
                 <Bar dataKey="Tasks" fill="#818cf8" radius={[4, 4, 0, 0]} />
               </BarChart>
@@ -156,15 +276,13 @@ export function DashboardView({ tasks }: DashboardViewProps) {
           </div>
 
           {/* Status pie chart */}
-          <div className="glass-card rounded-2xl p-5 flex flex-col items-center">
-            <h3 className="font-bold text-sm text-slate-700 mb-4 self-start">สัดส่วนสถานะงาน</h3>
+          <div className="glass-card rounded-2xl p-5 flex flex-col">
+            <h3 className="font-bold text-sm text-slate-700 mb-4">สัดส่วนสถานะงาน</h3>
             {statusData.length > 0 ? (
               <ResponsiveContainer width="100%" height={140}>
                 <RechartsPie>
                   <Pie data={statusData} cx="50%" cy="50%" innerRadius={40} outerRadius={60} paddingAngle={4} dataKey="value">
-                    {statusData.map((entry, i) => (
-                      <Cell key={i} fill={entry.color} />
-                    ))}
+                    {statusData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                   </Pie>
                   <Tooltip />
                 </RechartsPie>
@@ -182,34 +300,34 @@ export function DashboardView({ tasks }: DashboardViewProps) {
             </div>
           </div>
 
-          {/* Assignee distribution */}
-          <div className="glass-card rounded-2xl p-5">
+          {/* Assignee pie */}
+          <div className="glass-card rounded-2xl p-5 flex flex-col">
             <h3 className="font-bold text-sm text-slate-700 mb-4">งานแยกตาม Assignee</h3>
             {assigneeData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={140}>
-                <LineChart data={assigneeData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="value" stroke="#8b5cf6" strokeWidth={2} dot={{ fill: '#8b5cf6', r: 4 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="h-[140px]">
+              <>
                 <ResponsiveContainer width="100%" height={140}>
                   <RechartsPie>
-                    <Pie data={[{ name: 'Fan', value: 1, color: '#8b5cf6' }, { name: 'Mod', value: 1, color: '#10b981' }]} cx="50%" cy="50%" innerRadius={35} outerRadius={55} dataKey="value">
-                      {ASSIGNEE_COLORS.map((c, i) => <Cell key={i} fill={c} />)}
+                    <Pie data={assigneeData} cx="50%" cy="50%" innerRadius={40} outerRadius={60} paddingAngle={4} dataKey="value">
+                      {assigneeData.map((_, i) => <Cell key={i} fill={ASSIGNEE_COLORS[i % ASSIGNEE_COLORS.length]} />)}
                     </Pie>
                     <Tooltip />
                   </RechartsPie>
                 </ResponsiveContainer>
-              </div>
+                <div className="flex flex-wrap gap-3 justify-center mt-2">
+                  {assigneeData.map((d, i) => (
+                    <div key={d.name} className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-600">
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: ASSIGNEE_COLORS[i % ASSIGNEE_COLORS.length] }} />
+                      {d.name} ({d.value})
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="h-[140px] flex items-center justify-center text-xs text-slate-400 font-semibold">ยังไม่มีข้อมูล</div>
             )}
           </div>
-        </div>
 
+        </div>
       </div>
     </div>
   );

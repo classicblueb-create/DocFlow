@@ -14,6 +14,8 @@ export function LoginModal({ onLogin }: LoginModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const bgImage = localStorage.getItem('modty_bg_image');
+
   const submit = async () => {
     if (!email.trim() || !password) return;
     setLoading(true);
@@ -30,6 +32,7 @@ export function LoginModal({ onLogin }: LoginModalProps) {
   return (
     <div
       className="fixed inset-0 z-[200] flex items-center justify-center px-4 overflow-hidden select-none bg-[#09090b]"
+      style={bgImage ? { backgroundImage: `url("${bgImage}")`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
     >
       {/* Ambient background glows */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-indigo-600/10 rounded-full blur-[120px] pointer-events-none" />

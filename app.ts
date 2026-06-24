@@ -4,6 +4,8 @@ import multer from "multer";
 import dotenv from "dotenv";
 import cors from "cors";
 import helmet from "helmet";
+import { jsPDF } from "jspdf";
+import { createClient } from "@supabase/supabase-js";
 
 dotenv.config();
 
@@ -634,6 +636,515 @@ ${contextSection}
       res.json({ ok: true });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
+    }
+  });
+
+  // -----------------------------------------------------------------
+  // Telegram Bot API — webhook และการแจ้งเตือน
+  // -----------------------------------------------------------------
+  let telegramChatId = process.env.TELEGRAM_CHAT_ID || '';
+
+  // Helper to load Thai font for jsPDF on the server
+  let sarabunBase64: string | null = null;
+  async function getSarabunBase64(): Promise<string> {
+    if (sarabunBase64) return sarabunBase64;
+    try {
+      const res = await fetch("https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/sarabun/Sarabun-Regular.ttf");
+      if (!res.ok) throw new Error("Failed to fetch font");
+      const arrayBuffer = await res.arrayBuffer();
+      sarabunBase64 = Buffer.from(arrayBuffer).toString('base64');
+      return sarabunBase64;
+    } catch (e) {
+      console.error("[Telegram Assistant] Failed to load Sarabun font", e);
+      return "";
+    }
+  }
+
+  async function sendTelegramMessage(chatId: string | number, text: string) {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (!token) {
+      console.error("[Telegram] TELEGRAM_BOT_TOKEN is missing");
+      return;
+    }
+    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: text
+      })
+    });
+    if (!response.ok) {
+      const err = await response.text();
+      console.error("[Telegram sendMessage error]", err);
+    }
+  }
+
+  async function sendTelegramDocument(chatId: string | number, documentUrl: string, caption?: string) {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (!token) {
+      console.error("[Telegram] TELEGRAM_BOT_TOKEN is missing");
+      return;
+    }
+    const response = await fetch(`https://api.telegram.org/bot${token}/sendDocument`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        document: documentUrl,
+        caption: caption
+      })
+    });
+    if (!response.ok) {
+      const err = await response.text();
+      console.error("[Telegram sendDocument error]", err);
+    }
+  }
+
+  async function handleTelegramMessage(text: string, chatId: number | string) {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (!token) {
+      console.warn("[Telegram Assistant] TELEGRAM_BOT_TOKEN is missing");
+      return;
+    }
+
+    if (text.startsWith('/start') || text.startsWith('/help')) {
+      await sendTelegramMessage(chatId, `สวัสดีค่ะ! ฉันคือผู้ช่วยบันทึกงานและออกใบเสนอราคาอัจฉริยะ (DocFlow Assistant)\n\nคุณสามารถสั่งงานฉันได้ เช่น:\n👉 "ออกใบเสนอราคา ออกแบบแบนเนอร์ 3500 บาท สำหรับ บริษัท สินดี จำกัด"`);
+      return;
+    }
+
+    let tasksContext = "";
+    let clientsContext = "";
+    let ideasContext = "";
+
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+
+    if (supabaseUrl && supabaseAnonKey) {
+      try {
+        const supabase = createClient(supabaseUrl, supabaseAnonKey);
+        const [tasksRes, clientsRes, ideasRes] = await Promise.all([
+          supabase.from('tasks').select('*'),
+          supabase.from('clients').select('*'),
+          supabase.from('ideas').select('*')
+        ]);
+        if (tasksRes.data) {
+          tasksContext = tasksRes.data.map(t => `- งาน: ${t.name} (ลูกค้า: ${t.customer || 'ไม่มี'}, ผู้ทำ: ${t.assignee || 'ยังไม่มอบหมาย'}, สถานะ: ${t.status || 'To Do'}, ราคา: ${t.price || 0} บาท, กำหนดส่ง: ${t.dueDate || 'ไม่มี'}, รายละเอียด: ${t.details || 'ไม่มี'})`).join('\n');
+        }
+        if (clientsRes.data) {
+          clientsContext = clientsRes.data.map(c => `- ลูกค้า: ${c.name} (Budget: ${c.targetBudget || 0} บาท, อีเมล/ติดต่อ: ${c.contactInfo || 'ไม่มี'})`).join('\n');
+        }
+        if (ideasRes.data) {
+          ideasContext = ideasRes.data.map(i => `- ไอเดีย: ${i.title} (รายละเอียด: ${i.concept || 'ไม่มี'}, แพลตฟอร์ม: ${i.platform || 'ไม่มี'}, ผู้ลง: ${i.author || 'ไม่มี'})`).join('\n');
+        }
+      } catch (dbErr) {
+        console.error("[Telegram Assistant] Error loading db context:", dbErr);
+      }
+    }
+
+    try {
+      const systemPrompt = `คุณคือผู้ช่วยจดบันทึกงานและสร้างใบเสนอราคาอัจฉริยะ (DocFlow Assistant)
+ทำหน้าที่วิเคราะห์ข้อความพิมพ์ดิบในแชท เพื่อสร้างงาน/ดีลใหม่ และตอบคำถามทั่วไปเกี่ยวกับโปรเจกต์/ลูกค้า/ไอเดียที่มีอยู่ในระบบ
+
+นี่คือข้อมูลปัจจุบันในระบบเว็บ DocFlow:
+---
+[รายการงานทั้งหมด]
+${tasksContext || 'ไม่มีข้อมูลงาน'}
+
+[รายการลูกค้าทั้งหมด]
+${clientsContext || 'ไม่มีข้อมูลลูกค้า'}
+
+[รายการไอเดียทั้งหมด]
+${ideasContext || 'ไม่มีข้อมูลไอเดีย'}
+---
+
+ความสามารถและเงื่อนไขการตอบกลับ:
+1. หากผู้ใช้สั่งงาน เช่น "ออกใบเสนอราคา ออกแบบแบนเนอร์ 3500 บาท สำหรับ บริษัท สินดี จำกัด" 
+   ให้วิเคราะห์และสร้างใบเสนอราคาโดยตอบกลับเป็น JSON รูปแบบนี้รูปเดียวเท่านั้น (ห้ามมีคำพูดอธิบายอื่นนอกจาก JSON และห้ามใส่ markdown block):
+   {
+     "action": "create_quotation",
+     "customerName": "บริษัท สินดี จำกัด",
+     "taskName": "ออกแบบแบนเนอร์โฆษณา",
+     "price": 3500,
+     "details": "ทำกราฟิก 5 ภาพ",
+     "items": [
+       { "description": "ทำกราฟิก 5 ภาพ", "amount": 3500 }
+     ]
+   }
+
+2. หากผู้ใช้ถามคำถามเกี่ยวกับงาน ลูกค้า หรือไอเดียในระบบ เช่น "งานของบริษัท สินดี จำกัด ใครรับผิดชอบ?", "สัปดาห์นี้มีงานอะไรบ้าง?", "ลูกค้าทั้งหมดมีใครบ้าง?"
+   ให้ตอบกลับด้วยข้อความอธิบายเป็นภาษาไทยตามความจริงจากข้อมูลที่ได้รับด้านบน โดยกำหนดโครงสร้าง JSON ดังนี้ (ห้ามมีคำพูดอื่นนอกจาก JSON):
+   {
+     "action": "other",
+     "replyText": "[คำตอบของคุณที่นี่ อ้างอิงจากข้อมูลด้านบนอย่างแม่นยำ สรุปให้อ่านง่าย ชัดเจน]"
+   }
+
+3. หากผู้ใช้พูดคุยทั่วไป หรือข้อมูลไม่พอสร้างใบเสนอราคา ให้ตอบกลับด้วย:
+   {
+     "action": "other",
+     "replyText": "สวัสดีค่ะ! ต้องการให้ฉันช่วยจดงานหรือสอบถามข้อมูลงาน/ลูกค้า พิมพ์ถามรายละเอียดมาได้เลยนะคะ"
+   }`;
+
+      const aiResponse = await generateWithAI(systemPrompt, text);
+      let parsed: any;
+      try {
+        parsed = JSON.parse(aiResponse.replace(/```json/g, '').replace(/```/g, '').trim());
+      } catch (e) {
+        console.error("[Telegram Assistant] Failed to parse AI response:", aiResponse);
+        return;
+      }
+
+      if (parsed.action === 'create_quotation') {
+        const { customerName, taskName, price, details, items } = parsed;
+
+        // Save to Supabase Tasks
+        const taskId = `task-tg-${Date.now()}`;
+        const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+        const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+        
+        let dbSaved = false;
+        let pdfUrl = "";
+
+        if (supabaseUrl && supabaseAnonKey) {
+          const supabase = createClient(supabaseUrl, supabaseAnonKey);
+          
+          // Get or create client
+          let clientId: string | null = null;
+          if (customerName) {
+            const { data: clientData } = await supabase
+              .from('clients')
+              .select('id')
+              .eq('name', customerName)
+              .maybeSingle();
+            
+            if (clientData) {
+              clientId = clientData.id;
+            } else {
+              clientId = `client-${Date.now()}`;
+              await supabase.from('clients').insert({
+                id: clientId,
+                name: customerName,
+                targetBudget: price
+              });
+            }
+          }
+
+          // Generate PDF using jsPDF
+          const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+          
+          const fontBase64 = await getSarabunBase64();
+          if (fontBase64) {
+            doc.addFileToVFS("Sarabun-Regular.ttf", fontBase64);
+            doc.addFont("Sarabun-Regular.ttf", "Sarabun", "normal");
+            doc.setFont("Sarabun");
+          }
+
+          // Write PDF content
+          doc.setFontSize(22);
+          doc.text("ใบเสนอราคา / Quotation", 20, 25);
+          
+          doc.setFontSize(10);
+          doc.text(`เลขที่เอกสาร: QT-${Date.now().toString().slice(-6)}`, 140, 20);
+          doc.text(`วันที่ออก: ${new Date().toLocaleDateString('th-TH')}`, 140, 25);
+          
+          doc.line(20, 32, 190, 32);
+          
+          doc.setFontSize(11);
+          doc.text("ข้อมูลผู้เสนอราคา:", 20, 42);
+          doc.text("DocFlow Workspace Co., Ltd.", 20, 48);
+          doc.text("อีเมล: contact@docflow.app", 20, 54);
+          
+          doc.text("ข้อมูลผู้รับเสนอราคา (ลูกค้า):", 110, 42);
+          doc.text(customerName || "-", 110, 48);
+          
+          doc.line(20, 62, 190, 62);
+          
+          doc.setFontSize(12);
+          doc.text(`ชื่อโครงการ/งาน: ${taskName}`, 20, 72);
+          
+          // Draw Table Header
+          doc.setFontSize(10);
+          doc.setFillColor(240, 240, 240);
+          doc.rect(20, 80, 170, 8, "F");
+          doc.text("รายละเอียดรายการงาน (Items / Scope)", 22, 85);
+          doc.text("จำนวนเงิน (THB)", 150, 85);
+          
+          let currentY = 95;
+          const pdfItems = items || [{ description: taskName, amount: price }];
+          pdfItems.forEach((item: any, idx: number) => {
+            doc.text(`${idx + 1}. ${item.description || item.name || taskName}`, 22, currentY);
+            doc.text(`${(item.amount || price).toLocaleString()} .-`, 150, currentY);
+            currentY += 10;
+          });
+          
+          doc.line(20, currentY, 190, currentY);
+          currentY += 8;
+          
+          doc.setFontSize(12);
+          doc.text("ยอดเงินรวมสุทธิ (Total Amount):", 90, currentY);
+          doc.text(`${price.toLocaleString()} บาท`, 150, currentY);
+          
+          currentY += 15;
+          doc.setFontSize(10);
+          doc.text("ลงชื่อผู้เสนอราคา .....................................", 110, currentY);
+
+          // Upload PDF to Supabase Storage
+          const pdfOutput = doc.output("arraybuffer");
+          const buffer = Buffer.from(pdfOutput);
+          const fileName = `quotation_${Date.now()}.pdf`;
+          const filePath = `quotations/${fileName}`;
+          
+          const { error: uploadError } = await supabase.storage
+            .from('attachments')
+            .upload(filePath, buffer, {
+              contentType: 'application/pdf',
+              cacheControl: '3600',
+              upsert: true
+            });
+            
+          let newAttachments: any[] = [];
+          if (!uploadError) {
+            const { data: { publicUrl: url } } = supabase.storage
+              .from('attachments')
+              .getPublicUrl(filePath);
+            pdfUrl = url;
+
+            // Build task attachment
+            newAttachments.push({
+              id: `attach-${Date.now()}`,
+              name: `ใบเสนอราคา_${taskName}.pdf`,
+              url: pdfUrl,
+              path: filePath,
+              mimeType: 'application/pdf',
+              size: `${(buffer.length / (1024 * 1024)).toFixed(2)} MB`
+            });
+          } else {
+            console.error("[Telegram Assistant] Supabase PDF upload error:", uploadError);
+          }
+
+          // Build a mock invoice in the task
+          const invoiceNo = `INV-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Math.floor(100+Math.random()*900)}`;
+          const newInvoice = {
+            id: `inv-${Date.now()}`,
+            invoiceNo,
+            issueDate: new Date().toISOString().slice(0, 10),
+            status: 'draft',
+            phaseIds: [],
+            totalAmount: price,
+            notes: details
+          };
+
+          const { error: taskError } = await supabase.from('tasks').insert({
+            id: taskId,
+            name: taskName,
+            status: 'ไอเดีย/ร่าง',
+            price: price,
+            customer: customerName,
+            clientId: clientId,
+            details: details,
+            invoices: JSON.stringify([newInvoice]),
+            attachments: newAttachments.length > 0 ? JSON.stringify(newAttachments) : null
+          });
+          
+          if (!taskError) {
+            dbSaved = true;
+          } else {
+            console.error("[Telegram Assistant] Supabase insert task error:", taskError);
+          }
+        }
+
+        // Send Reply to Telegram
+        let messageText = `📄 *บันทึกงานและออกใบเสนอราคาสำเร็จ!*\n\n` +
+          `🏢 ลูกค้า: ${customerName || '-'}\n` +
+          `✅ ชื่องาน: ${taskName}\n` +
+          `💰 ราคา: ${price.toLocaleString()} บาท\n` +
+          `📝 รายละเอียด: ${details || '-'}\n\n`;
+          
+        if (dbSaved) {
+          messageText += `บันทึกเข้าระบบเรียบร้อยแล้วค่ะ 🚀`;
+        } else {
+          messageText += `⚠️ เกิดข้อผิดพลาดในการบันทึกข้อมูล`;
+        }
+
+        if (pdfUrl) {
+          await sendTelegramDocument(chatId, pdfUrl, messageText);
+        } else {
+          await sendTelegramMessage(chatId, messageText);
+        }
+      } else if (parsed.action === 'other' && parsed.replyText) {
+        await sendTelegramMessage(chatId, parsed.replyText);
+      }
+    } catch (err: any) {
+      console.error("[Telegram Assistant] handleTelegramMessage error:", err);
+    }
+  }
+
+  // Telegram webhook receiver
+  app.post("/api/telegram/webhook", (req, res) => {
+    res.sendStatus(200); // ตอบรับ Telegram ทันที
+    const update = updateBody(req.body);
+    const message = update.message || update.edited_message;
+    if (!message) return;
+
+    const chat = message.chat;
+    const text = message.text?.trim() || "";
+    const chatId = chat?.id;
+
+    if (chatId) {
+      const chatIdStr = String(chatId);
+      if (telegramChatId !== chatIdStr) {
+        telegramChatId = chatIdStr;
+        console.log(`[Telegram] บันทึก Chat ID: ${telegramChatId}`);
+      }
+    }
+
+    if (text) {
+      // ตอบกลับหากมีคำสำคัญ หรือเริ่มด้วย / หรือพิมพ์หาบอท
+      const isTriggered = text.includes('เสนอราคา') || text.includes('ใบเสนอราคา') || text.startsWith('/');
+      if (isTriggered) {
+        handleTelegramMessage(text, chatId).catch(err => {
+          console.error("[Telegram Webhook Error]", err);
+        });
+      }
+    }
+  });
+
+  // Helper helper to handle webhook requests body parsing safely
+  function updateBody(body: any): any {
+    return body || {};
+  }
+
+  // ดู Chat ID ล่าสุด
+  app.get("/api/telegram/chat-id", (_req, res) => {
+    res.json({ chatId: telegramChatId || null });
+  });
+
+  // Telegram push notification
+  app.post("/api/notify/telegram", async (req, res) => {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = telegramChatId || process.env.TELEGRAM_CHAT_ID;
+
+    if (!token) {
+      return res.status(503).json({ error: "TELEGRAM_BOT_TOKEN ยังไม่ได้ตั้งค่าในไฟล์ .env" });
+    }
+    if (!chatId) {
+      return res.status(503).json({ error: "ยังไม่มี TELEGRAM_CHAT_ID — ส่งข้อความหาบอทในแชทก่อน แล้วลองใหม่" });
+    }
+
+    const { taskName, assignee, dueDate, fileUrl, details, customer } = req.body;
+    if (!taskName || !assignee) {
+      return res.status(400).json({ error: "ต้องระบุ taskName และ assignee" });
+    }
+
+    const lines = [
+      '📋 มอบหมายงานใหม่!',
+      '━━━━━━━━━━━━━━━',
+      `✅ งาน: ${taskName}`,
+      `👤 มอบให้: ${assignee}`,
+      customer   ? `🏢 ลูกค้า: ${customer}` : '',
+      dueDate    ? `📅 กำหนดส่ง: ${dueDate}` : '',
+      details    ? `📝 ${details.slice(0, 120)}${details.length > 120 ? '...' : ''}` : '',
+      fileUrl    ? `🔗 ${fileUrl}` : '',
+      '━━━━━━━━━━━━━━━',
+      'ส่งจาก DocFlow 🚀',
+    ].filter(Boolean).join('\n');
+
+    try {
+      const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: lines
+        })
+      });
+      if (!response.ok) {
+        const err = await response.text();
+        console.error("[Telegram Push Error]", err);
+        return res.status(response.status).json({ error: err || "Telegram API error" });
+      }
+      return res.json({ ok: true });
+    } catch (e: any) {
+      console.error("[Telegram] Push fetch error:", e);
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Telegram push notification for due-soon tasks (within 5 days)
+  app.post("/api/notify/due-soon", async (req, res) => {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = telegramChatId || process.env.TELEGRAM_CHAT_ID;
+
+    if (!token) {
+      return res.status(503).json({ error: "TELEGRAM_BOT_TOKEN ยังไม่ได้ตั้งค่าในไฟล์ .env" });
+    }
+    if (!chatId) {
+      return res.status(503).json({ error: "ยังไม่มี TELEGRAM_CHAT_ID — ส่งข้อความหาบอทในแชทก่อน แล้วลองใหม่" });
+    }
+
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return res.status(500).json({ error: "Missing Supabase configuration" });
+    }
+
+    try {
+      const supabase = createClient(supabaseUrl, supabaseAnonKey);
+      const { data: tasks, error } = await supabase
+        .from('tasks')
+        .select('*');
+
+      if (error) throw error;
+
+      const today = new Date();
+      // Set to start of today local time
+      today.setHours(0,0,0,0);
+      const fiveDaysLater = new Date();
+      fiveDaysLater.setDate(today.getDate() + 5);
+      fiveDaysLater.setHours(23,59,59,999);
+
+      const dueSoonTasks = (tasks || []).filter((task: any) => {
+        if (!task.dueDate) return false;
+        if (task.status === 'เสร็จสิ้น' || task.status === 'Done') return false;
+        const dueDate = new Date(task.dueDate);
+        return dueDate >= today && dueDate <= fiveDaysLater;
+      });
+
+      if (dueSoonTasks.length === 0) {
+        return res.json({ ok: true, message: "ไม่มีงานที่ใกล้ครบกำหนดใน 5 วัน" });
+      }
+
+      let message = `⚠️ *แจ้งเตือนงานใกล้ครบกำหนด (ใน 5 วัน)*\n`;
+      message += `━━━━━━━━━━━━━━━\n`;
+      dueSoonTasks.forEach((task: any) => {
+        message += `✅ งาน: ${task.name}\n`;
+        message += `👤 มอบหมาย: ${task.assignee || 'ไม่มี'}\n`;
+        message += `📅 กำหนดส่ง: ${task.dueDate}\n`;
+        message += `🏢 ลูกค้า: ${task.customer || '-'}\n`;
+        message += `━━━━━━━━━━━━━━━\n`;
+      });
+      message += `ส่งจาก DocFlow 🚀`;
+
+      const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: message,
+          parse_mode: "Markdown"
+        })
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error("[Telegram Due Soon Push Error]", errText);
+        return res.status(response.status).json({ error: errText || "Telegram API error" });
+      }
+
+      return res.json({ ok: true, notifiedCount: dueSoonTasks.length });
+    } catch (e: any) {
+      console.error("[Telegram] Due soon fetch error:", e);
+      return res.status(500).json({ error: e.message });
     }
   });
 

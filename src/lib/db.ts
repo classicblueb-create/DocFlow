@@ -123,6 +123,11 @@ export async function saveTask(task: Task): Promise<void> {
     invoices: task.invoices || null,
     pipelineStage: task.pipelineStage || null,
     dealValue: task.dealValue ?? null,
+    attachments: task.attachments || null,
+    comments: task.comments || null,
+    dependencies: task.dependencies || null,
+    categoryId: task.categoryId || null,
+    updatedAt: task.updatedAt || null,
   });
   if (error) throw error;
 
@@ -288,6 +293,15 @@ export async function importDataFromSheets(
       aiCourse: t.aiCourse || null,
       priority: t.priority || null,
       aiChatHistory: t.aiChatHistory || null,
+      paymentPhases: t.paymentPhases || null,
+      invoices: t.invoices || null,
+      pipelineStage: t.pipelineStage || null,
+      dealValue: t.dealValue ?? null,
+      attachments: t.attachments || null,
+      comments: t.comments || null,
+      dependencies: t.dependencies || null,
+      categoryId: t.categoryId || null,
+      updatedAt: t.updatedAt || null,
     })));
     if (error) throw error;
   }

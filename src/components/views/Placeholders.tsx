@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight, BarChartHorizontal } from 'lucide-react';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday } from 'date-fns';
 import { useState } from 'react';
+import { cn } from '../../lib/utils';
 
 interface ViewProps {
   tasks: any[];

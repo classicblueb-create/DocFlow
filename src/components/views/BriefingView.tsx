@@ -741,7 +741,7 @@ export function BriefingView({
                 onClick={() => { setShowAnalysisModal(false); setAnalysisReport(null); }}
                 className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 cursor-pointer transition-colors"
               >
-                ✕
+                ×
               </button>
             </div>
 

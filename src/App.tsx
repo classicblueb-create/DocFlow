@@ -26,531 +26,585 @@ import { ThemeSettingsModal } from './components/modals/ThemeSettingsModal';
 
 import { ViewType, Task, Client, Template, Idea, ContentPlan, ProjectCategory } from './types';
 import {
-  subscribeTasks, subscribeClients, subscribeTemplates, subscribeIdeas,
-  saveTask, deleteTask as dbDeleteTask,
-  saveClient, deleteClient as dbDeleteClient,
-  saveTemplate, deleteTemplate as dbDeleteTemplate,
-  saveIdea, deleteIdea as dbDeleteIdea,
+ subscribeTasks, subscribeClients, subscribeTemplates, subscribeIdeas,
+ saveTask, deleteTask as dbDeleteTask,
+ saveClient, deleteClient as dbDeleteClient,
+ saveTemplate, deleteTemplate as dbDeleteTemplate,
+ saveIdea, deleteIdea as dbDeleteIdea,
 } from './lib/db';
 import { getSession, onAuthStateChange } from './lib/auth';
 import { applyTheme } from './lib/theme';
 
 // ── localStorage keys ─────────────────────────────────────────────────────────
-const LS_TASKS      = 'docflow_local_tasks';
-const LS_CLIENTS    = 'docflow_local_clients';
-const LS_TEMPLATES  = 'docflow_local_templates';
-const LS_IDEAS      = 'docflow_local_ideas';
-const LS_CONTENT    = 'docflow_local_content_plans';
+const LS_TASKS = 'docflow_local_tasks';
+const LS_CLIENTS = 'docflow_local_clients';
+const LS_TEMPLATES = 'docflow_local_templates';
+const LS_IDEAS = 'docflow_local_ideas';
+const LS_CONTENT = 'docflow_local_content_plans';
 const LS_CATEGORIES = 'docflow_local_categories';
 
 function lsGet<T>(key: string, fallback: T): T {
-  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
+ try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
 }
 function lsSet(key: string, val: unknown) {
-  try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
+ try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
 }
 
 // ── Notification type ─────────────────────────────────────────────────────────
 interface AppNotification { id: number; message: string; isError: boolean; }
 
 export default function App() {
-  // ── Auth ──────────────────────────────────────────────────────────────────
-  const [authed, setAuthed]     = useState(false);
-  const [authLoading, setAuthLoading] = useState(true);
+ // ── Auth ──────────────────────────────────────────────────────────────────
+ const [authed, setAuthed] = useState(false);
+ const [authLoading, setAuthLoading] = useState(true);
 
-  // ── UI state ──────────────────────────────────────────────────────────────
-  const [currentView, setCurrentView]     = useState<ViewType>('briefing');
-  const [isMobileOpen, setIsMobileOpen]   = useState(false);
-  const [searchQuery, setSearchQuery]     = useState('');
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [settingsVersion, setSettingsVersion] = useState(0);
+ // ── UI state ──────────────────────────────────────────────────────────────
+ const [currentView, setCurrentView] = useState<ViewType>('briefing');
+ const [isMobileOpen, setIsMobileOpen] = useState(false);
+ const [searchQuery, setSearchQuery] = useState('');
+ const [notifications, setNotifications] = useState<AppNotification[]>([]);
+ const [settingsVersion, setSettingsVersion] = useState(0);
 
-  // ── Active category (for category drill-down) ──────────────────────────────
-  const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
+ // ── Active category (for category drill-down) ──────────────────────────────
+ const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
 
-  // ── Modal state ───────────────────────────────────────────────────────────
-  const [isTaskModalOpen, setIsTaskModalOpen]   = useState(false);
-  const [editingTask, setEditingTask]           = useState<Task | null>(null);
-  const [selectedTask, setSelectedTask]         = useState<Task | null>(null);
-  const [selectedAgent, setSelectedAgent]       = useState<string | null>(null);
-  const [isStandupOpen, setIsStandupOpen]       = useState(false);
-  const [isDocSettingsOpen, setIsDocSettingsOpen] = useState(false);
-  const [isThemeOpen, setIsThemeOpen]           = useState(false);
-  const [newTaskPipelineStage, setNewTaskPipelineStage] = useState<string | undefined>();
+ // ── Modal state ───────────────────────────────────────────────────────────
+ const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+ const [editingTask, setEditingTask] = useState<Task | null>(null);
+ const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+ const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
+ const [isStandupOpen, setIsStandupOpen] = useState(false);
+ const [isDocSettingsOpen, setIsDocSettingsOpen] = useState(false);
+ const [isThemeOpen, setIsThemeOpen] = useState(false);
+ const [newTaskPipelineStage, setNewTaskPipelineStage] = useState<string | undefined>();
 
-  // ── Data ──────────────────────────────────────────────────────────────────
-  const [tasks, setTasks]           = useState<Task[]>(() => lsGet(LS_TASKS, []));
-  const [clients, setClients]       = useState<Client[]>(() => lsGet(LS_CLIENTS, []));
-  const [templates, setTemplates]   = useState<Template[]>(() => lsGet(LS_TEMPLATES, []));
-  const [ideas, setIdeas]           = useState<Idea[]>(() => lsGet(LS_IDEAS, []));
-  const [contentPlans, setContentPlans] = useState<ContentPlan[]>(() => lsGet(LS_CONTENT, []));
-  const [categories, setCategories] = useState<ProjectCategory[]>(() => lsGet(LS_CATEGORIES, []));
+ // ── Data ──────────────────────────────────────────────────────────────────
+ const [tasks, setTasks] = useState<Task[]>(() => lsGet(LS_TASKS, []));
+ const [clients, setClients] = useState<Client[]>(() => lsGet(LS_CLIENTS, []));
+ const [templates, setTemplates] = useState<Template[]>(() => lsGet(LS_TEMPLATES, []));
+ const [ideas, setIdeas] = useState<Idea[]>(() => lsGet(LS_IDEAS, []));
+ const [contentPlans, setContentPlans] = useState<ContentPlan[]>(() => lsGet(LS_CONTENT, []));
+ const [categories, setCategories] = useState<ProjectCategory[]>(() => lsGet(LS_CATEGORIES, []));
 
-  // ── Apply theme on mount ──────────────────────────────────────────────────
-  useEffect(() => { applyTheme(); }, []);
+ // ── Apply theme on mount ──────────────────────────────────────────────────
+ useEffect(() => { applyTheme(); }, []);
 
-  // ── Auth bootstrap ────────────────────────────────────────────────────────
-  useEffect(() => {
-    getSession().then(({ data }) => {
-      setAuthed(!!data.session);
-      setAuthLoading(false);
-    });
-    const { data: { subscription } } = onAuthStateChange((user: any) => {
-      setAuthed(!!user);
-    });
-    return () => subscription.unsubscribe();
-  }, []);
+ // ── Auth bootstrap ────────────────────────────────────────────────────────
+ useEffect(() => {
+ getSession().then(({ data }) => {
+ setAuthed(!!data.session);
+ setAuthLoading(false);
+ });
+ const { data: { subscription } } = onAuthStateChange((user: any) => {
+ setAuthed(!!user);
+ });
+ return () => subscription.unsubscribe();
+ }, []);
 
-  // ── Realtime subscriptions (only when authed) ─────────────────────────────
-  useEffect(() => {
-    if (!authed) return;
+ // ── Background image (persisted in localStorage) ─────────────────────────
+ const applyBgImage = (dataUrl: string | null) => {
+ const val = dataUrl ? `url("${dataUrl}")` : 'none';
+ document.documentElement.style.setProperty('--app-bg-image', val);
+ };
+ useEffect(() => {
+ const saved = localStorage.getItem('modty_bg_image');
+ if (saved) applyBgImage(saved);
+ }, []);
 
-    const unsubTasks = subscribeTasks(data => {
-      setTasks(data);
-      lsSet(LS_TASKS, data);
-    });
-    const unsubClients = subscribeClients(data => {
-      setClients(data);
-      lsSet(LS_CLIENTS, data);
-    });
-    const unsubTemplates = subscribeTemplates(data => {
-      setTemplates(data);
-      lsSet(LS_TEMPLATES, data);
-    });
-    const unsubIdeas = subscribeIdeas(data => {
-      setIdeas(data);
-      lsSet(LS_IDEAS, data);
-    });
+ const handleBgUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+ const file = e.target.files?.[0];
+ if (!file) return;
+ const reader = new FileReader();
+ reader.onload = ev => {
+ const dataUrl = ev.target?.result as string;
+ localStorage.setItem('modty_bg_image', dataUrl);
+ applyBgImage(dataUrl);
+ };
+ reader.readAsDataURL(file);
+ e.target.value = '';
+ };
 
-    return () => {
-      unsubTasks();
-      unsubClients();
-      unsubTemplates();
-      unsubIdeas();
-    };
-  }, [authed]);
+ const handleBgRemove = () => {
+ localStorage.removeItem('modty_bg_image');
+ applyBgImage(null);
+ };
 
-  // ── Notification helper ───────────────────────────────────────────────────
-  const showNotification = useCallback((message: string, isError = false) => {
-    const id = Date.now();
-    setNotifications(prev => [...prev, { id, message, isError }]);
-    setTimeout(() => setNotifications(prev => prev.filter(n => n.id !== id)), 3500);
-  }, []);
+ // ── Realtime subscriptions (only when authed) ─────────────────────────────
+ useEffect(() => {
+ if (!authed) return;
 
-  // ── Task handlers ─────────────────────────────────────────────────────────
-  const handleSaveTask = useCallback(async (taskData: Partial<Task>) => {
-    const id = taskData.id || `task-${Date.now()}`;
-    const task: Task = {
-      id,
-      name: taskData.name || 'งานใหม่',
-      status: taskData.status || 'To Do',
-      ...taskData,
-      updatedAt: new Date().toISOString(),
-    };
-    try {
-      await saveTask(task);
-      showNotification('บันทึกเรียบร้อย');
-    } catch (e: any) {
-      showNotification(`บันทึกไม่สำเร็จ: ${e.message}`, true);
-    }
-  }, [showNotification]);
+ const unsubTasks = subscribeTasks(data => {
+ setTasks(data);
+ lsSet(LS_TASKS, data);
+ });
+ const unsubClients = subscribeClients(data => {
+ setClients(data);
+ lsSet(LS_CLIENTS, data);
+ });
+ const unsubTemplates = subscribeTemplates(data => {
+ setTemplates(data);
+ lsSet(LS_TEMPLATES, data);
+ });
+ const unsubIdeas = subscribeIdeas(data => {
+ setIdeas(data);
+ lsSet(LS_IDEAS, data);
+ });
 
-  const handleUpdateTask = useCallback(async (task: Task) => {
-    const updated = { ...task, updatedAt: new Date().toISOString() };
-    // Optimistic update
-    setTasks(prev => {
-      const next = prev.map(t => t.id === task.id ? updated : t);
-      lsSet(LS_TASKS, next);
-      return next;
-    });
-    // Update selected task if open
-    setSelectedTask(prev => prev?.id === task.id ? updated : prev);
-    try {
-      await saveTask(updated);
-    } catch (e: any) {
-      showNotification(`อัปเดตไม่สำเร็จ: ${e.message}`, true);
-    }
-  }, [showNotification]);
+ return () => {
+ unsubTasks();
+ unsubClients();
+ unsubTemplates();
+ unsubIdeas();
+ };
+ }, [authed]);
 
-  const handleCreateTask = useCallback(async (taskData: Partial<Task>) => {
-    if (editingTask) {
-      await handleUpdateTask({ ...editingTask, ...taskData });
-      setEditingTask(null);
-    } else {
-      await handleSaveTask({
-        ...taskData,
-        pipelineStage: (newTaskPipelineStage as any) || taskData.pipelineStage,
-      });
-    }
-    setNewTaskPipelineStage(undefined);
-  }, [editingTask, handleUpdateTask, handleSaveTask, newTaskPipelineStage]);
+ // ── Notification helper ───────────────────────────────────────────────────
+ const showNotification = useCallback((message: string, isError = false) => {
+ const id = Date.now();
+ setNotifications(prev => [...prev, { id, message, isError }]);
+ setTimeout(() => setNotifications(prev => prev.filter(n => n.id !== id)), 3500);
+ }, []);
 
-  const handleDeleteTask = useCallback(async (id: string | number) => {
-    if (!window.confirm('ลบงานนี้ใช่ไหม? ไม่สามารถกู้คืนได้')) return;
-    setTasks(prev => { const next = prev.filter(t => t.id !== id); lsSet(LS_TASKS, next); return next; });
-    setSelectedTask(null);
-    try {
-      await dbDeleteTask(id);
-      showNotification('ลบเรียบร้อย');
-    } catch (e: any) {
-      showNotification(`ลบไม่สำเร็จ: ${e.message}`, true);
-    }
-  }, [showNotification]);
+ // ── Task handlers ─────────────────────────────────────────────────────────
+ const handleSaveTask = useCallback(async (taskData: Partial<Task>) => {
+ const id = taskData.id || `task-${Date.now()}`;
+ const task: Task = {
+ id,
+ name: taskData.name || 'งานใหม่',
+ status: taskData.status || 'To Do',
+ ...taskData,
+ updatedAt: new Date().toISOString(),
+ };
+ try {
+ await saveTask(task);
+ showNotification('บันทึกเรียบร้อย');
+ } catch (e: any) {
+ showNotification(`บันทึกไม่สำเร็จ: ${e.message}`, true);
+ }
+ }, [showNotification]);
 
-  const handleTaskDrop = useCallback(async (taskId: string, targetStatus: string) => {
-    const task = tasks.find(t => t.id.toString() === taskId);
-    if (!task) return;
-    await handleUpdateTask({ ...task, status: targetStatus });
-  }, [tasks, handleUpdateTask]);
+ const handleUpdateTask = useCallback(async (task: Task) => {
+ const updated = { ...task, updatedAt: new Date().toISOString() };
+ // Optimistic update
+ setTasks(prev => {
+ const next = prev.map(t => t.id === task.id ? updated : t);
+ lsSet(LS_TASKS, next);
+ return next;
+ });
+ // Update selected task if open
+ setSelectedTask(prev => prev?.id === task.id ? updated : prev);
+ try {
+ await saveTask(updated);
+ } catch (e: any) {
+ showNotification(`อัปเดตไม่สำเร็จ: ${e.message}`, true);
+ }
+ }, [showNotification]);
 
-  const handleTaskClick = useCallback((task: Task) => {
-    setSelectedTask(task);
-  }, []);
+ const handleCreateTask = useCallback(async (taskData: Partial<Task>) => {
+ if (editingTask) {
+ await handleUpdateTask({ ...editingTask, ...taskData });
+ setEditingTask(null);
+ } else {
+ await handleSaveTask({
+ ...taskData,
+ pipelineStage: (newTaskPipelineStage as any) || taskData.pipelineStage,
+ });
+ }
+ setNewTaskPipelineStage(undefined);
+ }, [editingTask, handleUpdateTask, handleSaveTask, newTaskPipelineStage]);
 
-  const handleEditClick = useCallback((task: Task) => {
-    setEditingTask(task);
-    setSelectedTask(null);
-    setIsTaskModalOpen(true);
-  }, []);
+ const handleDeleteTask = useCallback(async (id: string | number) => {
+ if (!window.confirm('ลบงานนี้ใช่ไหม? ไม่สามารถกู้คืนได้')) return;
+ setTasks(prev => { const next = prev.filter(t => t.id !== id); lsSet(LS_TASKS, next); return next; });
+ setSelectedTask(null);
+ try {
+ await dbDeleteTask(id);
+ showNotification('ลบเรียบร้อย');
+ } catch (e: any) {
+ showNotification(`ลบไม่สำเร็จ: ${e.message}`, true);
+ }
+ }, [showNotification]);
 
-  // ── Client handlers ───────────────────────────────────────────────────────
-  const handleSaveClient = useCallback(async (clientData: Partial<Client>) => {
-    const client: Client = { id: clientData.id || `C-${Date.now()}`, name: clientData.name || 'ลูกค้าใหม่', ...clientData };
-    try { await saveClient(client); showNotification('บันทึกลูกค้าเรียบร้อย'); }
-    catch (e: any) { showNotification(`บันทึกไม่สำเร็จ: ${e.message}`, true); }
-  }, [showNotification]);
+ const handleTaskDrop = useCallback(async (taskId: string, targetStatus: string) => {
+ const task = tasks.find(t => t.id.toString() === taskId);
+ if (!task) return;
+ await handleUpdateTask({ ...task, status: targetStatus });
+ }, [tasks, handleUpdateTask]);
 
-  const handleDeleteClient = useCallback(async (id: string) => {
-    if (!window.confirm('ลบลูกค้าใช่ไหม?')) return;
-    setClients(prev => { const next = prev.filter(c => c.id !== id); lsSet(LS_CLIENTS, next); return next; });
-    try { await dbDeleteClient(id); showNotification('ลบลูกค้าเรียบร้อย'); }
-    catch (e: any) { showNotification(`ลบไม่สำเร็จ: ${e.message}`, true); }
-  }, [showNotification]);
+ const handleTaskClick = useCallback((task: Task) => {
+ setSelectedTask(task);
+ }, []);
 
-  // ── Template handlers ─────────────────────────────────────────────────────
-  const handleSaveTemplate = useCallback(async (tmpl: Template) => {
-    const template: Template = { id: tmpl.id || `T-${Date.now()}`, name: tmpl.name || 'เทมเพลตใหม่', ...tmpl };
-    try { await saveTemplate(template); showNotification('บันทึกเทมเพลตเรียบร้อย'); }
-    catch (e: any) { showNotification(`บันทึกไม่สำเร็จ: ${e.message}`, true); }
-  }, [showNotification]);
+ const handleEditClick = useCallback((task: Task) => {
+ setEditingTask(task);
+ setSelectedTask(null);
+ setIsTaskModalOpen(true);
+ }, []);
 
-  const handleDeleteTemplate = useCallback(async (id: string) => {
-    if (!window.confirm('ลบเทมเพลตใช่ไหม?')) return;
-    setTemplates(prev => { const next = prev.filter(t => t.id !== id); lsSet(LS_TEMPLATES, next); return next; });
-    try { await dbDeleteTemplate(id); showNotification('ลบเทมเพลตเรียบร้อย'); }
-    catch (e: any) { showNotification(`ลบไม่สำเร็จ: ${e.message}`, true); }
-  }, [showNotification]);
+ // ── Client handlers ───────────────────────────────────────────────────────
+ const handleSaveClient = useCallback(async (clientData: Partial<Client>) => {
+ const client: Client = { id: clientData.id || `C-${Date.now()}`, name: clientData.name || 'ลูกค้าใหม่', ...clientData };
+ try { await saveClient(client); showNotification('บันทึกลูกค้าเรียบร้อย'); }
+ catch (e: any) { showNotification(`บันทึกไม่สำเร็จ: ${e.message}`, true); }
+ }, [showNotification]);
 
-  // ── Idea handlers ─────────────────────────────────────────────────────────
-  const handleSaveIdea = useCallback(async (idea: Idea) => {
-    // Optimistic
-    setIdeas(prev => {
-      const existing = prev.findIndex(i => i.id === idea.id);
-      const next = existing >= 0 ? prev.map(i => i.id === idea.id ? idea : i) : [...prev, idea];
-      lsSet(LS_IDEAS, next);
-      return next;
-    });
-    try { await saveIdea(idea); }
-    catch (e: any) { showNotification(`บันทึกไอเดียไม่สำเร็จ: ${e.message}`, true); }
-  }, [showNotification]);
+ const handleDeleteClient = useCallback(async (id: string) => {
+ if (!window.confirm('ลบลูกค้าใช่ไหม?')) return;
+ setClients(prev => { const next = prev.filter(c => c.id !== id); lsSet(LS_CLIENTS, next); return next; });
+ try { await dbDeleteClient(id); showNotification('ลบลูกค้าเรียบร้อย'); }
+ catch (e: any) { showNotification(`ลบไม่สำเร็จ: ${e.message}`, true); }
+ }, [showNotification]);
 
-  const handleDeleteIdea = useCallback(async (id: string) => {
-    setIdeas(prev => { const next = prev.filter(i => i.id !== id); lsSet(LS_IDEAS, next); return next; });
-    try { await dbDeleteIdea(id); showNotification('ลบไอเดียเรียบร้อย'); }
-    catch (e: any) { showNotification(`ลบไม่สำเร็จ: ${e.message}`, true); }
-  }, [showNotification]);
+ // ── Template handlers ─────────────────────────────────────────────────────
+ const handleSaveTemplate = useCallback(async (tmpl: Template) => {
+ const template: Template = { id: tmpl.id || `T-${Date.now()}`, name: tmpl.name || 'เทมเพลตใหม่', ...tmpl };
+ try { await saveTemplate(template); showNotification('บันทึกเทมเพลตเรียบร้อย'); }
+ catch (e: any) { showNotification(`บันทึกไม่สำเร็จ: ${e.message}`, true); }
+ }, [showNotification]);
 
-  const handleUpdateIdea = useCallback(async (idea: Idea) => {
-    setIdeas(prev => { const next = prev.map(i => i.id === idea.id ? idea : i); lsSet(LS_IDEAS, next); return next; });
-    try { await saveIdea(idea); }
-    catch (e: any) { showNotification(`อัปเดตไอเดียไม่สำเร็จ: ${e.message}`, true); }
-  }, [showNotification]);
+ const handleDeleteTemplate = useCallback(async (id: string) => {
+ if (!window.confirm('ลบเทมเพลตใช่ไหม?')) return;
+ setTemplates(prev => { const next = prev.filter(t => t.id !== id); lsSet(LS_TEMPLATES, next); return next; });
+ try { await dbDeleteTemplate(id); showNotification('ลบเทมเพลตเรียบร้อย'); }
+ catch (e: any) { showNotification(`ลบไม่สำเร็จ: ${e.message}`, true); }
+ }, [showNotification]);
 
-  // ── Content plan handlers ──────────────────────────────────────────────────
-  const handleSaveContentPlan = useCallback(async (plan: ContentPlan) => {
-    setContentPlans(prev => {
-      const exists = prev.findIndex(p => p.id === plan.id);
-      const next = exists >= 0 ? prev.map(p => p.id === plan.id ? plan : p) : [...prev, plan];
-      lsSet(LS_CONTENT, next);
-      return next;
-    });
-    showNotification('บันทึกแผนคอนเทนต์เรียบร้อย');
-  }, [showNotification]);
+ // ── Idea handlers ─────────────────────────────────────────────────────────
+ const handleSaveIdea = useCallback(async (idea: Idea) => {
+ // Optimistic
+ setIdeas(prev => {
+ const existing = prev.findIndex(i => i.id === idea.id);
+ const next = existing >= 0 ? prev.map(i => i.id === idea.id ? idea : i) : [...prev, idea];
+ lsSet(LS_IDEAS, next);
+ return next;
+ });
+ try { await saveIdea(idea); }
+ catch (e: any) { showNotification(`บันทึกไอเดียไม่สำเร็จ: ${e.message}`, true); }
+ }, [showNotification]);
 
-  const handleDeleteContentPlan = useCallback(async (id: string) => {
-    setContentPlans(prev => { const next = prev.filter(p => p.id !== id); lsSet(LS_CONTENT, next); return next; });
-    showNotification('ลบแผนคอนเทนต์เรียบร้อย');
-  }, [showNotification]);
+ const handleDeleteIdea = useCallback(async (id: string) => {
+ setIdeas(prev => { const next = prev.filter(i => i.id !== id); lsSet(LS_IDEAS, next); return next; });
+ try { await dbDeleteIdea(id); showNotification('ลบไอเดียเรียบร้อย'); }
+ catch (e: any) { showNotification(`ลบไม่สำเร็จ: ${e.message}`, true); }
+ }, [showNotification]);
 
-  const handleUpdateContentPlan = useCallback(async (plan: ContentPlan) => {
-    setContentPlans(prev => { const next = prev.map(p => p.id === plan.id ? plan : p); lsSet(LS_CONTENT, next); return next; });
-  }, []);
+ const handleUpdateIdea = useCallback(async (idea: Idea) => {
+ setIdeas(prev => { const next = prev.map(i => i.id === idea.id ? idea : i); lsSet(LS_IDEAS, next); return next; });
+ try { await saveIdea(idea); }
+ catch (e: any) { showNotification(`อัปเดตไอเดียไม่สำเร็จ: ${e.message}`, true); }
+ }, [showNotification]);
 
-  // ── Category handlers ──────────────────────────────────────────────────────
-  const handleCreateCategory = useCallback((cat: Omit<ProjectCategory, 'id' | 'createdAt'>) => {
-    const newCat: ProjectCategory = { ...cat, id: `cat-${Date.now()}`, createdAt: new Date().toISOString() };
-    setCategories(prev => { const next = [...prev, newCat]; lsSet(LS_CATEGORIES, next); return next; });
-    showNotification('สร้าง Category เรียบร้อย');
-  }, [showNotification]);
+ // ── Content plan handlers ──────────────────────────────────────────────────
+ const handleSaveContentPlan = useCallback(async (plan: ContentPlan) => {
+ // Sync to Notion (fire-and-forget; update plan with notionPageId/url if success)
+ let savedPlan = plan;
+ try {
+ const res = await fetch('/api/notion/content-plan', {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify(plan),
+ });
+ if (res.ok) {
+ const { notionPageId, notionUrl } = await res.json();
+ savedPlan = { ...plan, notionPageId, notionUrl };
+ }
+ } catch { /* Notion unavailable — save locally anyway */ }
 
-  const handleDeleteCategory = useCallback((id: string) => {
-    if (!window.confirm('ลบ Category นี้ใช่ไหม?')) return;
-    setCategories(prev => { const next = prev.filter(c => c.id !== id); lsSet(LS_CATEGORIES, next); return next; });
-  }, []);
+ setContentPlans(prev => {
+ const exists = prev.findIndex(p => p.id === savedPlan.id);
+ const next = exists >= 0 ? prev.map(p => p.id === savedPlan.id ? savedPlan : p) : [...prev, savedPlan];
+ lsSet(LS_CONTENT, next);
+ return next;
+ });
+ showNotification('บันทึกแผนคอนเทนต์เรียบร้อย' + (savedPlan.notionUrl ? ' · ซิงค์ Notion แล้ว ' : ''));
+ }, [showNotification]);
 
-  // ── Consult agent ──────────────────────────────────────────────────────────
-  const handleConsultAgent = useCallback((agentId: string, _initialPrompt?: string) => {
-    setSelectedAgent(agentId);
-  }, []);
+ const handleDeleteContentPlan = useCallback(async (id: string) => {
+ setContentPlans(prev => { const next = prev.filter(p => p.id !== id); lsSet(LS_CONTENT, next); return next; });
+ showNotification('ลบแผนคอนเทนต์เรียบร้อย');
+ }, [showNotification]);
 
-  // ── New task from pipeline ─────────────────────────────────────────────────
-  const handleNewPipelineTask = useCallback((stage: string) => {
-    setNewTaskPipelineStage(stage);
-    setEditingTask(null);
-    setIsTaskModalOpen(true);
-  }, []);
+ const handleUpdateContentPlan = useCallback(async (plan: ContentPlan) => {
+ setContentPlans(prev => { const next = prev.map(p => p.id === plan.id ? plan : p); lsSet(LS_CONTENT, next); return next; });
+ // Sync to Notion if page already exists
+ if (plan.notionPageId) {
+ try {
+ await fetch(`/api/notion/content-plan/${plan.notionPageId}`, {
+ method: 'PATCH',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify(plan),
+ });
+ } catch { /* silent */ }
+ }
+ }, []);
 
-  // ── Filtered data ─────────────────────────────────────────────────────────
-  const q = searchQuery.toLowerCase();
-  const filteredTasks     = q ? tasks.filter(t => t.name.toLowerCase().includes(q) || (t.customer || '').toLowerCase().includes(q)) : tasks;
-  const filteredClients   = q ? clients.filter(c => c.name.toLowerCase().includes(q) || (c.taxId || '').includes(q)) : clients;
-  const filteredTemplates = q ? templates.filter(t => t.name.toLowerCase().includes(q)) : templates;
+ // ── Category handlers ──────────────────────────────────────────────────────
+ const handleCreateCategory = useCallback((cat: Omit<ProjectCategory, 'id' | 'createdAt'>) => {
+ const newCat: ProjectCategory = { ...cat, id: `cat-${Date.now()}`, createdAt: new Date().toISOString() };
+ setCategories(prev => { const next = [...prev, newCat]; lsSet(LS_CATEGORIES, next); return next; });
+ showNotification('สร้าง Category เรียบร้อย');
+ }, [showNotification]);
 
-  // Category-filtered tasks
-  const categoryTasks = activeCategoryId ? filteredTasks.filter(t => t.categoryId === activeCategoryId) : filteredTasks;
+ const handleDeleteCategory = useCallback((id: string) => {
+ if (!window.confirm('ลบ Category นี้ใช่ไหม?')) return;
+ setCategories(prev => { const next = prev.filter(c => c.id !== id); lsSet(LS_CATEGORIES, next); return next; });
+ }, []);
 
-  // ── View renderer ─────────────────────────────────────────────────────────
-  const renderView = () => {
-    switch (currentView) {
-      case 'briefing':
-        return (
-          <BriefingView
-            tasks={filteredTasks} clients={clients} ideas={ideas}
-            onTaskClick={handleTaskClick}
-            onUpdateTask={handleUpdateTask}
-            onSaveTask={handleSaveTask}
-            onSaveIdea={handleSaveIdea}
-            onViewChange={setCurrentView}
-            onConsultAgent={handleConsultAgent}
-            showNotification={showNotification}
-          />
-        );
+ // ── Consult agent ──────────────────────────────────────────────────────────
+ const handleConsultAgent = useCallback((agentId: string, _initialPrompt?: string) => {
+ setSelectedAgent(agentId);
+ }, []);
 
-      case 'board':
-        return (
-          <BoardView
-            tasks={categoryTasks}
-            onTaskDrop={handleTaskDrop}
-            onTaskClick={handleTaskClick}
-          />
-        );
+ // ── New task from pipeline ─────────────────────────────────────────────────
+ const handleNewPipelineTask = useCallback((stage: string) => {
+ setNewTaskPipelineStage(stage);
+ setEditingTask(null);
+ setIsTaskModalOpen(true);
+ }, []);
 
-      case 'list':
-        return (
-          <ListView
-            tasks={categoryTasks}
-            clients={clients}
-            onTaskClick={handleTaskClick}
-            onStatusChange={(id, status) => {
-              const t = tasks.find(t => t.id.toString() === id);
-              if (t) handleUpdateTask({ ...t, status });
-            }}
-            onConsultAgent={(id) => handleConsultAgent('daily_briefer')}
-          />
-        );
+ // ── Filtered data ─────────────────────────────────────────────────────────
+ const q = searchQuery.toLowerCase();
+ const filteredTasks = q ? tasks.filter(t => t.name.toLowerCase().includes(q) || (t.customer || '').toLowerCase().includes(q)) : tasks;
+ const filteredClients = q ? clients.filter(c => c.name.toLowerCase().includes(q) || (c.taxId || '').includes(q)) : clients;
+ const filteredTemplates = q ? templates.filter(t => t.name.toLowerCase().includes(q)) : templates;
 
-      case 'gantt':     return <GanttView tasks={filteredTasks} />;
-      case 'calendar':  return <CalendarView tasks={filteredTasks} />;
+ // Category-filtered tasks
+ const categoryTasks = activeCategoryId ? filteredTasks.filter(t => t.categoryId === activeCategoryId) : filteredTasks;
 
-      case 'dashboard':
-        return <DashboardView tasks={filteredTasks} />;
+ // ── View renderer ─────────────────────────────────────────────────────────
+ const renderView = () => {
+ switch (currentView) {
+ case 'briefing':
+ return (
+ <BriefingView
+ tasks={filteredTasks} clients={clients} ideas={ideas}
+ onTaskClick={handleTaskClick}
+ onUpdateTask={handleUpdateTask}
+ onSaveTask={handleSaveTask}
+ onSaveIdea={handleSaveIdea}
+ onViewChange={setCurrentView}
+ onConsultAgent={handleConsultAgent}
+ showNotification={showNotification}
+ />
+ );
 
-      case 'pipeline':
-        return (
-          <PipelineView
-            tasks={filteredTasks} clients={clients}
-            onTaskClick={handleTaskClick}
-            onUpdateTask={handleUpdateTask}
-            onNewTask={handleNewPipelineTask}
-          />
-        );
+ case 'board':
+ return (
+ <BoardView
+ tasks={categoryTasks}
+ onTaskDrop={handleTaskDrop}
+ onTaskClick={handleTaskClick}
+ />
+ );
 
-      case 'categories':
-        return (
-          <CategoryDashboardView
-            categories={categories}
-            tasks={filteredTasks}
-            onEnterCategory={(id) => { setActiveCategoryId(id); setCurrentView('board'); }}
-            onCreateCategory={handleCreateCategory}
-            onDeleteCategory={handleDeleteCategory}
-          />
-        );
+ case 'list':
+ return (
+ <ListView
+ tasks={categoryTasks}
+ clients={clients}
+ onTaskClick={handleTaskClick}
+ onStatusChange={(id, status) => {
+ const t = tasks.find(t => t.id.toString() === id);
+ if (t) handleUpdateTask({ ...t, status });
+ }}
+ onConsultAgent={(id) => handleConsultAgent('daily_briefer')}
+ />
+ );
 
-      case 'clients':
-        return (
-          <ClientsView
-            clients={filteredClients}
-            onCreateClient={handleSaveClient}
-            onDeleteClient={handleDeleteClient}
-          />
-        );
+ case 'gantt': return <GanttView tasks={filteredTasks} />;
+ case 'calendar': return <CalendarView tasks={filteredTasks} />;
 
-      case 'templates':
-        return (
-          <TemplatesView
-            templates={filteredTemplates}
-            onCreateTemplate={handleSaveTemplate}
-            onDeleteTemplate={handleDeleteTemplate}
-          />
-        );
+ case 'dashboard':
+ return <DashboardView tasks={filteredTasks} />;
 
-      case 'docflow':
-        return (
-          <DocFlowView
-            onOpenSettings={() => setIsDocSettingsOpen(true)}
-            showNotification={showNotification}
-            clients={filteredClients}
-            settingsVersion={settingsVersion}
-          />
-        );
+ case 'pipeline':
+ return (
+ <PipelineView
+ tasks={filteredTasks} clients={clients}
+ onTaskClick={handleTaskClick}
+ onUpdateTask={handleUpdateTask}
+ onNewTask={handleNewPipelineTask}
+ />
+ );
 
-      case 'agents':
-        return <AgentsView onAgentClick={setSelectedAgent} />;
+ case 'categories':
+ return (
+ <CategoryDashboardView
+ categories={categories}
+ tasks={filteredTasks}
+ onEnterCategory={(id) => { setActiveCategoryId(id); setCurrentView('board'); }}
+ onCreateCategory={handleCreateCategory}
+ onDeleteCategory={handleDeleteCategory}
+ />
+ );
 
-      case 'ideas':
-        return (
-          <IdeasView
-            ideas={ideas}
-            onSaveIdea={handleSaveIdea}
-            onDeleteIdea={handleDeleteIdea}
-            onUpdateIdea={handleUpdateIdea}
-          />
-        );
+ case 'clients':
+ return (
+ <ClientsView
+ clients={filteredClients}
+ onCreateClient={handleSaveClient}
+ onDeleteClient={handleDeleteClient}
+ />
+ );
 
-      case 'content_plan':
-        return (
-          <ContentPlanView
-            contentPlans={contentPlans}
-            onSaveContentPlan={handleSaveContentPlan}
-            onDeleteContentPlan={handleDeleteContentPlan}
-            onUpdateContentPlan={handleUpdateContentPlan}
-          />
-        );
+ case 'templates':
+ return (
+ <TemplatesView
+ templates={filteredTemplates}
+ onCreateTemplate={handleSaveTemplate}
+ onDeleteTemplate={handleDeleteTemplate}
+ />
+ );
 
-      default:
-        return (
-          <BoardView
-            tasks={filteredTasks}
-            onTaskDrop={handleTaskDrop}
-            onTaskClick={handleTaskClick}
-          />
-        );
-    }
-  };
+ case 'docflow':
+ return (
+ <DocFlowView
+ onOpenSettings={() => setIsDocSettingsOpen(true)}
+ showNotification={showNotification}
+ clients={filteredClients}
+ settingsVersion={settingsVersion}
+ />
+ );
 
-  // ── Loading splash ────────────────────────────────────────────────────────
-  if (authLoading) {
-    return (
-      <div className="h-full flex items-center justify-center app-bg">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center text-white font-black text-2xl shadow-xl animate-pulse">M</div>
-          <p className="text-slate-500 text-sm font-semibold">กำลังโหลด ModtyTasks...</p>
-        </div>
-      </div>
-    );
-  }
+ case 'agents':
+ return <AgentsView onAgentClick={setSelectedAgent} />;
 
-  // ── Auth gate ─────────────────────────────────────────────────────────────
-  if (!authed) {
-    return <LoginModal onLogin={() => setAuthed(true)} />;
-  }
+ case 'ideas':
+ return (
+ <IdeasView
+ ideas={ideas}
+ onSaveIdea={handleSaveIdea}
+ onDeleteIdea={handleDeleteIdea}
+ onUpdateIdea={handleUpdateIdea}
+ />
+ );
 
-  // ── Active category name for header ───────────────────────────────────────
-  const activeCategoryName = activeCategoryId
-    ? categories.find(c => c.id === activeCategoryId)?.name
-    : undefined;
+ case 'content_plan':
+ return (
+ <ContentPlanView
+ contentPlans={contentPlans}
+ onSaveContentPlan={handleSaveContentPlan}
+ onDeleteContentPlan={handleDeleteContentPlan}
+ onUpdateContentPlan={handleUpdateContentPlan}
+ />
+ );
 
-  return (
-    <div
-      className="text-[#0f172a] flex overflow-hidden font-sans relative app-bg"
-      style={{ height: '100%' }}
-    >
-      <Sidebar
-        currentView={currentView}
-        onViewChange={(view) => {
-          setCurrentView(view);
-          setActiveCategoryId(null);
-        }}
-        isMobileOpen={isMobileOpen}
-        setIsMobileOpen={setIsMobileOpen}
-      />
+ default:
+ return (
+ <BoardView
+ tasks={filteredTasks}
+ onTaskDrop={handleTaskDrop}
+ onTaskClick={handleTaskClick}
+ />
+ );
+ }
+ };
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <Header
-          currentView={currentView}
-          isSyncing={false}
-          onNewTaskClick={() => { setEditingTask(null); setIsTaskModalOpen(true); }}
-          onMenuClick={() => setIsMobileOpen(true)}
-          onSearchChange={setSearchQuery}
-          categoryName={activeCategoryName}
-        />
+ // ── Loading splash ────────────────────────────────────────────────────────
+ if (authLoading) {
+ return (
+ <div className="h-full flex items-center justify-center app-bg">
+ <div className="flex flex-col items-center gap-4">
+ <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center text-white font-black text-2xl shadow-xl animate-pulse">M</div>
+ <p className="text-slate-500 text-sm font-semibold">กำลังโหลด ModtyTasks...</p>
+ </div>
+ </div>
+ );
+ }
 
-        <main className="flex-1 relative overflow-hidden flex flex-col">
-          {renderView()}
-        </main>
-      </div>
+ // ── Auth gate ─────────────────────────────────────────────────────────────
+ if (!authed) {
+ return <LoginModal onLogin={() => setAuthed(true)} />;
+ }
 
-      {/* Notifications */}
-      <div className="fixed bottom-5 right-5 z-[90] flex flex-col gap-2 pointer-events-none">
-        {notifications.map(n => (
-          <div
-            key={n.id}
-            className={`px-4 py-3 rounded-xl shadow-lg text-sm font-semibold text-white flex items-center gap-2 animate-fade-in ${n.isError ? 'bg-rose-500' : 'bg-emerald-500'}`}
-          >
-            <CheckCircle className="w-4 h-4 shrink-0" /> {n.message}
-          </div>
-        ))}
-      </div>
+ // ── Active category name for header ───────────────────────────────────────
+ const activeCategoryName = activeCategoryId
+ ? categories.find(c => c.id === activeCategoryId)?.name
+ : undefined;
 
-      {/* Project Page (full task detail) */}
-      {selectedTask && (
-        <ProjectPage
-          task={selectedTask}
-          tasks={tasks}
-          clients={clients}
-          onClose={() => setSelectedTask(null)}
-          onUpdateTask={handleUpdateTask}
-          onDeleteTask={handleDeleteTask}
-          onEdit={handleEditClick}
-          onConsultAgent={(taskId, agentId) => handleConsultAgent(agentId || 'daily_briefer')}
-          onSaveAsTemplate={handleSaveTemplate}
-        />
-      )}
+ return (
+ <div
+ className="text-[#0f172a] flex overflow-hidden font-sans relative app-bg"
+ style={{ height: '100%' }}
+ >
+ <Sidebar
+ currentView={currentView}
+ onViewChange={(view) => {
+ setCurrentView(view);
+ setActiveCategoryId(null);
+ }}
+ isMobileOpen={isMobileOpen}
+ setIsMobileOpen={setIsMobileOpen}
+ />
 
-      {/* Task create/edit modal */}
-      <TaskModal
-        isOpen={isTaskModalOpen}
-        onClose={() => { setIsTaskModalOpen(false); setEditingTask(null); setNewTaskPipelineStage(undefined); }}
-        onSave={handleCreateTask}
-        initialTask={editingTask}
-        categories={categories}
-      />
+ <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+ <Header
+ currentView={currentView}
+ isSyncing={false}
+ onNewTaskClick={() => { setEditingTask(null); setIsTaskModalOpen(true); }}
+ onMenuClick={() => setIsMobileOpen(true)}
+ onSearchChange={setSearchQuery}
+ categoryName={activeCategoryName}
+ onBgUpload={handleBgUpload}
+ onBgRemove={handleBgRemove}
+ />
 
-      {/* Agent modal */}
-      <AgentModal agentId={selectedAgent} onClose={() => setSelectedAgent(null)} />
+ <main className="flex-1 relative overflow-hidden flex flex-col">
+ {renderView()}
+ </main>
+ </div>
 
-      {/* Standup modal */}
-      <StandupModal isOpen={isStandupOpen} onClose={() => setIsStandupOpen(false)} tasks={tasks} />
+ {/* Notifications */}
+ <div className="fixed bottom-5 right-5 z-[90] flex flex-col gap-2 pointer-events-none">
+ {notifications.map(n => (
+ <div
+ key={n.id}
+ className={`px-4 py-3 rounded-xl shadow-lg text-sm font-semibold text-white flex items-center gap-2 animate-fade-in ${n.isError ? 'bg-rose-500' : 'bg-emerald-500'}`}
+ >
+ <CheckCircle className="w-4 h-4 shrink-0" /> {n.message}
+ </div>
+ ))}
+ </div>
 
-      {/* Doc settings modal */}
-      <DocSettingsModal
-        isOpen={isDocSettingsOpen}
-        onClose={() => setIsDocSettingsOpen(false)}
-        onSave={() => { setSettingsVersion(v => v + 1); showNotification('บันทึกการตั้งค่าแล้วค่ะ'); }}
-      />
+ {/* Project Page (full task detail) */}
+ {selectedTask && (
+ <ProjectPage
+ task={selectedTask}
+ tasks={tasks}
+ clients={clients}
+ onClose={() => setSelectedTask(null)}
+ onUpdateTask={handleUpdateTask}
+ onDeleteTask={handleDeleteTask}
+ onEdit={handleEditClick}
+ onConsultAgent={(taskId, agentId) => handleConsultAgent(agentId || 'daily_briefer')}
+ onSaveAsTemplate={handleSaveTemplate}
+ />
+ )}
 
-      {/* Theme settings modal */}
-      {isThemeOpen && <ThemeSettingsModal onClose={() => { setIsThemeOpen(false); applyTheme(); }} />}
-    </div>
-  );
+ {/* Task create/edit modal */}
+ <TaskModal
+ isOpen={isTaskModalOpen}
+ onClose={() => { setIsTaskModalOpen(false); setEditingTask(null); setNewTaskPipelineStage(undefined); }}
+ onSave={handleCreateTask}
+ initialTask={editingTask}
+ categories={categories}
+ />
+
+ {/* Agent modal */}
+ <AgentModal agentId={selectedAgent} onClose={() => setSelectedAgent(null)} />
+
+ {/* Standup modal */}
+ <StandupModal isOpen={isStandupOpen} onClose={() => setIsStandupOpen(false)} tasks={tasks} />
+
+ {/* Doc settings modal */}
+ <DocSettingsModal
+ isOpen={isDocSettingsOpen}
+ onClose={() => setIsDocSettingsOpen(false)}
+ onSave={() => { setSettingsVersion(v => v + 1); showNotification('บันทึกการตั้งค่าแล้วค่ะ'); }}
+ />
+
+ {/* Theme settings modal */}
+ {isThemeOpen && <ThemeSettingsModal onClose={() => { setIsThemeOpen(false); applyTheme(); }} />}
+ </div>
+ );
 }
