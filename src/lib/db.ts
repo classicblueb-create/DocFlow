@@ -4,7 +4,7 @@
  * และส่งข้อมูลแบบ Shadow write ไปที่ Google Sheets ด้วยในพื้นหลัง
  */
 import { supabase } from './supabase';
-import type { Task, Client, Template, Idea } from '../types';
+import type { Task, Client, Template, Idea, ProjectCategory, ContentPlan } from '../types';
 import {
   saveTaskToSheet, deleteTaskFromSheet,
   saveClientToSheet, deleteClientFromSheet,
@@ -345,22 +345,141 @@ export async function importDataFromSheets(
   }
 }
 
-// ── Product stubs (stored in localStorage only) ───────────────────────────────
-import type { Product } from '../types';
-const LS_PRODUCTS = 'docflow_local_products';
+// ── Categories (Supabase) ─────────────────────────────────────────────────────
 
-export async function loadProducts(_month?: string): Promise<Product[]> {
-  try { const v = localStorage.getItem(LS_PRODUCTS); return v ? JSON.parse(v) : []; } catch { return []; }
+export function subscribeCategories(cb: (cats: ProjectCategory[]) => void): Unsubscribe {
+  supabase.from('categories').select('*').order('name').then(({ data, error }) => {
+    if (error) console.error('[Supabase] fetch categories failed:', error);
+    else if (data) cb(data as ProjectCategory[]);
+  });
+
+  const channel = supabase.channel('categories-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, async () => {
+      const { data } = await supabase.from('categories').select('*').order('name');
+      if (data) cb(data as ProjectCategory[]);
+    })
+    .subscribe();
+
+  return () => { supabase.removeChannel(channel); };
+}
+
+export async function saveCategory(cat: ProjectCategory): Promise<void> {
+  const { error } = await supabase.from('categories').upsert({
+    id: cat.id,
+    name: cat.name,
+    icon: cat.icon || null,
+    description: cat.description || null,
+    color: cat.color || null,
+    createdAt: cat.createdAt || new Date().toISOString(),
+  });
+  if (error) throw error;
+}
+
+export async function deleteCategory(id: string): Promise<void> {
+  const { error } = await supabase.from('categories').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ── ContentPlans (Supabase) ───────────────────────────────────────────────────
+
+function mapContentPlan(r: any): ContentPlan {
+  return {
+    id: r.id,
+    title: r.title,
+    platform: r.platform || '',
+    status: r.status || 'ไอเดีย/ร่าง',
+    concept: r.concept || '',
+    toneOfVoice: r.toneOfVoice || undefined,
+    targetAudience: r.targetAudience || undefined,
+    aiHooks: r.aiHooks ? (typeof r.aiHooks === 'string' ? JSON.parse(r.aiHooks) : r.aiHooks) : undefined,
+    aiOutline: r.aiOutline || undefined,
+    aiScript: r.aiScript || undefined,
+    aiHashtags: r.aiHashtags || undefined,
+    publishDate: r.publishDate || undefined,
+    notionPageId: r.notionPageId || undefined,
+    notionUrl: r.notionUrl || undefined,
+    createdAt: r.createdAt || new Date().toISOString(),
+  };
+}
+
+export function subscribeContentPlans(cb: (plans: ContentPlan[]) => void): Unsubscribe {
+  supabase.from('content_plans').select('*').order('"createdAt"').then(({ data, error }) => {
+    if (error) console.error('[Supabase] fetch content_plans failed:', error);
+    else if (data) cb(data.map(mapContentPlan));
+  });
+
+  const channel = supabase.channel('content-plans-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'content_plans' }, async () => {
+      const { data } = await supabase.from('content_plans').select('*').order('"createdAt"');
+      if (data) cb(data.map(mapContentPlan));
+    })
+    .subscribe();
+
+  return () => { supabase.removeChannel(channel); };
+}
+
+export async function saveContentPlan(plan: ContentPlan): Promise<void> {
+  const { error } = await supabase.from('content_plans').upsert({
+    id: plan.id,
+    title: plan.title,
+    platform: plan.platform || null,
+    status: plan.status || 'ไอเดีย/ร่าง',
+    concept: plan.concept || null,
+    toneOfVoice: plan.toneOfVoice || null,
+    targetAudience: plan.targetAudience || null,
+    aiHooks: plan.aiHooks ? JSON.stringify(plan.aiHooks) : null,
+    aiOutline: plan.aiOutline || null,
+    aiScript: plan.aiScript || null,
+    aiHashtags: plan.aiHashtags || null,
+    publishDate: plan.publishDate || null,
+    notionPageId: plan.notionPageId || null,
+    notionUrl: plan.notionUrl || null,
+    createdAt: plan.createdAt || new Date().toISOString(),
+  });
+  if (error) throw error;
+}
+
+export async function deleteContentPlan(id: string): Promise<void> {
+  const { error } = await supabase.from('content_plans').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ── Products (Supabase) ───────────────────────────────────────────────────────
+import type { Product } from '../types';
+
+export async function loadProducts(month?: string): Promise<Product[]> {
+  let q = supabase.from('products').select('*');
+  if (month) q = q.eq('month', month);
+  const { data, error } = await q.order('created_at');
+  if (error) { console.error('[Supabase] fetch products failed:', error); return []; }
+  return (data || []).map((r: any) => ({
+    id: r.id,
+    name: r.name,
+    price: Number(r.price),
+    targetUnits: r.target_units ?? 0,
+    soldUnits: r.sold_units ?? 0,
+    month: r.month,
+    platform: r.platform,
+    category: r.category,
+    createdAt: r.created_at,
+  })) as Product[];
 }
 
 export async function saveProduct(product: Product): Promise<void> {
-  const products: Product[] = await loadProducts();
-  const idx = products.findIndex(p => p.id === product.id);
-  if (idx >= 0) products[idx] = product; else products.push(product);
-  localStorage.setItem(LS_PRODUCTS, JSON.stringify(products));
+  const { error } = await supabase.from('products').upsert({
+    id: product.id,
+    name: product.name,
+    price: product.price ?? 0,
+    target_units: product.targetUnits ?? 0,
+    sold_units: product.soldUnits ?? 0,
+    month: product.month,
+    platform: product.platform || 'อื่นๆ',
+    category: product.category || 'คอร์ส',
+  });
+  if (error) throw error;
 }
 
 export async function deleteProduct(id: string): Promise<void> {
-  const products: Product[] = await loadProducts();
-  localStorage.setItem(LS_PRODUCTS, JSON.stringify(products.filter(p => p.id !== id)));
+  const { error } = await supabase.from('products').delete().eq('id', id);
+  if (error) throw error;
 }

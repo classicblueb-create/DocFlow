@@ -27,10 +27,13 @@ import { ThemeSettingsModal } from './components/modals/ThemeSettingsModal';
 import { ViewType, Task, Client, Template, Idea, ContentPlan, ProjectCategory } from './types';
 import {
  subscribeTasks, subscribeClients, subscribeTemplates, subscribeIdeas,
+ subscribeCategories, subscribeContentPlans,
  saveTask, deleteTask as dbDeleteTask,
  saveClient, deleteClient as dbDeleteClient,
  saveTemplate, deleteTemplate as dbDeleteTemplate,
  saveIdea, deleteIdea as dbDeleteIdea,
+ saveCategory, deleteCategory as dbDeleteCategory,
+ saveContentPlan, deleteContentPlan as dbDeleteContentPlan,
 } from './lib/db';
 import { getSession, onAuthStateChange } from './lib/auth';
 import { applyTheme } from './lib/theme';
@@ -40,8 +43,7 @@ const LS_TASKS = 'docflow_local_tasks';
 const LS_CLIENTS = 'docflow_local_clients';
 const LS_TEMPLATES = 'docflow_local_templates';
 const LS_IDEAS = 'docflow_local_ideas';
-const LS_CONTENT = 'docflow_local_content_plans';
-const LS_CATEGORIES = 'docflow_local_categories';
+
 
 function lsGet<T>(key: string, fallback: T): T {
  try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
@@ -83,8 +85,8 @@ export default function App() {
  const [clients, setClients] = useState<Client[]>(() => lsGet(LS_CLIENTS, []));
  const [templates, setTemplates] = useState<Template[]>(() => lsGet(LS_TEMPLATES, []));
  const [ideas, setIdeas] = useState<Idea[]>(() => lsGet(LS_IDEAS, []));
- const [contentPlans, setContentPlans] = useState<ContentPlan[]>(() => lsGet(LS_CONTENT, []));
- const [categories, setCategories] = useState<ProjectCategory[]>(() => lsGet(LS_CATEGORIES, []));
+ const [contentPlans, setContentPlans] = useState<ContentPlan[]>([]);
+ const [categories, setCategories] = useState<ProjectCategory[]>([]);
 
  // ── Apply theme on mount ──────────────────────────────────────────────────
  useEffect(() => { applyTheme(); }, []);
@@ -149,31 +151,32 @@ export default function App() {
  setIdeas(data);
  lsSet(LS_IDEAS, data);
  });
+ const unsubCategories = subscribeCategories(data => {
+ setCategories(data);
+ });
+ const unsubContentPlans = subscribeContentPlans(async data => {
+ // One-time migration: push any localStorage plans not yet in Supabase
+ if (data.length === 0) {
+ try {
+ const local = localStorage.getItem('docflow_local_content_plans');
+ if (local) {
+ const localPlans: ContentPlan[] = JSON.parse(local);
+ for (const p of localPlans) await saveContentPlan(p).catch(() => {});
+ localStorage.removeItem('docflow_local_content_plans');
+ }
+ } catch { /* skip */ }
+ }
+ setContentPlans(data);
+ });
 
  return () => {
  unsubTasks();
  unsubClients();
  unsubTemplates();
  unsubIdeas();
+ unsubCategories();
+ unsubContentPlans();
  };
- }, [authed]);
-
- // ── Load Notion content plans on login ────────────────────────────────────
- useEffect(() => {
-   if (!authed) return;
-   fetch('/api/notion/content-plans')
-     .then(r => r.ok ? r.json() : Promise.reject(r))
-     .then((notionPlans: ContentPlan[]) => {
-       if (!Array.isArray(notionPlans) || notionPlans.length === 0) return;
-       setContentPlans(prev => {
-         // Merge: Notion is source-of-truth; keep local-only plans not yet synced
-         const localOnly = prev.filter(p => !notionPlans.some(n => n.id === p.id || n.id === p.notionPageId));
-         const merged = [...notionPlans, ...localOnly];
-         lsSet(LS_CONTENT, merged);
-         return merged;
-       });
-     })
-     .catch(() => { /* Notion unavailable — keep localStorage data */ });
  }, [authed]);
 
  // ── Notification helper ───────────────────────────────────────────────────
@@ -314,7 +317,6 @@ export default function App() {
 
  // ── Content plan handlers ──────────────────────────────────────────────────
  const handleSaveContentPlan = useCallback(async (plan: ContentPlan) => {
- // Sync to Notion (fire-and-forget; update plan with notionPageId/url if success)
  let savedPlan = plan;
  try {
  const res = await fetch('/api/notion/content-plans', {
@@ -326,25 +328,25 @@ export default function App() {
  const { notionPageId, notionUrl } = await res.json();
  savedPlan = { ...plan, notionPageId, notionUrl };
  }
- } catch { /* Notion unavailable — save locally anyway */ }
+ } catch { /* Notion unavailable */ }
 
- setContentPlans(prev => {
- const exists = prev.findIndex(p => p.id === savedPlan.id);
- const next = exists >= 0 ? prev.map(p => p.id === savedPlan.id ? savedPlan : p) : [...prev, savedPlan];
- lsSet(LS_CONTENT, next);
- return next;
- });
+ try {
+ await saveContentPlan(savedPlan);
  showNotification('บันทึกแผนคอนเทนต์เรียบร้อย' + (savedPlan.notionUrl ? ' · ซิงค์ Notion แล้ว ' : ''));
+ } catch { showNotification('บันทึกแผนคอนเทนต์ไม่สำเร็จ', true); }
  }, [showNotification]);
 
  const handleDeleteContentPlan = useCallback(async (id: string) => {
- setContentPlans(prev => { const next = prev.filter(p => p.id !== id); lsSet(LS_CONTENT, next); return next; });
+ try {
+ await dbDeleteContentPlan(id);
  showNotification('ลบแผนคอนเทนต์เรียบร้อย');
+ } catch { showNotification('ลบแผนคอนเทนต์ไม่สำเร็จ', true); }
  }, [showNotification]);
 
  const handleUpdateContentPlan = useCallback(async (plan: ContentPlan) => {
- setContentPlans(prev => { const next = prev.map(p => p.id === plan.id ? plan : p); lsSet(LS_CONTENT, next); return next; });
- // Sync to Notion if page already exists
+ try {
+ await saveContentPlan(plan);
+ } catch { /* silent */ }
  if (plan.notionPageId) {
  try {
  await fetch(`/api/notion/content-plans/${plan.notionPageId}`, {
@@ -357,16 +359,20 @@ export default function App() {
  }, []);
 
  // ── Category handlers ──────────────────────────────────────────────────────
- const handleCreateCategory = useCallback((cat: Omit<ProjectCategory, 'id' | 'createdAt'>) => {
- const newCat: ProjectCategory = { ...cat, id: `cat-${Date.now()}`, createdAt: new Date().toISOString() };
- setCategories(prev => { const next = [...prev, newCat]; lsSet(LS_CATEGORIES, next); return next; });
+ const handleCreateCategory = useCallback(async (cat: Omit<ProjectCategory, 'id' | 'createdAt'>) => {
+ const newCat: ProjectCategory = { ...cat, id: `CAT-${Date.now()}`, createdAt: new Date().toISOString() };
+ try {
+ await saveCategory(newCat);
  showNotification('สร้าง Category เรียบร้อย');
+ } catch { showNotification('สร้าง Category ไม่สำเร็จ', true); }
  }, [showNotification]);
 
- const handleDeleteCategory = useCallback((id: string) => {
+ const handleDeleteCategory = useCallback(async (id: string) => {
  if (!window.confirm('ลบ Category นี้ใช่ไหม?')) return;
- setCategories(prev => { const next = prev.filter(c => c.id !== id); lsSet(LS_CATEGORIES, next); return next; });
- }, []);
+ try {
+ await dbDeleteCategory(id);
+ } catch { showNotification('ลบ Category ไม่สำเร็จ', true); }
+ }, [showNotification]);
 
  // ── Consult agent ──────────────────────────────────────────────────────────
  const handleConsultAgent = useCallback((agentId: string, _initialPrompt?: string) => {
