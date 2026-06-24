@@ -1047,7 +1047,7 @@ ${ideasContext || 'ยังไม่มีไอเดีย'}
           : `⚠️ ไม่สามารถเพิ่มลูกค้า "${name}" ได้`);
 
       } else if (parsed.action === 'add_idea') {
-        // ── Action: add_idea ─────────────────────────────────────────────
+        // Action: add_idea
         const { title, concept, platform } = parsed;
         let saved = false;
         if (supabaseUrl && supabaseAnonKey && title) {
