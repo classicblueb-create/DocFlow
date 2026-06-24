@@ -6,18 +6,19 @@ import cors from "cors";
 import helmet from "helmet";
 import { jsPDF } from "jspdf";
 import { createClient } from "@supabase/supabase-js";
+import { GoogleGenAI } from "@google/genai";
 
 dotenv.config();
 
 // =================================================================
-// OpenRouter Configuration
+// AI Configuration (OpenRouter & Gemini SDK)
 // =================================================================
 function getApiKey(): string {
   const envKey = process.env.OPENROUTER_API_KEY;
   if (envKey && envKey.trim() !== "" && envKey !== "YOUR_OPENROUTER_API_KEY") {
     return envKey;
   }
-  throw new Error("OPENROUTER_API_KEY ไม่ได้ตั้งค่าใน .env — กรุณาใส่ API key ก่อนใช้งาน AI features");
+  return "";
 }
 
 const MODEL_PRIMARY  = "google/gemma-4-26b-a4b-it";
@@ -29,6 +30,9 @@ async function callOpenRouter(
   model = MODEL_PRIMARY
 ): Promise<string> {
   const apiKey = getApiKey();
+  if (!apiKey) {
+    throw new Error("OPENROUTER_API_KEY is not configured");
+  }
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -61,13 +65,40 @@ async function generateWithAI(
   userPrompt: string,
   temperature = 0.7
 ): Promise<string> {
-  return callOpenRouter(
-    [
-      { role: "system", content: systemInstruction },
-      { role: "user", content: userPrompt },
-    ],
-    temperature
-  );
+  // Try OpenRouter first if configured
+  if (getApiKey()) {
+    return callOpenRouter(
+      [
+        { role: "system", content: systemInstruction },
+        { role: "user", content: userPrompt },
+      ],
+      temperature
+    );
+  }
+
+  // Fallback to native Gemini API SDK if GEMINI_API_KEY is set
+  if (process.env.GEMINI_API_KEY) {
+    const ai = new GoogleGenAI({
+      apiKey: process.env.GEMINI_API_KEY,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
+    
+    const response = await ai.models.generateContent({
+      model: "gemini-2.0-flash",
+      contents: userPrompt,
+      config: {
+        systemInstruction,
+        temperature,
+      },
+    });
+    return response.text || "";
+  }
+
+  throw new Error("No AI API keys configured. Please set OPENROUTER_API_KEY or GEMINI_API_KEY.");
 }
 
 // =================================================================
