@@ -709,11 +709,38 @@ ${contextSection}
       return;
     }
 
+    // ── Built-in commands ──────────────────────────────────────────────
     if (text.startsWith('/start') || text.startsWith('/help')) {
-      await sendTelegramMessage(chatId, `สวัสดีค่ะ! ฉันคือผู้ช่วยบันทึกงานและออกใบเสนอราคาอัจฉริยะ (DocFlow Assistant)\n\nคุณสามารถสั่งงานฉันได้ เช่น:\n👉 "ออกใบเสนอราคา ออกแบบแบนเนอร์ 3500 บาท สำหรับ บริษัท สินดี จำกัด"`);
+      await sendTelegramMessage(chatId,
+        `🤖 *DocFlow Assistant พร้อมให้บริการ!*\n\n` +
+        `คำสั่งที่ใช้ได้:\n` +
+        `📋 /tasks — ดูรายการงานทั้งหมด\n` +
+        `📊 /summarize — สรุปภาพรวมงานและลูกค้า\n` +
+        `⚠️ /duesoon — งานที่ใกล้ครบกำหนด 5 วัน\n` +
+        `❓ /help — แสดงคำสั่งทั้งหมด\n\n` +
+        `หรือพิมพ์อะไรก็ได้ เช่น:\n` +
+        `👉 *"ออกใบเสนอราคา ออกแบบโลโก้ 5,000 บาท ให้บริษัท ABC"*\n` +
+        `👉 *"สร้างงาน ประชุม Kick-off กับลูกค้า XYZ วันพรุ่งนี้"*\n` +
+        `👉 *"สรุปงานสัปดาห์นี้"*\n` +
+        `👉 *"งานของใครที่ยังไม่เสร็จ?"*`
+      );
       return;
     }
 
+    if (text.startsWith('/tasks')) {
+      // shortcut to list tasks
+      return handleTelegramMessage('แสดงรายการงานทั้งหมดในระบบพร้อมสถานะ', chatId);
+    }
+
+    if (text.startsWith('/summarize')) {
+      return handleTelegramMessage('สรุปภาพรวมงานและลูกค้าทั้งหมดในระบบ', chatId);
+    }
+
+    if (text.startsWith('/duesoon')) {
+      return handleTelegramMessage('งานไหนบ้างที่ใกล้ครบกำหนดใน 5 วันนี้', chatId);
+    }
+
+    // ── Load DB context ────────────────────────────────────────────────
     let tasksContext = "";
     let clientsContext = "";
     let ideasContext = "";
@@ -736,103 +763,95 @@ ${contextSection}
           clientsContext = clientsRes.data.map(c => `- ลูกค้า: ${c.name} (Budget: ${c.targetBudget || 0} บาท, อีเมล/ติดต่อ: ${c.contactInfo || 'ไม่มี'})`).join('\n');
         }
         if (ideasRes.data) {
-          ideasContext = ideasRes.data.map(i => `- ไอเดีย: ${i.title} (รายละเอียด: ${i.concept || 'ไม่มี'}, แพลตฟอร์ม: ${i.platform || 'ไม่มี'}, ผู้ลง: ${i.author || 'ไม่มี'})`).join('\n');
+          ideasContext = ideasRes.data.map(i => `- ไอเดีย: ${i.title} (รายละเอียด: ${i.concept || 'ไม่มี'}, แพลตฟอร์ม: ${i.platform || 'ไม่มี'})`).join('\n');
         }
       } catch (dbErr) {
         console.error("[Telegram Assistant] Error loading db context:", dbErr);
       }
     }
 
+    const today = new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
+
     try {
-      const systemPrompt = `คุณคือผู้ช่วยจดบันทึกงานและสร้างใบเสนอราคาอัจฉริยะ (DocFlow Assistant)
-ทำหน้าที่วิเคราะห์ข้อความพิมพ์ดิบในแชท เพื่อสร้างงาน/ดีลใหม่ และตอบคำถามทั่วไปเกี่ยวกับโปรเจกต์/ลูกค้า/ไอเดียที่มีอยู่ในระบบ
+      const systemPrompt = `คุณคือ "Modty" ผู้ช่วย AI ส่วนตัวที่ฉลาดและเป็นกันเองเหมือนเพื่อนที่รู้ทุกอย่างในระบบ DocFlow
+วันนี้: ${today} (ใช้วันนี้ในการคำนวณ "พรุ่งนี้" "สัปดาห์นี้" ฯลฯ)
 
-นี่คือข้อมูลปัจจุบันในระบบเว็บ DocFlow:
+📌 ข้อมูลปัจจุบันในระบบ:
 ---
-[รายการงานทั้งหมด]
-${tasksContext || 'ไม่มีข้อมูลงาน'}
+[งานทั้งหมด]
+${tasksContext || 'ยังไม่มีงาน'}
 
-[รายการลูกค้าทั้งหมด]
-${clientsContext || 'ไม่มีข้อมูลลูกค้า'}
+[ลูกค้าทั้งหมด]
+${clientsContext || 'ยังไม่มีลูกค้า'}
 
-[รายการไอเดียทั้งหมด]
-${ideasContext || 'ไม่มีข้อมูลไอเดีย'}
+[ไอเดียทั้งหมด]
+${ideasContext || 'ยังไม่มีไอเดีย'}
 ---
 
-ความสามารถและเงื่อนไขการตอบกลับ:
-1. หากผู้ใช้สั่งงาน เช่น "ออกใบเสนอราคา ออกแบบแบนเนอร์ 3500 บาท สำหรับ บริษัท สินดี จำกัด" 
-   ให้วิเคราะห์และสร้างใบเสนอราคาโดยตอบกลับเป็น JSON รูปแบบนี้รูปเดียวเท่านั้น (ห้ามมีคำพูดอธิบายอื่นนอกจาก JSON และห้ามใส่ markdown block):
-   {
-     "action": "create_quotation",
-     "customerName": "บริษัท สินดี จำกัด",
-     "taskName": "ออกแบบแบนเนอร์โฆษณา",
-     "price": 3500,
-     "details": "ทำกราฟิก 5 ภาพ",
-     "items": [
-       { "description": "ทำกราฟิก 5 ภาพ", "amount": 3500 }
-     ]
-   }
+บุคลิก: เป็นกันเอง สนุกสนาน ฉลาด ตอบสั้นกระชับ ใช้ emoji อย่างเหมาะสม ตอบภาษาไทยเป็นหลัก
+ถ้าถามเรื่องทั่วไป ชีวิต หรือคุย social ก็คุยได้ปกติ แต่ถ้าเกี่ยวกับงานในระบบให้อ้างอิงข้อมูลจริงเสมอ
 
-2. หากผู้ใช้ถามคำถามเกี่ยวกับงาน ลูกค้า หรือไอเดียในระบบ เช่น "งานของบริษัท สินดี จำกัด ใครรับผิดชอบ?", "สัปดาห์นี้มีงานอะไรบ้าง?", "ลูกค้าทั้งหมดมีใครบ้าง?"
-   ให้ตอบกลับด้วยข้อความอธิบายเป็นภาษาไทยตามความจริงจากข้อมูลที่ได้รับด้านบน โดยกำหนดโครงสร้าง JSON ดังนี้ (ห้ามมีคำพูดอื่นนอกจาก JSON):
-   {
-     "action": "other",
-     "replyText": "[คำตอบของคุณที่นี่ อ้างอิงจากข้อมูลด้านบนอย่างแม่นยำ สรุปให้อ่านง่าย ชัดเจน]"
-   }
+ตอบกลับเป็น JSON เท่านั้น (ห้ามใส่ markdown block \`\`\`json):
 
-3. หากผู้ใช้พูดคุยทั่วไป หรือข้อมูลไม่พอสร้างใบเสนอราคา ให้ตอบกลับด้วย:
-   {
-     "action": "other",
-     "replyText": "สวัสดีค่ะ! ต้องการให้ฉันช่วยจดงานหรือสอบถามข้อมูลงาน/ลูกค้า พิมพ์ถามรายละเอียดมาได้เลยนะคะ"
-   }`;
+สำหรับ action ที่ต้องทำในระบบ:
+
+1. ออกใบเสนอราคา (มีราคา + ชื่อลูกค้า + ชื่องาน):
+{"action":"create_quotation","customerName":"...","taskName":"...","price":0,"details":"...","items":[{"description":"...","amount":0}]}
+
+2. สร้างงานใหม่ (บอกว่า สร้างงาน/เพิ่มงาน/จดไว้หน่อย):
+{"action":"create_task","taskName":"...","customerName":"...","assignee":"...","dueDate":"YYYY-MM-DD หรือ null","details":"...","status":"To Do"}
+
+3. อัปเดตงาน (เปลี่ยนสถานะ/มอบหมาย/กำหนดส่ง ของงานที่มีอยู่):
+{"action":"update_task","taskId":"id ของงาน","taskName":"ชื่องานที่ตรงกับในระบบ","updates":{"status":"...","assignee":"...","dueDate":"...","details":"..."}}
+
+4. เพิ่มลูกค้าใหม่:
+{"action":"create_client","name":"...","contactInfo":"...","targetBudget":0}
+
+5. เพิ่มไอเดีย:
+{"action":"add_idea","title":"...","concept":"...","platform":"TikTok/YouTube/Facebook/Instagram/Blog/อื่นๆ"}
+
+6. ตอบคำถาม/คุยทั่วไป/สรุปงาน:
+{"action":"reply","replyText":"[คำตอบ ใช้ emoji อ่านง่าย ถ้าถามข้อมูลงานให้อ้างอิงจากระบบจริง ถ้าคุยทั่วไปตอบแบบเพื่อน]"}
+
+กฎสำคัญ:
+- ตอบเป็น JSON เท่านั้น ห้ามมีคำนอก JSON
+- ถ้าไม่แน่ใจว่าจะ action อะไร ให้ใช้ reply เสมอ
+- อัปเดตงาน: ให้ match ชื่องานจากรายการข้างบน แล้วใส่ taskId ให้ถูกต้อง (id ของ task นั้น)
+- วันที่ให้แปลงเป็น YYYY-MM-DD เสมอ เช่น พรุ่งนี้ = คำนวณจากวันนี้`;
 
       const aiResponse = await generateWithAI(systemPrompt, text);
       let parsed: any;
       try {
         parsed = JSON.parse(aiResponse.replace(/```json/g, '').replace(/```/g, '').trim());
       } catch (e) {
-        console.error("[Telegram Assistant] Failed to parse AI response:", aiResponse);
-        return;
+        // If JSON parse fails, treat as plain reply
+        parsed = { action: 'reply', replyText: aiResponse.trim() };
       }
 
+      // ── Action: create_quotation ──────────────────────────────────────
       if (parsed.action === 'create_quotation') {
         const { customerName, taskName, price, details, items } = parsed;
 
-        // Save to Supabase Tasks
         const taskId = `task-tg-${Date.now()}`;
-        const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
-        const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
-        
         let dbSaved = false;
         let pdfUrl = "";
 
         if (supabaseUrl && supabaseAnonKey) {
           const supabase = createClient(supabaseUrl, supabaseAnonKey);
-          
-          // Get or create client
+
           let clientId: string | null = null;
           if (customerName) {
-            const { data: clientData } = await supabase
-              .from('clients')
-              .select('id')
-              .eq('name', customerName)
-              .maybeSingle();
-            
+            const { data: clientData } = await supabase.from('clients').select('id').eq('name', customerName).maybeSingle();
             if (clientData) {
               clientId = clientData.id;
             } else {
               clientId = `client-${Date.now()}`;
-              await supabase.from('clients').insert({
-                id: clientId,
-                name: customerName,
-                targetBudget: price
-              });
+              await supabase.from('clients').insert({ id: clientId, name: customerName, targetBudget: price });
             }
           }
 
-          // Generate PDF using jsPDF
+          // Generate PDF
           const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-          
           const fontBase64 = await getSarabunBase64();
           if (fontBase64) {
             doc.addFileToVFS("Sarabun-Regular.ttf", fontBase64);
@@ -840,36 +859,26 @@ ${ideasContext || 'ไม่มีข้อมูลไอเดีย'}
             doc.setFont("Sarabun");
           }
 
-          // Write PDF content
           doc.setFontSize(22);
           doc.text("ใบเสนอราคา / Quotation", 20, 25);
-          
           doc.setFontSize(10);
           doc.text(`เลขที่เอกสาร: QT-${Date.now().toString().slice(-6)}`, 140, 20);
           doc.text(`วันที่ออก: ${new Date().toLocaleDateString('th-TH')}`, 140, 25);
-          
           doc.line(20, 32, 190, 32);
-          
           doc.setFontSize(11);
           doc.text("ข้อมูลผู้เสนอราคา:", 20, 42);
           doc.text("DocFlow Workspace Co., Ltd.", 20, 48);
           doc.text("อีเมล: contact@docflow.app", 20, 54);
-          
           doc.text("ข้อมูลผู้รับเสนอราคา (ลูกค้า):", 110, 42);
           doc.text(customerName || "-", 110, 48);
-          
           doc.line(20, 62, 190, 62);
-          
           doc.setFontSize(12);
           doc.text(`ชื่อโครงการ/งาน: ${taskName}`, 20, 72);
-          
-          // Draw Table Header
           doc.setFontSize(10);
           doc.setFillColor(240, 240, 240);
           doc.rect(20, 80, 170, 8, "F");
           doc.text("รายละเอียดรายการงาน (Items / Scope)", 22, 85);
           doc.text("จำนวนเงิน (THB)", 150, 85);
-          
           let currentY = 95;
           const pdfItems = items || [{ description: taskName, amount: price }];
           pdfItems.forEach((item: any, idx: number) => {
@@ -877,106 +886,144 @@ ${ideasContext || 'ไม่มีข้อมูลไอเดีย'}
             doc.text(`${(item.amount || price).toLocaleString()} .-`, 150, currentY);
             currentY += 10;
           });
-          
           doc.line(20, currentY, 190, currentY);
           currentY += 8;
-          
           doc.setFontSize(12);
           doc.text("ยอดเงินรวมสุทธิ (Total Amount):", 90, currentY);
           doc.text(`${price.toLocaleString()} บาท`, 150, currentY);
-          
           currentY += 15;
           doc.setFontSize(10);
           doc.text("ลงชื่อผู้เสนอราคา .....................................", 110, currentY);
 
-          // Upload PDF to Supabase Storage
           const pdfOutput = doc.output("arraybuffer");
           const buffer = Buffer.from(pdfOutput);
           const fileName = `quotation_${Date.now()}.pdf`;
           const filePath = `quotations/${fileName}`;
-          
-          const { error: uploadError } = await supabase.storage
-            .from('attachments')
-            .upload(filePath, buffer, {
-              contentType: 'application/pdf',
-              cacheControl: '3600',
-              upsert: true
-            });
-            
+          const { error: uploadError } = await supabase.storage.from('attachments').upload(filePath, buffer, { contentType: 'application/pdf', cacheControl: '3600', upsert: true });
           let newAttachments: any[] = [];
           if (!uploadError) {
-            const { data: { publicUrl: url } } = supabase.storage
-              .from('attachments')
-              .getPublicUrl(filePath);
+            const { data: { publicUrl: url } } = supabase.storage.from('attachments').getPublicUrl(filePath);
             pdfUrl = url;
-
-            // Build task attachment
-            newAttachments.push({
-              id: `attach-${Date.now()}`,
-              name: `ใบเสนอราคา_${taskName}.pdf`,
-              url: pdfUrl,
-              path: filePath,
-              mimeType: 'application/pdf',
-              size: `${(buffer.length / (1024 * 1024)).toFixed(2)} MB`
-            });
+            newAttachments.push({ id: `attach-${Date.now()}`, name: `ใบเสนอราคา_${taskName}.pdf`, url: pdfUrl, path: filePath, mimeType: 'application/pdf', size: `${(buffer.length / (1024 * 1024)).toFixed(2)} MB` });
           } else {
             console.error("[Telegram Assistant] Supabase PDF upload error:", uploadError);
           }
 
-          // Build a mock invoice in the task
           const invoiceNo = `INV-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Math.floor(100+Math.random()*900)}`;
-          const newInvoice = {
-            id: `inv-${Date.now()}`,
-            invoiceNo,
-            issueDate: new Date().toISOString().slice(0, 10),
-            status: 'draft',
-            phaseIds: [],
-            totalAmount: price,
-            notes: details
-          };
-
-          const { error: taskError } = await supabase.from('tasks').insert({
-            id: taskId,
-            name: taskName,
-            status: 'ไอเดีย/ร่าง',
-            price: price,
-            customer: customerName,
-            clientId: clientId,
-            details: details,
-            invoices: JSON.stringify([newInvoice]),
-            attachments: newAttachments.length > 0 ? JSON.stringify(newAttachments) : null
-          });
-          
-          if (!taskError) {
-            dbSaved = true;
-          } else {
-            console.error("[Telegram Assistant] Supabase insert task error:", taskError);
-          }
+          const newInvoice = { id: `inv-${Date.now()}`, invoiceNo, issueDate: new Date().toISOString().slice(0, 10), status: 'draft', phaseIds: [], totalAmount: price, notes: details };
+          const { error: taskError } = await supabase.from('tasks').insert({ id: taskId, name: taskName, status: 'ไอเดีย/ร่าง', price, customer: customerName, clientId, details, invoices: JSON.stringify([newInvoice]), attachments: newAttachments.length > 0 ? JSON.stringify(newAttachments) : null });
+          if (!taskError) dbSaved = true;
+          else console.error("[Telegram Assistant] Supabase insert task error:", taskError);
         }
 
-        // Send Reply to Telegram
         let messageText = `📄 *บันทึกงานและออกใบเสนอราคาสำเร็จ!*\n\n` +
           `🏢 ลูกค้า: ${customerName || '-'}\n` +
           `✅ ชื่องาน: ${taskName}\n` +
           `💰 ราคา: ${price.toLocaleString()} บาท\n` +
           `📝 รายละเอียด: ${details || '-'}\n\n`;
-          
-        if (dbSaved) {
-          messageText += `บันทึกเข้าระบบเรียบร้อยแล้วค่ะ 🚀`;
-        } else {
-          messageText += `⚠️ เกิดข้อผิดพลาดในการบันทึกข้อมูล`;
-        }
+        messageText += dbSaved ? `บันทึกเข้าระบบเรียบร้อยแล้วค่ะ 🚀` : `⚠️ เกิดข้อผิดพลาดในการบันทึกข้อมูล`;
 
         if (pdfUrl) {
           await sendTelegramDocument(chatId, pdfUrl, messageText);
         } else {
           await sendTelegramMessage(chatId, messageText);
         }
-      } else if (parsed.action === 'other' && parsed.replyText) {
-        await sendTelegramMessage(chatId, parsed.replyText);
+
+      // ── Action: create_task ────────────────────────────────────────────
+      } else if (parsed.action === 'create_task') {
+        const { taskName, customerName, assignee, dueDate, details, status } = parsed;
+        const taskId = `task-tg-${Date.now()}`;
+        let dbSaved = false;
+
+        if (supabaseUrl && supabaseAnonKey) {
+          const supabase = createClient(supabaseUrl, supabaseAnonKey);
+          let clientId: string | null = null;
+          if (customerName) {
+            const { data: cd } = await supabase.from('clients').select('id').eq('name', customerName).maybeSingle();
+            if (cd) clientId = cd.id;
+          }
+          const { error } = await supabase.from('tasks').insert({
+            id: taskId,
+            name: taskName,
+            status: status || 'To Do',
+            customer: customerName || null,
+            clientId,
+            assignee: assignee || null,
+            dueDate: dueDate || null,
+            details: details || null,
+            updatedAt: new Date().toISOString()
+          });
+          if (!error) dbSaved = true;
+          else console.error("[Telegram create_task error]", error);
+        }
+
+        const msg = dbSaved
+          ? `✅ *สร้างงานใหม่สำเร็จ!*\n\n📌 ชื่องาน: ${taskName}\n👤 มอบหมาย: ${assignee || 'ยังไม่ได้มอบหมาย'}\n🏢 ลูกค้า: ${customerName || '-'}\n📅 กำหนดส่ง: ${dueDate || 'ยังไม่กำหนด'}\n📝 รายละเอียด: ${details || '-'}\n\nบันทึกเข้าระบบเรียบร้อยแล้วค่ะ 🚀`
+          : `⚠️ ไม่สามารถสร้างงาน "${taskName}" ได้ กรุณาลองใหม่`;
+        await sendTelegramMessage(chatId, msg);
+
+      // ── Action: reply (general Q&A / summarize) ───────────────────────
+      } else if (parsed.action === 'reply' || parsed.action === 'other') {
+        const replyText = parsed.replyText || parsed.reply || 'ขอโทษค่ะ ไม่สามารถตอบได้ในขณะนี้';
+        await sendTelegramMessage(chatId, replyText);
+
+      } else if (parsed.action === 'update_task') {
+        // ── Action: update_task ───────────────────────────────────────────
+        const { taskId, taskName, updates } = parsed;
+        let updated = false;
+        if (supabaseUrl && supabaseAnonKey && (taskId || taskName)) {
+          const supabase = createClient(supabaseUrl, supabaseAnonKey);
+          let query = supabase.from('tasks').update({ ...updates, updatedAt: new Date().toISOString() });
+          if (taskId) {
+            query = query.eq('id', taskId);
+          } else {
+            query = query.ilike('name', `%${taskName}%`);
+          }
+          const { error } = await query;
+          if (!error) updated = true;
+          else console.error('[Telegram update_task error]', error);
+        }
+        const statusLabel = updates?.status || updates?.assignee ? `สถานะ: ${updates.status || '?'}, มอบหมาย: ${updates.assignee || '?'}` : JSON.stringify(updates);
+        await sendTelegramMessage(chatId, updated
+          ? `✅ อัปเดตงาน "${taskName}" เรียบร้อยแล้วค่ะ!\n${statusLabel}`
+          : `⚠️ ไม่พบงานชื่อ "${taskName}" ในระบบ`);
+
+      } else if (parsed.action === 'create_client') {
+        // ── Action: create_client ─────────────────────────────────────────
+        const { name, contactInfo, targetBudget } = parsed;
+        let saved = false;
+        if (supabaseUrl && supabaseAnonKey && name) {
+          const supabase = createClient(supabaseUrl, supabaseAnonKey);
+          const { error } = await supabase.from('clients').insert({ id: `client-tg-${Date.now()}`, name, contactInfo: contactInfo || null, targetBudget: targetBudget || 0 });
+          if (!error) saved = true;
+          else console.error('[Telegram create_client error]', error);
+        }
+        await sendTelegramMessage(chatId, saved
+          ? `✅ เพิ่มลูกค้า "${name}" เรียบร้อยแล้วค่ะ! 🏢`
+          : `⚠️ ไม่สามารถเพิ่มลูกค้า "${name}" ได้`);
+
+      } else if (parsed.action === 'add_idea') {
+        // ── Action: add_idea ─────────────────────────────────────────────
+        const { title, concept, platform } = parsed;
+        let saved = false;
+        if (supabaseUrl && supabaseAnonKey && title) {
+          const supabase = createClient(supabaseUrl, supabaseAnonKey);
+          const { error } = await supabase.from('ideas').insert({ id: `idea-tg-${Date.now()}`, title, concept: concept || null, platform: platform || 'อื่นๆ', createdAt: new Date().toISOString() });
+          if (!error) saved = true;
+          else console.error('[Telegram add_idea error]', error);
+        }
+        await sendTelegramMessage(chatId, saved
+          ? `💡 บันทึกไอเดีย "${title}" ใน ${platform || 'อื่นๆ'} เรียบร้อยแล้วค่ะ!`
+          : `⚠️ ไม่สามารถบันทึกไอเดียได้`);
+
+      } else {
+        // Fallback
+        await sendTelegramMessage(chatId, parsed.replyText || 'ขอโทษค่ะ ไม่เข้าใจคำสั่ง ลองพิมพ์ /help เพื่อดูคำสั่งทั้งหมด');
       }
+
     } catch (err: any) {
       console.error("[Telegram Assistant] handleTelegramMessage error:", err);
+      await sendTelegramMessage(chatId, '⚠️ เกิดข้อผิดพลาดภายใน กรุณาลองใหม่ในภายหลัง');
     }
   }
 
@@ -1000,13 +1047,47 @@ ${ideasContext || 'ไม่มีข้อมูลไอเดีย'}
     }
 
     if (text) {
-      // ตอบกลับหากมีคำสำคัญ หรือเริ่มด้วย / หรือพิมพ์หาบอท
-      const isTriggered = text.includes('เสนอราคา') || text.includes('ใบเสนอราคา') || text.startsWith('/');
-      if (isTriggered) {
-        handleTelegramMessage(text, chatId).catch(err => {
-          console.error("[Telegram Webhook Error]", err);
-        });
+      // ตอบทุกข้อความ — bot เป็น AI เพื่อนที่คุยได้ทุกเรื่อง
+      handleTelegramMessage(text, chatId).catch(err => {
+        console.error("[Telegram Webhook Error]", err);
+      });
+    }
+  });
+
+  // Setup Telegram Webhook — เรียกครั้งเดียวเพื่อ register URL
+  app.post("/api/telegram/setup-webhook", async (req, res) => {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (!token) return res.status(503).json({ error: "TELEGRAM_BOT_TOKEN ยังไม่ได้ตั้งค่า" });
+    const appUrl = (req.body?.appUrl || process.env.APP_URL || '').replace(/\/$/, '');
+    if (!appUrl) return res.status(400).json({ error: "กรุณาระบุ appUrl เช่น https://modtytasks.vercel.app" });
+    const webhookUrl = `${appUrl}/api/telegram/webhook`;
+    try {
+      const r = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: webhookUrl, allowed_updates: ['message', 'edited_message'] })
+      });
+      const data = await r.json() as any;
+      if (data.ok) {
+        res.json({ ok: true, webhookUrl, message: `ตั้ง Webhook สำเร็จ: ${webhookUrl}` });
+      } else {
+        res.status(400).json({ error: data.description || 'Telegram API error' });
       }
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // ตรวจสอบสถานะ Webhook ปัจจุบัน
+  app.get("/api/telegram/setup-webhook", async (_req, res) => {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (!token) return res.status(503).json({ error: "TELEGRAM_BOT_TOKEN ยังไม่ได้ตั้งค่า" });
+    try {
+      const r = await fetch(`https://api.telegram.org/bot${token}/getWebhookInfo`);
+      const data = await r.json() as any;
+      res.json(data);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
     }
   });
 
