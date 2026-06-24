@@ -6,7 +6,7 @@ import {
   DollarSign, Wallet, Hourglass, CalendarDays, ChevronRight, CheckSquare,
   ListTodo, Plus, Target, ShieldAlert, Sparkle, BrainCircuit, RefreshCw, Send, Bot, ClipboardCheck, UserCircle2
 } from 'lucide-react';
-import { Task, Client, Idea } from '../../types';
+import { Task, Client, Idea, Subtask } from '../../types';
 import { cn } from '../../lib/utils';
 import {
   calculateTaskPriorityScore,
@@ -54,10 +54,33 @@ export function BriefingView({
   // ── Compile calculations ──
   const revenueData = useMemo(() => compileRevenueData(tasks), [tasks]);
   
+  // Parse subtasks from all tasks and tag them with parent task name
+  const allSubtasksWithParent = useMemo(() => {
+    const result: Array<{ sub: Subtask; parentName: string; parentId: string }> = [];
+    tasks.forEach(t => {
+      if (!t.subtasks) return;
+      try {
+        const subs = typeof t.subtasks === 'string' ? JSON.parse(t.subtasks) : t.subtasks;
+        if (Array.isArray(subs)) {
+          subs.forEach((s: any) => result.push({ sub: s, parentName: t.name, parentId: String(t.id) }));
+        }
+      } catch (e) {
+        console.error("Malformed subtasks for task:", t.id, e);
+      }
+    });
+    return result;
+  }, [tasks]);
+
   const fanTasks = useMemo(() => tasks.filter(t => t.assignee === 'Fan' && t.status !== 'Done' && t.status !== 'เสร็จสิ้น'), [tasks]);
   const modTasks = useMemo(() => tasks.filter(t => t.assignee === 'Mod' && t.status !== 'Done' && t.status !== 'เสร็จสิ้น'), [tasks]);
   const fanDone  = useMemo(() => tasks.filter(t => t.assignee === 'Fan' && (t.status === 'Done' || t.status === 'เสร็จสิ้น')), [tasks]);
   const modDone  = useMemo(() => tasks.filter(t => t.assignee === 'Mod' && (t.status === 'Done' || t.status === 'เสร็จสิ้น')), [tasks]);
+
+  // Subtasks assigned to each person
+  const fanSubtasks = useMemo(() => allSubtasksWithParent.filter(({ sub }) => sub.assignee === 'Fan' && sub.status !== 'done'), [allSubtasksWithParent]);
+  const modSubtasks = useMemo(() => allSubtasksWithParent.filter(({ sub }) => sub.assignee === 'Mod' && sub.status !== 'done'), [allSubtasksWithParent]);
+  const fanSubDone  = useMemo(() => allSubtasksWithParent.filter(({ sub }) => sub.assignee === 'Fan' && sub.status === 'done'), [allSubtasksWithParent]);
+  const modSubDone  = useMemo(() => allSubtasksWithParent.filter(({ sub }) => sub.assignee === 'Mod' && sub.status === 'done'), [allSubtasksWithParent]);
 
   // Tasks with priority scores calculated
   const prioritizedTasks = useMemo(() => {
@@ -385,9 +408,9 @@ export function BriefingView({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Fan — Admin */}
               {(() => {
-                const active = fanTasks;
-                const done   = fanDone;
-                const urgent = active.filter(t => t.priority === 'ด่วน (Urgent)' || t.priority === 'สูง (High)');
+                const activeCount = fanTasks.length + fanSubtasks.length;
+                const completedCount = fanDone.length + fanSubDone.length;
+                const urgent = fanTasks.filter(t => t.priority === 'ด่วน (Urgent)' || t.priority === 'สูง (High)');
                 return (
                   <div className="rounded-[18px] bg-slate-50/50 border border-slate-100 p-5 flex flex-col gap-3">
                     <div className="flex items-center justify-between">
@@ -399,8 +422,8 @@ export function BriefingView({
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-xl font-black text-slate-800">{active.length}</p>
-                        <p className="text-[10px] text-slate-400">งานค้างอยู่</p>
+                        <p className="text-xl font-black text-slate-800">{activeCount}</p>
+                        <p className="text-[9px] text-slate-400">งานค้าง ({fanTasks.length} หลัก / {fanSubtasks.length} ซับ)</p>
                       </div>
                     </div>
                     {urgent.length > 0 && (
@@ -413,18 +436,32 @@ export function BriefingView({
                       </div>
                     )}
                     <div className="flex flex-col gap-1 max-h-32 overflow-y-auto pr-1">
-                      {active.length === 0 && <p className="text-[11px] text-slate-400 text-center py-2 font-medium">ไม่มีงานค้าง</p>}
-                      {active.map(t => (
+                      {activeCount === 0 && <p className="text-[11px] text-slate-400 text-center py-2 font-medium">ไม่มีงานค้าง</p>}
+                      
+                      {/* Parent Tasks */}
+                      {fanTasks.map(t => (
                         <div key={String(t.id)} className="flex items-center gap-2">
                           <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', t.priority === 'ด่วน (Urgent)' ? 'bg-rose-500' : t.priority === 'สูง (High)' ? 'bg-orange-400' : 'bg-slate-300')} />
                           <p className="text-[11px] text-slate-600 truncate flex-1 font-semibold">{t.name}</p>
-                          <span className="text-[9px] text-slate-400 shrink-0 font-bold uppercase tracking-wider">{t.status}</span>
+                          <span className="text-[9px] text-indigo-500 shrink-0 font-bold uppercase tracking-wider">งานหลัก ({t.status})</span>
+                        </div>
+                      ))}
+
+                      {/* Subtasks */}
+                      {fanSubtasks.map(({ sub, parentName }) => (
+                        <div key={String(sub.id)} className="flex items-center gap-2 pl-3 border-l-2 border-indigo-200">
+                          <span className="w-1 h-1 rounded-full shrink-0 bg-indigo-400" />
+                          <p className="text-[11px] text-slate-600 truncate flex-1 font-medium">
+                            <span className="text-slate-400 font-normal mr-1">[ซับ]</span>
+                            {sub.name} <span className="text-[9px] text-slate-400 font-normal">({parentName})</span>
+                          </p>
+                          <span className="text-[9px] text-slate-400 shrink-0 font-bold uppercase tracking-wider">{sub.status}</span>
                         </div>
                       ))}
                     </div>
                     <div className="flex items-center justify-between pt-2.5 border-t border-slate-100">
                       <span className="text-[10px] text-slate-400">เสร็จแล้ว</span>
-                      <span className="text-[11px] font-black text-emerald-600">{done.length} งาน</span>
+                      <span className="text-[11px] font-black text-emerald-600">{completedCount} ({fanDone.length} หลัก / {fanSubDone.length} ซับ)</span>
                     </div>
                   </div>
                 );
@@ -432,9 +469,9 @@ export function BriefingView({
 
               {/* Mod — Owner */}
               {(() => {
-                const active = modTasks;
-                const done   = modDone;
-                const urgent = active.filter(t => t.priority === 'ด่วน (Urgent)' || t.priority === 'สูง (High)');
+                const activeCount = modTasks.length + modSubtasks.length;
+                const completedCount = modDone.length + modSubDone.length;
+                const urgent = modTasks.filter(t => t.priority === 'ด่วน (Urgent)' || t.priority === 'สูง (High)');
                 return (
                   <div className="rounded-[18px] bg-slate-50/50 border border-slate-100 p-5 flex flex-col gap-3">
                     <div className="flex items-center justify-between">
@@ -446,8 +483,8 @@ export function BriefingView({
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-xl font-black text-slate-800">{active.length}</p>
-                        <p className="text-[10px] text-slate-400">งานค้างอยู่</p>
+                        <p className="text-xl font-black text-slate-800">{activeCount}</p>
+                        <p className="text-[9px] text-slate-400">งานค้าง ({modTasks.length} หลัก / {modSubtasks.length} ซับ)</p>
                       </div>
                     </div>
                     {urgent.length > 0 && (
@@ -460,18 +497,32 @@ export function BriefingView({
                       </div>
                     )}
                     <div className="flex flex-col gap-1 max-h-32 overflow-y-auto pr-1">
-                      {active.length === 0 && <p className="text-[11px] text-slate-400 text-center py-2 font-medium">ไม่มีงานค้าง</p>}
-                      {active.map(t => (
+                      {activeCount === 0 && <p className="text-[11px] text-slate-400 text-center py-2 font-medium">ไม่มีงานค้าง</p>}
+                      
+                      {/* Parent Tasks */}
+                      {modTasks.map(t => (
                         <div key={String(t.id)} className="flex items-center gap-2">
                           <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', t.priority === 'ด่วน (Urgent)' ? 'bg-rose-500' : t.priority === 'สูง (High)' ? 'bg-orange-400' : 'bg-slate-300')} />
                           <p className="text-[11px] text-slate-600 truncate flex-1 font-semibold">{t.name}</p>
-                          <span className="text-[9px] text-slate-400 shrink-0 font-bold uppercase tracking-wider">{t.status}</span>
+                          <span className="text-[9px] text-emerald-600 shrink-0 font-bold uppercase tracking-wider">งานหลัก ({t.status})</span>
+                        </div>
+                      ))}
+
+                      {/* Subtasks */}
+                      {modSubtasks.map(({ sub, parentName }) => (
+                        <div key={String(sub.id)} className="flex items-center gap-2 pl-3 border-l-2 border-emerald-100">
+                          <span className="w-1 h-1 rounded-full shrink-0 bg-emerald-400" />
+                          <p className="text-[11px] text-slate-600 truncate flex-1 font-medium">
+                            <span className="text-slate-400 font-normal mr-1">[ซับ]</span>
+                            {sub.name} <span className="text-[9px] text-slate-400 font-normal">({parentName})</span>
+                          </p>
+                          <span className="text-[9px] text-slate-400 shrink-0 font-bold uppercase tracking-wider">{sub.status}</span>
                         </div>
                       ))}
                     </div>
                     <div className="flex items-center justify-between pt-2.5 border-t border-slate-100">
                       <span className="text-[10px] text-slate-400">เสร็จแล้ว</span>
-                      <span className="text-[11px] font-black text-emerald-600">{done.length} งาน</span>
+                      <span className="text-[11px] font-black text-emerald-600">{completedCount} ({modDone.length} หลัก / {modSubDone.length} ซับ)</span>
                     </div>
                   </div>
                 );
