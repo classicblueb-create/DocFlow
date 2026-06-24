@@ -21,14 +21,14 @@ export function AgentsView({ onAgentClick }: AgentsViewProps) {
   ];
 
   return (
-    <div className="flex-1 flex-col overflow-y-auto hide-scrollbar p-4 md:p-6 flex bg-gray-50">
+    <div className="flex-1 flex-col overflow-y-auto hide-scrollbar p-4 md:p-6 flex bg-transparent">
       <div className="max-w-6xl w-full mx-auto">
-        <div className="flex justify-between items-center mb-6 border-b border-gray-200 pb-4">
+        <div className="flex justify-between items-center mb-6 border-b border-white/20 pb-4">
           <div>
-            <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-              <BrainCircuit className="w-7 h-7 text-clickup-purple" /> คลังผู้ช่วยอัจฉริยะ (AI Agents Library)
+            <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+              <BrainCircuit className="w-7 h-7 text-indigo-500" /> คลังผู้ช่วยอัจฉริยะ (AI Agents Library)
             </h2>
-            <p className="text-sm text-gray-500 mt-1">เลือกผู้ช่วย AI เฉพาะทางเพื่อช่วยจัดการงานของคุณได้อย่างแม่นยำ</p>
+            <p className="text-sm text-slate-500 mt-1">เลือกผู้ช่วย AI เฉพาะทางเพื่อช่วยจัดการงานของคุณได้อย่างแม่นยำ</p>
           </div>
         </div>
 
@@ -39,17 +39,17 @@ export function AgentsView({ onAgentClick }: AgentsViewProps) {
             
             return (
               <div key={cat.id} className="mb-8">
-                <h3 className={`text-lg font-bold text-gray-800 mb-4 border-l-4 pl-3`} style={{ borderColor: `var(--color-${cat.color}-500, #3b82f6)` }}>
+                <h3 className={`text-lg font-bold text-slate-850 mb-4 border-l-4 pl-3`} style={{ borderColor: `var(--color-${cat.color}-500, #3b82f6)` }}>
                   {cat.name}
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                   {catAgents.map(agent => (
-                    <div key={agent.id} onClick={() => onAgentClick(agent.id)} className="bg-white border rounded-xl p-5 shadow-sm hover:shadow-md cursor-pointer transition flex flex-col group relative overflow-hidden">
-                      <div className={`w-10 h-10 rounded-lg ${agent.bg} bg-opacity-10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
+                    <div key={agent.id} onClick={() => onAgentClick(agent.id)} className="glass-card rounded-xl p-5 cursor-pointer transition flex flex-col group relative overflow-hidden">
+                      <div className={`w-10 h-10 rounded-lg ${agent.bg} bg-opacity-15 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
                         <agent.icon className="w-5 h-5 text-current" style={{ color: `var(--color-${agent.color}-600, #2563eb)`}} />
                       </div>
-                      <h4 className="font-bold text-gray-800 text-sm mb-2">{agent.title}</h4>
-                      <p className="text-xs text-gray-500 leading-relaxed">{agent.text}</p>
+                      <h4 className="font-bold text-slate-800 text-sm mb-2">{agent.title}</h4>
+                      <p className="text-xs text-slate-500 leading-relaxed">{agent.text}</p>
                     </div>
                   ))}
                 </div>

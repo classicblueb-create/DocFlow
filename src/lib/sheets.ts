@@ -1,4 +1,6 @@
-import { getAccessToken } from './auth';
+// Google Sheets shadow-write helpers
+// getAccessToken is not available in Supabase auth — shadow writes are best-effort no-ops
+async function getAccessToken(): Promise<string | null> { return null; }
 import type { Task, Client, Template } from '../types';
 
 export const SPREADSHEET_ID_KEY = 'docflow_spreadsheet_id';
@@ -262,3 +264,16 @@ export async function syncAllTemplatesToSheet(templates: Template[]) {
     })
   });
 }
+
+// ── Stub exports for db.ts shadow-writes ────────────────────────────────────
+// These are no-ops until Google OAuth token support is wired up.
+import type { Idea } from '../types';
+
+export async function deleteTaskFromSheet(_id: string | number): Promise<void> {}
+export async function saveClientToSheet(_client: Client): Promise<void> {}
+export async function deleteClientFromSheet(_id: string): Promise<void> {}
+export async function saveTemplateToSheet(_template: Template): Promise<void> {}
+export async function deleteTemplateFromSheet(_id: string): Promise<void> {}
+export async function saveIdeaToSheet(_idea: Idea): Promise<void> {}
+export async function deleteIdeaFromSheet(_id: string): Promise<void> {}
+export async function generatePDF(_data: unknown): Promise<string | null> { return null; }

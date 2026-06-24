@@ -355,6 +355,83 @@ async function startServer() {
     }
   });
 
+  // LINE Messaging API — webhook รับ Group ID อัตโนมัติเมื่อ bot ถูก add เข้ากลุ่ม
+  let lineGroupId = process.env.LINE_GROUP_ID || '';
+
+  app.post("/api/line/webhook", (req, res) => {
+    res.sendStatus(200); // ตอบ 200 ทันทีตาม LINE spec
+    const events = req.body?.events || [];
+    for (const event of events) {
+      const source = event.source;
+      // บันทึก groupId จาก event ใดก็ตามที่มาจากกลุ่ม
+      if (source?.type === 'group' && source?.groupId) {
+        if (lineGroupId !== source.groupId) {
+          lineGroupId = source.groupId;
+          console.log(`[LINE] บันทึก Group ID: ${lineGroupId}`);
+        }
+      }
+    }
+  });
+
+  // LINE Messaging API — ดู Group ID ที่จับได้ (สำหรับ debug)
+  app.get("/api/line/group-id", (_req, res) => {
+    res.json({ groupId: lineGroupId || null });
+  });
+
+  // LINE Messaging API — ส่งแจ้งเตือนเมื่อ assign งาน
+  app.post("/api/notify/line", async (req, res) => {
+    const channelToken = process.env.LINE_CHANNEL_TOKEN;
+    const groupId = lineGroupId || process.env.LINE_GROUP_ID;
+
+    if (!channelToken) {
+      return res.status(503).json({ error: "LINE_CHANNEL_TOKEN ยังไม่ได้ตั้งค่าในไฟล์ .env" });
+    }
+    if (!groupId) {
+      return res.status(503).json({ error: "ยังไม่มี LINE_GROUP_ID — พิมพ์อะไรก็ได้ในกลุ่มที่มี bot ก่อน แล้วลองใหม่" });
+    }
+
+    const { taskName, assignee, dueDate, fileUrl, details, customer } = req.body;
+    if (!taskName || !assignee) {
+      return res.status(400).json({ error: "ต้องระบุ taskName และ assignee" });
+    }
+
+    const lines = [
+      '📋 มอบหมายงานใหม่!',
+      '━━━━━━━━━━━━━━━',
+      `✅ งาน: ${taskName}`,
+      `👤 มอบให้: ${assignee}`,
+      customer   ? `🏢 ลูกค้า: ${customer}` : '',
+      dueDate    ? `📅 กำหนดส่ง: ${dueDate}` : '',
+      details    ? `📝 ${details.slice(0, 120)}${details.length > 120 ? '...' : ''}` : '',
+      fileUrl    ? `🔗 ${fileUrl}` : '',
+      '━━━━━━━━━━━━━━━',
+      'ส่งจาก DocFlow 🚀',
+    ].filter(Boolean).join('\n');
+
+    try {
+      const response = await fetch("https://api.line.me/v2/bot/message/push", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${channelToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          to: groupId,
+          messages: [{ type: "text", text: lines }],
+        }),
+      });
+      if (!response.ok) {
+        const err: any = await response.json();
+        console.error("[LINE] push error:", err);
+        return res.status(response.status).json({ error: err.message || "LINE API error" });
+      }
+      return res.json({ ok: true });
+    } catch (e: any) {
+      console.error("[LINE] fetch error:", e);
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
   // Health check
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });

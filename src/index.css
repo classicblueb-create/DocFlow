@@ -1,36 +1,148 @@
 @import "tailwindcss";
 
 @theme {
-  --color-claude-accent: #d97757;
-  --color-claude-border: #e5e7eb;
+  --color-claude-accent: #6366f1;
+  --color-claude-border: #f1f5f9;
   --color-claude-card: #ffffff;
-  --color-claude-subtext: #6b7280;
-  --color-clickup-sidebar: #2A2E35;
-  --color-clickup-hover: #3A3F48;
-  --color-clickup-active: #e2e8f0;
-  --color-clickup-purple: #7B68EE;
+  --color-claude-subtext: #64748b;
+  --color-clickup-sidebar: #0f172a;
+  --color-clickup-hover: #1e293b;
+  --color-clickup-active: #f1f5f9;
+  --color-clickup-purple: #6366f1;
 
-  --font-sans: "Sarabun", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "Sarabun", ui-serif, Georgia, serif;
+  --font-sans: "Plus Jakarta Sans", "IBM Plex Sans Thai", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Plus Jakarta Sans", "IBM Plex Sans Thai", ui-serif, Georgia, serif;
+}
+
+/* ── Root sizing (iOS-safe: no overflow:hidden on body, no fixed bg) ── */
+html {
+  height: 100%;
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  font-family: 'Sarabun', sans-serif;
-  background-color: #f9fafb;
+  height: 100%;
+  font-family: "Plus Jakarta Sans", "IBM Plex Sans Thai", sans-serif;
+  background-color: #fafafa;
+  /* NOTE: background-attachment:scroll (NOT fixed) — fixed breaks iOS keyboard */
+  background-attachment: scroll;
 }
 
-.hide-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-.hide-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+#root {
+  height: 100%;
 }
 
-.kanban-column {
-  min-height: 500px;
+/* ── iOS input zoom fix ── */
+input, select, textarea {
+  font-size: max(16px, 1em);
+  touch-action: manipulation;
 }
-.drag-over {
-  background-color: #f3f4f6;
-  border: 2px dashed #7B68EE;
+
+/* ── Scrollbar hide ── */
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+.hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ── Kanban ── */
+.kanban-column { min-height: 400px; }
+
+/* ── Glassmorphism design system ── */
+
+/* CSS variables for theme */
+:root {
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  --app-bg-image: none;
+  --glass-bg: rgba(255, 255, 255, 0.45);
+  --glass-border: rgba(255, 255, 255, 0.4);
+  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.04), inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
 }
+
+/* Base glass card */
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+/* Glass panel (sidebar / header) */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+/* Glass modal */
+.glass-modal {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.08), 0 4px 24px rgba(15, 23, 42, 0.03);
+}
+
+/* Glass input */
+.glass-input {
+  background: rgba(255,255,255,0.9);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1.5px solid rgba(226,232,240,0.8);
+  border-radius: 12px;
+  color: #0f172a;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  outline: none;
+}
+.glass-input:focus {
+  border-color: rgba(99,102,241,0.5);
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+}
+
+/* Primary button */
+.btn-primary {
+  background: #0f172a;
+  color: white;
+  font-weight: 600;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.15s, background-color 0.15s;
+}
+.btn-primary:hover {
+  background: #1e293b;
+  transform: translateY(-0.5px);
+}
+.btn-primary:active { transform: scale(0.98); }
+
+/* Smooth transitions */
+.transition-premium {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* App background gradient */
+.app-bg {
+  background-image: var(--app-bg-image, none),
+    radial-gradient(at 10% 20%, rgba(99, 102, 241, 0.18) 0, transparent 45%),
+    radial-gradient(at 90% 10%, rgba(244, 63, 94, 0.12) 0, transparent 40%),
+    radial-gradient(at 50% 80%, rgba(56, 189, 248, 0.18) 0, transparent 50%),
+    linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  background-size: cover;
+  background-position: center;
+}
+
+/* Fade in animation */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in { animation: fadeIn 0.25s ease-out forwards; }
+
+/* DS fade-in-up (for modals) */
+@keyframes dsSlideUp {
+  from { opacity: 0; transform: translateY(16px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.ds-fade-in-up { animation: dsSlideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
