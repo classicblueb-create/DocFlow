@@ -156,7 +156,7 @@ export function ListView({ tasks, clients, onTaskClick, onStatusChange, onConsul
  {group.tasks.map(task => {
  const isOverdue = task.endDate && task.endDate < today && task.status !== 'Done' && task.status !== 'เสร็จสิ้น';
  const subtasks = parseSubtasks(task.subtasks);
- const completedSubs = subtasks.filter(s => s.completed).length;
+ const completedSubs = subtasks.filter(s => s.status === 'done' || s.completed).length;
  const progress = subtasks.length > 0 ? Math.round(completedSubs / subtasks.length * 100) : -1;
  return (
  <div
@@ -235,7 +235,7 @@ export function ListView({ tasks, clients, onTaskClick, onStatusChange, onConsul
  const isOverdue = task.endDate && task.endDate < today &&
  task.status !== 'Done' && task.status !== 'เสร็จสิ้น';
  const subtasks = parseSubtasks(task.subtasks);
- const completedSubs = subtasks.filter(s => s.completed).length;
+ const completedSubs = subtasks.filter(s => s.status === 'done' || s.completed).length;
  const progress = subtasks.length > 0 ? Math.round(completedSubs / subtasks.length * 100) : -1;
 
  return (

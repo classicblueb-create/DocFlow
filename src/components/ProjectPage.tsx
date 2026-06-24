@@ -287,9 +287,9 @@ export function ProjectPage({
  setNewSubDueDate('');
  setNewSubNotes('');
  setNewSubAssignee('');
- // ส่ง LINE notification
+ // ส่ง Telegram notification
  const projectName = task.name;
- fetch('/api/notify/line', {
+ fetch('/api/notify/telegram', {
  method: 'POST',
  headers: { 'Content-Type': 'application/json' },
  body: JSON.stringify({
@@ -787,7 +787,7 @@ export function ProjectPage({
  className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-400 resize-none bg-white" />
  <button onClick={addSubtask}
  className="w-full flex items-center justify-center gap-1.5 text-xs font-bold px-3 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-700 transition-colors cursor-pointer">
- <Plus className="w-3.5 h-3.5" /> เพิ่ม Subtask + แจ้ง LINE
+ <Plus className="w-3.5 h-3.5" /> เพิ่ม Subtask + แจ้ง Telegram
  </button>
  </div>
  </div>
