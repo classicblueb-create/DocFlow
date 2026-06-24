@@ -158,6 +158,24 @@ export default function App() {
  };
  }, [authed]);
 
+ // ── Load Notion content plans on login ────────────────────────────────────
+ useEffect(() => {
+   if (!authed) return;
+   fetch('/api/notion/content-plans')
+     .then(r => r.ok ? r.json() : Promise.reject(r))
+     .then((notionPlans: ContentPlan[]) => {
+       if (!Array.isArray(notionPlans) || notionPlans.length === 0) return;
+       setContentPlans(prev => {
+         // Merge: Notion is source-of-truth; keep local-only plans not yet synced
+         const localOnly = prev.filter(p => !notionPlans.some(n => n.id === p.id || n.id === p.notionPageId));
+         const merged = [...notionPlans, ...localOnly];
+         lsSet(LS_CONTENT, merged);
+         return merged;
+       });
+     })
+     .catch(() => { /* Notion unavailable — keep localStorage data */ });
+ }, [authed]);
+
  // ── Notification helper ───────────────────────────────────────────────────
  const showNotification = useCallback((message: string, isError = false) => {
  const id = Date.now();
@@ -299,7 +317,7 @@ export default function App() {
  // Sync to Notion (fire-and-forget; update plan with notionPageId/url if success)
  let savedPlan = plan;
  try {
- const res = await fetch('/api/notion/content-plan', {
+ const res = await fetch('/api/notion/content-plans', {
  method: 'POST',
  headers: { 'Content-Type': 'application/json' },
  body: JSON.stringify(plan),
@@ -329,7 +347,7 @@ export default function App() {
  // Sync to Notion if page already exists
  if (plan.notionPageId) {
  try {
- await fetch(`/api/notion/content-plan/${plan.notionPageId}`, {
+ await fetch(`/api/notion/content-plans/${plan.notionPageId}`, {
  method: 'PATCH',
  headers: { 'Content-Type': 'application/json' },
  body: JSON.stringify(plan),

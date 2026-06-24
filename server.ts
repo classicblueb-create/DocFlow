@@ -903,8 +903,41 @@ ${ideasContext || 'ไม่มีข้อมูลไอเดีย'}
     return blocks;
   }
 
-  // Create a new Notion page for a content plan
-  app.post('/api/notion/content-plan', async (req, res) => {
+  // GET all Notion content plans
+  app.get('/api/notion/content-plans', async (_req, res) => {
+    try {
+      const dbId = process.env.NOTION_CONTENT_DB_ID;
+      if (!process.env.NOTION_TOKEN || !dbId) return res.status(400).json({ error: 'Notion not configured' });
+      const r = await fetch(`https://api.notion.com/v1/databases/${dbId}/query`, {
+        method: 'POST',
+        headers: NOTION_HEADERS(),
+        body: JSON.stringify({ sorts: [{ property: 'Created time', direction: 'descending' }] }),
+      });
+      const data = await r.json() as any;
+      const plans = (data.results || []).map((page: any) => {
+        const props = page.properties;
+        const platformRaw: string[] = (props['Platform ']?.multi_select || []).map((s: any) => s.name as string);
+        const platformMap: Record<string, string> = { TIKTOK: 'TikTok', FB: 'Facebook', IG: 'Instagram' };
+        const s = props['Status']?.status?.name || 'Not started';
+        return {
+          id: page.id,
+          notionPageId: page.id,
+          title: props['Name']?.title?.[0]?.plain_text || props['name']?.title?.[0]?.plain_text || '',
+          concept: props['Details']?.rich_text?.[0]?.plain_text || '',
+          platform: platformMap[platformRaw[0]] || platformRaw[0] || 'อื่นๆ',
+          status: s === 'Done' ? 'เผยแพร่แล้ว' : s === 'In progress' ? 'กำลังผลิต' : 'ไอเดีย/ร่าง',
+          createdAt: page.created_time,
+          notionUrl: page.url,
+        };
+      });
+      res.json(plans);
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Create a new Notion page for a content plan (supports both singular and plural URL)
+  async function createNotionContentPlan(req: any, res: any) {
     try {
       const dbId = process.env.NOTION_CONTENT_DB_ID;
       if (!process.env.NOTION_TOKEN || !dbId) return res.status(400).json({ error: 'Notion not configured' });
@@ -922,11 +955,14 @@ ${ideasContext || 'ไม่มีข้อมูลไอเดีย'}
       });
       const data = await response.json();
       if (!response.ok) return res.status(response.status).json({ error: data.message });
-      res.json({ notionPageId: data.id, notionUrl: data.url });
+      res.json({ notionPageId: data.id, id: data.id, notionUrl: data.url });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
-  });
+  }
+  app.post('/api/notion/content-plan', createNotionContentPlan);
+  app.post('/api/notion/content-plans', createNotionContentPlan);
+
 
   // Update an existing Notion page (replace all children blocks)
   app.patch('/api/notion/content-plan/:pageId', async (req, res) => {
@@ -962,6 +998,34 @@ ${ideasContext || 'ไม่มีข้อมูลไอเดีย'}
         body: JSON.stringify({ children: buildNotionChildren(plan) }),
       });
 
+      res.json({ ok: true });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+  // Alias: plural URL
+  app.patch('/api/notion/content-plans/:pageId', async (req, res) => {
+    req.params.pageId = req.params.pageId;
+    // Reuse same logic by delegating to singular
+    try {
+      if (!process.env.NOTION_TOKEN) return res.status(400).json({ error: 'Notion not configured' });
+      const { pageId } = req.params;
+      const plan = req.body;
+      await fetch(`https://api.notion.com/v1/pages/${pageId}`, {
+        method: 'PATCH',
+        headers: NOTION_HEADERS(),
+        body: JSON.stringify({ properties: { title: { title: [{ text: { content: plan.title || 'Untitled' } }] } } }),
+      });
+      const listRes = await fetch(`https://api.notion.com/v1/blocks/${pageId}/children?page_size=100`, { headers: NOTION_HEADERS() });
+      const listData = await listRes.json();
+      if (listData.results) {
+        await Promise.all(listData.results.map((b: any) =>
+          fetch(`https://api.notion.com/v1/blocks/${b.id}`, { method: 'DELETE', headers: NOTION_HEADERS() })
+        ));
+      }
+      await fetch(`https://api.notion.com/v1/blocks/${pageId}/children`, {
+        method: 'PATCH', headers: NOTION_HEADERS(), body: JSON.stringify({ children: buildNotionChildren(plan) }),
+      });
       res.json({ ok: true });
     } catch (e: any) {
       res.status(500).json({ error: e.message });

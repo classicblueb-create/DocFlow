@@ -544,6 +544,7 @@ ${contextSection}
     const platformMap: Record<string, string> = { TIKTOK: "TikTok", FB: "Facebook", IG: "Instagram" };
     return {
       id: page.id,
+      notionPageId: page.id,
       title: props["Name"]?.title?.[0]?.plain_text || "",
       concept: props["Details"]?.rich_text?.[0]?.plain_text || "",
       platform: platformMap[platformRaw[0]] || platformRaw[0] || "อื่นๆ",
