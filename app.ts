@@ -702,6 +702,45 @@ ${contextSection}
     }
   }
 
+  // ส่งไฟล์ Buffer โดยตรง (multipart form-data) ไม่ต้องอาศัย URL
+  async function sendTelegramFile(chatId: string | number, buffer: Buffer, filename: string, caption?: string) {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (!token) {
+      console.error("[Telegram] TELEGRAM_BOT_TOKEN is missing");
+      return;
+    }
+    try {
+      const FormData = (await import('form-data')).default;
+      const form = new FormData();
+      form.append('chat_id', String(chatId));
+      form.append('document', buffer, { filename, contentType: filename.endsWith('.csv') ? 'text/csv' : 'application/pdf' });
+      if (caption) form.append('caption', caption);
+      const response = await fetch(`https://api.telegram.org/bot${token}/sendDocument`, {
+        method: 'POST',
+        body: form as any,
+        headers: form.getHeaders()
+      });
+      if (!response.ok) {
+        const err = await response.text();
+        console.error('[Telegram sendFile error]', err);
+      }
+    } catch (e: any) {
+      // Fallback: try without form-data using fetch FormData
+      console.error('[Telegram sendFile fallback error]', e.message);
+      // Try native fetch FormData
+      try {
+        const fd = new (globalThis as any).FormData();
+        const blob = new (globalThis as any).Blob([buffer], { type: filename.endsWith('.csv') ? 'text/csv; charset=utf-8' : 'application/pdf' });
+        fd.append('chat_id', String(chatId));
+        fd.append('document', blob, filename);
+        if (caption) fd.append('caption', caption);
+        await fetch(`https://api.telegram.org/bot${token}/sendDocument`, { method: 'POST', body: fd });
+      } catch (e2: any) {
+        console.error('[Telegram sendFile native error]', e2.message);
+      }
+    }
+  }
+
   async function handleTelegramMessage(text: string, chatId: number | string) {
     const token = process.env.TELEGRAM_BOT_TOKEN;
     if (!token) {
@@ -812,6 +851,11 @@ ${ideasContext || 'ยังไม่มีไอเดีย'}
 
 6. ตอบคำถาม/คุยทั่วไป/สรุปงาน:
 {"action":"reply","replyText":"[คำตอบ ใช้ emoji อ่านง่าย ถ้าถามข้อมูลงานให้อ้างอิงจากระบบจริง ถ้าคุยทั่วไปตอบแบบเพื่อน]"}
+
+7. ส่งไฟล์รายงานงาน (ผู้ใช้เอ่ย ส่งไฟล์/export/PDF รายงาน/CSV/ลีสต์งาน):
+{"action":"export_tasks_pdf","filter":"ทั้งหมด/ยังไม่เสร็จ/เสร็จแล้ว/ชื่อลูกค้า"}
+{"action":"export_tasks_csv"}
+{"action":"export_clients_csv"}
 
 กฎสำคัญ:
 - ตอบเป็น JSON เท่านั้น ห้ามมีคำนอก JSON
@@ -1015,6 +1059,102 @@ ${ideasContext || 'ยังไม่มีไอเดีย'}
         await sendTelegramMessage(chatId, saved
           ? `💡 บันทึกไอเดีย "${title}" ใน ${platform || 'อื่นๆ'} เรียบร้อยแล้วค่ะ!`
           : `⚠️ ไม่สามารถบันทึกไอเดียได้`);
+
+      } else if (parsed.action === 'export_tasks_pdf') {
+        // ── Action: export_tasks_pdf ───────────────────────────────────────
+        await sendTelegramMessage(chatId, '📄 กำลังสร้าง PDF รายงานงาน...');
+        if (supabaseUrl && supabaseAnonKey) {
+          const supabase = createClient(supabaseUrl, supabaseAnonKey);
+          const { data: tasks } = await supabase.from('tasks').select('*');
+          const filter = parsed.filter || 'ทั้งหมด';
+          const filteredTasks = (tasks || []).filter((t: any) => {
+            if (filter === 'ทั้งหมด') return true;
+            if (filter === 'ยังไม่เสร็จ') return t.status !== 'เสร็จสิ้น' && t.status !== 'Done';
+            if (filter === 'เสร็จแล้ว') return t.status === 'เสร็จสิ้น' || t.status === 'Done';
+            return (t.customer || '').toLowerCase().includes(filter.toLowerCase());
+          });
+
+          const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+          const fontBase64 = await getSarabunBase64();
+          if (fontBase64) {
+            doc.addFileToVFS('Sarabun-Regular.ttf', fontBase64);
+            doc.addFont('Sarabun-Regular.ttf', 'Sarabun', 'normal');
+            doc.setFont('Sarabun');
+          }
+          doc.setFontSize(18);
+          doc.text(`รายงานงาน DocFlow`, 20, 20);
+          doc.setFontSize(10);
+          doc.text(`ออกเมื่อ: ${new Date().toLocaleDateString('th-TH')}  สถานะ: ${filter}  รวม ${filteredTasks.length} รายการ`, 20, 28);
+          doc.line(20, 32, 190, 32);
+
+          // Header
+          doc.setFillColor(60, 60, 80);
+          doc.rect(20, 34, 170, 8, 'F');
+          doc.setTextColor(255, 255, 255);
+          doc.setFontSize(9);
+          doc.text('ชื่องาน', 22, 39);
+          doc.text('ลูกค้า', 80, 39);
+          doc.text('สถานะ', 120, 39);
+          doc.text('ผู้รับผิดชอบ', 150, 39);
+          doc.text('กำหนดส่ง', 175, 39);
+
+          doc.setTextColor(0, 0, 0);
+          let y = 50;
+          filteredTasks.forEach((t: any, i: number) => {
+            if (y > 270) { doc.addPage(); y = 20; }
+            if (i % 2 === 0) { doc.setFillColor(245, 245, 250); doc.rect(20, y - 5, 170, 9, 'F'); }
+            doc.setFontSize(8);
+            doc.text((t.name || '-').substring(0, 30), 22, y);
+            doc.text((t.customer || '-').substring(0, 18), 80, y);
+            doc.text((t.status || '-').substring(0, 16), 120, y);
+            doc.text((t.assignee || '-').substring(0, 14), 150, y);
+            doc.text((t.dueDate || '-'), 175, y);
+            y += 9;
+          });
+
+          const buf = Buffer.from(doc.output('arraybuffer'));
+          const filename = `tasks_report_${new Date().toISOString().slice(0,10)}.pdf`;
+          await sendTelegramFile(chatId, buf, filename, `📄 รายงานงานทั้งหมด (${filteredTasks.length} รายการ)`);
+        } else {
+          await sendTelegramMessage(chatId, '⚠️ ไม่สามารถสร้างรายงานได้ เนื่องจากไม่ได้ตั้งค่า Supabase');
+        }
+
+      } else if (parsed.action === 'export_tasks_csv') {
+        // ── Action: export_tasks_csv ───────────────────────────────────────
+        await sendTelegramMessage(chatId, '📊 กำลังสร้าง CSV รายการงาน...');
+        if (supabaseUrl && supabaseAnonKey) {
+          const supabase = createClient(supabaseUrl, supabaseAnonKey);
+          const { data: tasks } = await supabase.from('tasks').select('*');
+          const headers = ['ชื่องาน','ลูกค้า','สถานะ','ผู้รับผิดชอบ','ราคา','กำหนดส่ง','รายละเอียด'];
+          const rows = (tasks || []).map((t: any) => [
+            t.name || '', t.customer || '', t.status || '', t.assignee || '',
+            t.price || 0, t.dueDate || '', (t.details || '').replace(/[,"\n]/g, ' ')
+          ].map((v: any) => `"${v}"`).join(','));
+          const csv = '\uFEFF' + headers.join(',') + '\n' + rows.join('\n');
+          const buf = Buffer.from(csv, 'utf-8');
+          const filename = `tasks_${new Date().toISOString().slice(0,10)}.csv`;
+          await sendTelegramFile(chatId, buf, filename, `📊 เอกสารงานทั้งหมด ${(tasks || []).length} รายการ (เปิดใน Excel ได้)`);
+        } else {
+          await sendTelegramMessage(chatId, '⚠️ ไม่สามารถ export ได้');
+        }
+
+      } else if (parsed.action === 'export_clients_csv') {
+        // ── Action: export_clients_csv ─────────────────────────────────────
+        await sendTelegramMessage(chatId, '🏢 กำลังสร้าง CSV รายชื่อลูกค้า...');
+        if (supabaseUrl && supabaseAnonKey) {
+          const supabase = createClient(supabaseUrl, supabaseAnonKey);
+          const { data: clients } = await supabase.from('clients').select('*');
+          const headers = ['ชื่อลูกค้า','ติดต่อ','งบประมาณ'];
+          const rows = (clients || []).map((c: any) => [
+            c.name || '', (c.contactInfo || '').replace(/[,"\n]/g, ' '), c.targetBudget || 0
+          ].map((v: any) => `"${v}"`).join(','));
+          const csv = '\uFEFF' + headers.join(',') + '\n' + rows.join('\n');
+          const buf = Buffer.from(csv, 'utf-8');
+          const filename = `clients_${new Date().toISOString().slice(0,10)}.csv`;
+          await sendTelegramFile(chatId, buf, filename, `🏢 ลูกค้าทั้งหมด ${(clients || []).length} ราย`);
+        } else {
+          await sendTelegramMessage(chatId, '⚠️ ไม่สามารถ export ได้');
+        }
 
       } else {
         // Fallback
