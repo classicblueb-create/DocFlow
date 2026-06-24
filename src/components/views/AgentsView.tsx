@@ -16,8 +16,13 @@ interface AgentsViewProps {
 export function AgentsView({ onAgentClick }: AgentsViewProps) {
 
   const categories = [
+    { id: 'strategy', name: 'กลยุทธ์ธุรกิจ (Business Strategy)', color: 'violet' },
     { id: 'productivity', name: 'ประสิทธิภาพส่วนตัว (Productivity)', color: 'blue' },
     { id: 'engineering', name: 'วิศวกรรม (Engineering)', color: 'indigo' },
+    { id: 'research', name: 'วิจัยและข้อมูล (Research)', color: 'amber' },
+    { id: 'operations', name: 'ปฏิบัติการ (Operations)', color: 'teal' },
+    { id: 'sales', name: 'ขายและการตลาด (Sales)', color: 'emerald' },
+    { id: 'support', name: 'บริการลูกค้า (Support)', color: 'rose' },
   ];
 
   return (
