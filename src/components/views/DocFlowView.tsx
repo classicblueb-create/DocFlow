@@ -256,16 +256,75 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
     setExporting(true);
     showNotification(lang === 'th' ? 'กำลังสร้างไฟล์ PDF...' : 'Generating PDF...');
     try {
+      // รอให้ font โหลดครบก่อน
+      await document.fonts.ready;
+
       const paper = paperRef.current;
+
+      // แทน input/textarea/select ด้วย div ชั่วคราว เพื่อให้ html2canvas capture ค่าได้ถูกต้อง
+      const replacements: { original: HTMLElement; fake: HTMLElement }[] = [];
+      paper.querySelectorAll<HTMLElement>('input, textarea, select').forEach(el => {
+        if ((el as HTMLInputElement).type === 'file') return;
+
+        const isMulti = el.tagName === 'TEXTAREA';
+        const fake = document.createElement(isMulti ? 'div' : 'span');
+        const st = window.getComputedStyle(el);
+
+        fake.style.cssText = `
+          font-family:${st.fontFamily}; font-size:${st.fontSize}; font-weight:${st.fontWeight};
+          color:${st.color}; text-align:${st.textAlign}; width:${st.width};
+          padding:${st.padding}; margin:${st.margin}; box-sizing:${st.boxSizing};
+          display:${isMulti ? 'block' : 'inline-block'};
+          ${isMulti ? `white-space:pre-wrap; word-break:break-word; line-height:${st.lineHeight};` : ''}
+        `;
+
+        let val = (el as HTMLInputElement).value ?? '';
+        if (el.tagName === 'SELECT') {
+          val = (el as HTMLSelectElement).options[(el as HTMLSelectElement).selectedIndex]?.text ?? '';
+        } else if ((el as HTMLInputElement).type === 'date' && val) {
+          const [y, m, d] = val.split('-');
+          val = `${d}/${m}/${y}`;
+        }
+        fake.innerText = val;
+
+        el.style.display = 'none';
+        el.parentNode?.insertBefore(fake, el.nextSibling);
+        replacements.push({ original: el, fake });
+      });
+
+      // ซ่อน UI element ที่ไม่ต้องการในเอกสาร
+      const hiddenEls: { el: HTMLElement; prev: string }[] = [];
+      paper.querySelectorAll<HTMLElement>('[data-no-print]').forEach(el => {
+        hiddenEls.push({ el, prev: el.style.display });
+        el.style.display = 'none';
+      });
+
       const prevStyle = { width: paper.style.width, maxWidth: paper.style.maxWidth, boxShadow: paper.style.boxShadow };
       paper.style.width = '794px';
       paper.style.maxWidth = '794px';
       paper.style.boxShadow = 'none';
 
-      const canvas = await html2canvas(paper, { scale: 2, useCORS: true, logging: false });
+      const canvas = await html2canvas(paper, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        scrollY: 0,
+        windowWidth: 840,
+        onclone: (clonedDoc) => {
+          // ให้ font ใน clone document โหลดด้วย
+          const link = clonedDoc.createElement('link');
+          link.rel = 'stylesheet';
+          link.href = 'https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;700&family=Sarabun:wght@300;400;500;700&family=Kanit:wght@300;400;500;700&family=Noto+Sans+Thai:wght@300;400;500;700&display=swap';
+          clonedDoc.head.appendChild(link);
+        },
+      });
+
+      // คืนค่าทุกอย่าง
       paper.style.width = prevStyle.width;
       paper.style.maxWidth = prevStyle.maxWidth;
       paper.style.boxShadow = prevStyle.boxShadow;
+      replacements.forEach(({ original, fake }) => { fake.remove(); original.style.display = ''; });
+      hiddenEls.forEach(({ el, prev }) => { el.style.display = prev; });
 
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -435,7 +494,7 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
             ))}
             {/* Client quick-select */}
             {clients.length > 0 && (
-              <div style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <div data-no-print style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span style={{ fontSize: '11px', color: '#888' }}>เลือกลูกค้า:</span>
                 <select
                   onChange={e => {
@@ -482,7 +541,7 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
                   <td style={{ border: '1px solid #d4d4d4', padding: '6px', textAlign: 'right', verticalAlign: 'top', fontWeight: 500 }}>
                     {fmt(item.qty * item.price)}
                   </td>
-                  <td style={{ border: '1px solid #d4d4d4', padding: '2px', textAlign: 'center', verticalAlign: 'top' }}>
+                  <td data-no-print style={{ border: '1px solid #d4d4d4', padding: '2px', textAlign: 'center', verticalAlign: 'top' }}>
                     <button onClick={() => removeItem(item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', padding: '4px', borderRadius: '4px' }} className="hover:!text-red-500 hover:!bg-red-50">
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -492,6 +551,7 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
             </tbody>
           </table>
           <button
+            data-no-print
             onClick={addItem}
             style={{ display: 'block', width: '100%', textAlign: 'center', background: '#f8fafc', border: '1px dashed #cbd5e1', color: '#64748b', padding: '8px', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', marginBottom: '24px', fontFamily: font }}
             className="hover:bg-slate-100 transition"
