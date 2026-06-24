@@ -64,7 +64,7 @@ function statusLabel(status: string) {
 }
 
 // ── Tab type ─────────────────────────────────────────────────────────────────
-type TabId = 'subtasks' | 'payment' | 'invoice' | 'overview' | 'notes' | 'files' | 'dependencies' | 'ai';
+type TabId = 'subtasks' | 'payment' | 'overview' | 'notes' | 'files' | 'dependencies' | 'ai';
 
 // ── Props ────────────────────────────────────────────────────────────────────
 interface ProjectPageProps {
@@ -88,6 +88,10 @@ export function ProjectPage({
   const [comments, setComments]         = useState<TaskComment[]>(() => parseComments(task.comments));
   const [attachments, setAttachments]   = useState<TaskAttachment[]>(() => parseAttachments(task.attachments));
   const [newSubtaskName, setNewSubtaskName] = useState('');
+  const [newSubStartDate, setNewSubStartDate] = useState('');
+  const [newSubDueDate, setNewSubDueDate] = useState('');
+  const [newSubNotes, setNewSubNotes] = useState('');
+  const [expandedSubId, setExpandedSubId] = useState<string | null>(null);
   const [newComment, setNewComment]     = useState('');
   const [newLinkName, setNewLinkName]   = useState('');
   const [newLinkUrl, setNewLinkUrl]     = useState('');
@@ -266,9 +270,34 @@ export function ProjectPage({
   const addSubtask = () => {
     const name = newSubtaskName.trim();
     if (!name) return;
-    const next: Subtask = { id: Date.now().toString(), name, status: 'todo', order: subtasks.length };
+    const next: Subtask = {
+      id: Date.now().toString(),
+      name,
+      status: 'todo',
+      order: subtasks.length,
+      startDate: newSubStartDate || undefined,
+      dueDate: newSubDueDate || undefined,
+      notes: newSubNotes || undefined,
+    };
     commitSubtasks([...subtasks, next]);
     setNewSubtaskName('');
+    setNewSubStartDate('');
+    setNewSubDueDate('');
+    setNewSubNotes('');
+    // ส่ง LINE notification
+    const projectName = task.name;
+    fetch('/api/notify/line', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        taskName: `[Subtask] ${name}`,
+        assignee: next.assignee || task.assignee || 'ทีม',
+        dueDate: newSubDueDate || '',
+        details: newSubNotes || '',
+        customer: projectName,
+        fileUrl: task.fileUrl || '',
+      }),
+    }).catch(() => {}); // silent fail
   };
 
   const toggleSubtask = (id: string) => {
@@ -463,7 +492,6 @@ export function ProjectPage({
   const TABS: { id: TabId; label: string; icon: React.ElementType; badge?: number }[] = [
     { id: 'subtasks',     label: 'Subtasks',      icon: CheckCircle,   badge: totalSubs > 0 ? totalSubs : undefined },
     { id: 'payment',      label: 'การชำระเงิน',   icon: Banknote,      badge: phases.length > 0 ? phases.length : undefined },
-    { id: 'invoice',      label: 'ใบแจ้งหนี้',    icon: FileText,      badge: invoices.length > 0 ? invoices.length : undefined },
     { id: 'overview',     label: 'ภาพรวม',        icon: GitBranch },
     { id: 'ai',           label: 'AI',            icon: Bot,           badge: aiDataCount > 0 ? aiDataCount : undefined },
     { id: 'notes',        label: 'บันทึก',         icon: MessageSquare, badge: comments.length > 0 ? comments.length : undefined },
@@ -634,57 +662,104 @@ export function ProjectPage({
               {/* Subtask list */}
               <div className="space-y-2">
                 {subtasks.map((sub, i) => (
-                  <div key={sub.id}
-                    draggable
-                    onDragStart={() => onDragStart(i)}
-                    onDragOver={e => onDragOver(e, i)}
-                    onDrop={() => onDrop(i)}
-                    className={cn(
-                      'flex items-center gap-3 p-3 rounded-2xl border bg-white transition-all',
-                      dragOverIdx === i ? 'border-indigo-300 bg-indigo-50' : 'border-slate-100 hover:border-slate-200',
-                    )}>
-                    <GripVertical className="w-3.5 h-3.5 text-slate-300 shrink-0 cursor-grab" />
-
-                    {/* Status cycle button */}
-                    <button onClick={() => cycleSubtaskStatus(sub.id)}
-                      className={cn('w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors cursor-pointer',
-                        sub.status === 'done'  ? 'bg-emerald-500 border-emerald-500 text-white' :
-                        sub.status === 'doing' ? 'bg-orange-400 border-orange-400 text-white' :
-                                                  'border-slate-300 hover:border-indigo-400')}>
-                      {sub.status === 'done'  && <Check className="w-3 h-3" />}
-                      {sub.status === 'doing' && <Clock className="w-3 h-3" />}
-                    </button>
-
-                    <span className={cn('flex-1 text-sm font-semibold', sub.status === 'done' && 'line-through text-slate-400')}>
-                      {sub.name}
-                    </span>
-
-                    <span className={cn('text-[9px] font-black px-2 py-0.5 rounded-full shrink-0',
-                      sub.status === 'done'  ? 'bg-emerald-100 text-emerald-700' :
-                      sub.status === 'doing' ? 'bg-orange-100 text-orange-700' :
-                                               'bg-slate-100 text-slate-500')}>
-                      {sub.status === 'done' ? 'Done' : sub.status === 'doing' ? 'กำลังทำ' : 'รอ'}
-                    </span>
-
-                    <button onClick={() => deleteSubtask(sub.id)} className="text-slate-300 hover:text-rose-400 transition-colors cursor-pointer">
-                      <X className="w-3.5 h-3.5" />
-                    </button>
+                  <div key={sub.id} className="rounded-2xl border bg-white border-slate-100 hover:border-slate-200 transition-all">
+                    {/* Main row */}
+                    <div
+                      draggable
+                      onDragStart={() => onDragStart(i)}
+                      onDragOver={e => onDragOver(e, i)}
+                      onDrop={() => onDrop(i)}
+                      className={cn('flex items-center gap-3 p-3', dragOverIdx === i ? 'opacity-50' : '')}
+                    >
+                      <GripVertical className="w-3.5 h-3.5 text-slate-300 shrink-0 cursor-grab" />
+                      <button onClick={() => cycleSubtaskStatus(sub.id)}
+                        className={cn('w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors cursor-pointer',
+                          sub.status === 'done'  ? 'bg-emerald-500 border-emerald-500 text-white' :
+                          sub.status === 'doing' ? 'bg-orange-400 border-orange-400 text-white' :
+                                                    'border-slate-300 hover:border-indigo-400')}>
+                        {sub.status === 'done'  && <Check className="w-3 h-3" />}
+                        {sub.status === 'doing' && <Clock className="w-3 h-3" />}
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <span className={cn('text-sm font-semibold', sub.status === 'done' && 'line-through text-slate-400')}>
+                          {sub.name}
+                        </span>
+                        {/* Date badges */}
+                        {(sub.startDate || sub.dueDate) && (
+                          <div className="flex gap-2 mt-0.5">
+                            {sub.startDate && <span className="text-[10px] text-slate-400">เริ่ม {sub.startDate}</span>}
+                            {sub.dueDate && <span className="text-[10px] text-rose-500 font-semibold">ส่ง {sub.dueDate}</span>}
+                          </div>
+                        )}
+                      </div>
+                      <span className={cn('text-[9px] font-black px-2 py-0.5 rounded-full shrink-0',
+                        sub.status === 'done'  ? 'bg-emerald-100 text-emerald-700' :
+                        sub.status === 'doing' ? 'bg-orange-100 text-orange-700' :
+                                                 'bg-slate-100 text-slate-500')}>
+                        {sub.status === 'done' ? 'Done' : sub.status === 'doing' ? 'กำลังทำ' : 'รอ'}
+                      </span>
+                      <button onClick={() => setExpandedSubId(expandedSubId === sub.id ? null : sub.id)}
+                        className="text-slate-300 hover:text-indigo-400 transition-colors cursor-pointer">
+                        <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', expandedSubId === sub.id && 'rotate-180')} />
+                      </button>
+                      <button onClick={() => deleteSubtask(sub.id)} className="text-slate-300 hover:text-rose-400 transition-colors cursor-pointer">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    {/* Expanded detail panel */}
+                    {expandedSubId === sub.id && (
+                      <div className="px-4 pb-3 border-t border-slate-50 pt-3 space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-400 block mb-1">วันเริ่ม</label>
+                            <input type="date" value={sub.startDate || ''} onChange={e => commitSubtasks(subtasks.map(s => s.id === sub.id ? {...s, startDate: e.target.value || undefined} : s))}
+                              className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400" />
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-bold text-slate-400 block mb-1">วันกำหนดส่ง</label>
+                            <input type="date" value={sub.dueDate || ''} onChange={e => commitSubtasks(subtasks.map(s => s.id === sub.id ? {...s, dueDate: e.target.value || undefined} : s))}
+                              className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400" />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 block mb-1">หมายเหตุ</label>
+                          <textarea value={sub.notes || ''} onChange={e => commitSubtasks(subtasks.map(s => s.id === sub.id ? {...s, notes: e.target.value || undefined} : s))}
+                            rows={2} placeholder="ระบุหมายเหตุ..."
+                            className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 resize-none" />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
 
-              {/* Add subtask input */}
-              <div className="flex gap-2 pt-2">
+              {/* Add subtask form */}
+              <div className="border border-slate-200 rounded-2xl p-3 space-y-2 bg-slate-50/50">
                 <input
                   value={newSubtaskName}
                   onChange={e => setNewSubtaskName(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && addSubtask()}
-                  placeholder="เพิ่ม subtask ใหม่..."
-                  className="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-50"
+                  placeholder="ชื่อ subtask ใหม่..."
+                  className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-50 bg-white"
                 />
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 block mb-1">วันเริ่ม</label>
+                    <input type="date" value={newSubStartDate} onChange={e => setNewSubStartDate(e.target.value)}
+                      className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 bg-white" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 block mb-1">กำหนดส่ง</label>
+                    <input type="date" value={newSubDueDate} onChange={e => setNewSubDueDate(e.target.value)}
+                      className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-400 bg-white" />
+                  </div>
+                </div>
+                <textarea value={newSubNotes} onChange={e => setNewSubNotes(e.target.value)}
+                  rows={2} placeholder="หมายเหตุ (ถ้ามี)..."
+                  className="w-full text-xs border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-400 resize-none bg-white" />
                 <button onClick={addSubtask}
-                  className="flex items-center gap-1 text-xs font-bold px-3 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-700 transition-colors cursor-pointer">
-                  <Plus className="w-3.5 h-3.5" /> เพิ่ม
+                  className="w-full flex items-center justify-center gap-1.5 text-xs font-bold px-3 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-700 transition-colors cursor-pointer">
+                  <Plus className="w-3.5 h-3.5" /> เพิ่ม Subtask + แจ้ง LINE
                 </button>
               </div>
             </div>
@@ -904,183 +979,6 @@ export function ProjectPage({
                   })}
                 </div>
               )}
-            </div>
-          )}
-
-          {/* Invoice */}
-          {activeTab === 'invoice' && (
-            <div className="p-6 space-y-5">
-
-              {/* Invoice list */}
-              {invoices.length === 0 && !showInvForm ? (
-                <div className="flex flex-col items-center justify-center py-16 gap-3 border border-dashed border-slate-200 rounded-2xl bg-slate-50/30">
-                  <FileText className="w-10 h-10 text-slate-300" />
-                  <p className="text-sm font-bold text-slate-400">ยังไม่มีใบแจ้งหนี้</p>
-                  <p className="text-xs text-slate-300">สร้างจาก payment phases ด้านล่าง</p>
-                  <button onClick={() => setShowInvForm(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white text-sm font-bold rounded-xl hover:bg-slate-700 transition-colors cursor-pointer mt-1">
-                    <Plus className="w-4 h-4" /> สร้างใบแจ้งหนี้
-                  </button>
-                </div>
-              ) : (
-                <>
-                  {/* Existing invoices */}
-                  <div className="space-y-3">
-                    {invoices.map(inv => {
-                      const st = INV_STATUS[inv.status];
-                      const invPhases = phases.filter(p => inv.phaseIds.includes(p.id));
-                      return (
-                        <div key={inv.id} className="border border-slate-200 rounded-2xl overflow-hidden">
-                          {/* Header */}
-                          <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-100">
-                            <div className="flex items-center gap-3">
-                              <FileText className="w-4 h-4 text-slate-400" />
-                              <div>
-                                <p className="text-sm font-black text-slate-800">{inv.invoiceNo}</p>
-                                <p className="text-[10px] text-slate-400 font-medium">ออก {inv.issueDate}{inv.dueDate ? ` · ครบ ${inv.dueDate}` : ''}</p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className={cn('text-[11px] font-black px-2.5 py-1 rounded-full', st.bg, st.color)}>{st.label}</span>
-                              <button onClick={() => downloadInvoicePdf(inv)} disabled={isPdfLoading === inv.id}
-                                className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer">
-                                {isPdfLoading === inv.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-                              </button>
-                              <button onClick={() => deleteInvoice(inv.id)}
-                                className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-300 hover:text-rose-500 transition-colors cursor-pointer">
-                                <X className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Phase breakdown */}
-                          <div className="px-4 py-3 space-y-1">
-                            {invPhases.map(p => (
-                              <div key={p.id} className="flex justify-between text-xs text-slate-600">
-                                <span>{p.label}</span>
-                                <span className="font-bold tabular-nums">฿{p.amount.toLocaleString()}</span>
-                              </div>
-                            ))}
-                            <div className="flex justify-between text-sm font-black text-slate-900 pt-2 border-t border-slate-100 mt-2">
-                              <span>รวม</span>
-                              <span className="tabular-nums">฿{inv.totalAmount.toLocaleString()}</span>
-                            </div>
-                            {inv.notes && <p className="text-[11px] text-slate-400 italic mt-1">{inv.notes}</p>}
-                          </div>
-
-                          {/* Status actions */}
-                          {inv.status !== 'paid' && (
-                            <div className="flex gap-2 px-4 pb-3">
-                              {inv.status === 'draft' && (
-                                <button onClick={() => updateInvoiceStatus(inv.id, 'sent')}
-                                  className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl hover:bg-blue-100 transition-colors cursor-pointer">
-                                  <Send className="w-3.5 h-3.5" /> ส่งใบแจ้งหนี้แล้ว
-                                </button>
-                              )}
-                              {(inv.status === 'sent' || inv.status === 'pending') && (
-                                <button onClick={() => updateInvoiceStatus(inv.id, 'pending')}
-                                  className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-xl hover:bg-amber-100 transition-colors cursor-pointer">
-                                  <Clock className="w-3.5 h-3.5" /> รอชำระ
-                                </button>
-                              )}
-                              <button onClick={() => updateInvoiceStatus(inv.id, 'paid')}
-                                className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl hover:bg-emerald-100 transition-colors cursor-pointer">
-                                <CheckCircle className="w-3.5 h-3.5" /> รับเงินแล้ว
-                              </button>
-                              {inv.status !== 'overdue' && (
-                                <button onClick={() => updateInvoiceStatus(inv.id, 'overdue')}
-                                  className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 bg-rose-50 text-rose-700 border border-rose-200 rounded-xl hover:bg-rose-100 transition-colors cursor-pointer">
-                                  <AlertCircle className="w-3.5 h-3.5" /> เกินกำหนด
-                                </button>
-                              )}
-                            </div>
-                          )}
-                          {inv.status === 'paid' && inv.paidAt && (
-                            <p className="px-4 pb-3 text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
-                              <CheckCircle className="w-3.5 h-3.5" /> รับเงินแล้วเมื่อ {inv.paidAt}
-                            </p>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <button onClick={() => setShowInvForm(v => !v)}
-                    className="flex items-center gap-2 text-sm font-bold text-indigo-600 hover:text-indigo-800 transition-colors cursor-pointer">
-                    <Plus className="w-4 h-4" /> {showInvForm ? 'ซ่อนฟอร์ม' : 'สร้างใบแจ้งหนี้ใหม่'}
-                  </button>
-                </>
-              )}
-
-              {/* Create invoice form */}
-              {showInvForm && (
-                <div className="border border-indigo-200 rounded-2xl p-5 bg-indigo-50/30 space-y-4">
-                  <p className="text-xs font-black text-indigo-700 uppercase tracking-widest">สร้างใบแจ้งหนี้ใหม่</p>
-
-                  {phases.length === 0 ? (
-                    <p className="text-xs text-slate-400 text-center py-4">ยังไม่มี payment phases — ไปที่ Tab "การชำระเงิน" เพื่อเพิ่มเฟสก่อน</p>
-                  ) : (
-                    <>
-                      <div>
-                        <p className="text-[11px] font-bold text-slate-500 mb-2">เลือกเฟสที่รวมใน invoice นี้</p>
-                        <div className="space-y-2">
-                          {phases.map(p => (
-                            <label key={p.id} className={cn(
-                              'flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all',
-                              selectedPhaseIds.includes(p.id) ? 'bg-indigo-50 border-indigo-300' : 'bg-white border-slate-200 hover:border-slate-300'
-                            )}>
-                              <input type="checkbox" checked={selectedPhaseIds.includes(p.id)}
-                                onChange={e => setSelectedPhaseIds(prev => e.target.checked ? [...prev, p.id] : prev.filter(id => id !== p.id))}
-                                className="w-4 h-4 accent-indigo-600" />
-                              <span className="flex-1 text-sm font-semibold text-slate-700">{p.label}</span>
-                              <span className={cn('text-xs font-bold', p.paid ? 'text-emerald-600' : 'text-slate-600')}>
-                                ฿{p.amount.toLocaleString()} {p.paid ? '✓' : ''}
-                              </span>
-                            </label>
-                          ))}
-                        </div>
-                        {selectedPhaseIds.length > 0 && (
-                          <p className="text-sm font-black text-indigo-700 mt-2 text-right">
-                            รวม ฿{phases.filter(p => selectedPhaseIds.includes(p.id)).reduce((s, p) => s + p.amount, 0).toLocaleString()}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <p className="text-[11px] font-bold text-slate-500 mb-1">วันครบกำหนดชำระ</p>
-                          <input type="date" value={invoiceDueDate} onChange={e => setInvoiceDueDate(e.target.value)}
-                            className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-400 bg-white" />
-                        </div>
-                        <div>
-                          <p className="text-[11px] font-bold text-slate-500 mb-1">เลขที่ใบแจ้งหนี้</p>
-                          <input value={nextInvoiceNo()} readOnly
-                            className="w-full text-sm border border-slate-100 rounded-xl px-3 py-2 bg-slate-50 text-slate-400 tabular-nums" />
-                        </div>
-                      </div>
-
-                      <div>
-                        <p className="text-[11px] font-bold text-slate-500 mb-1">หมายเหตุ (optional)</p>
-                        <input value={invoiceNotes} onChange={e => setInvoiceNotes(e.target.value)}
-                          placeholder="เช่น ชำระผ่าน โอนเงิน / PromptPay..."
-                          className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:border-indigo-400 bg-white" />
-                      </div>
-
-                      <div className="flex gap-2 pt-1">
-                        <button onClick={createInvoice} disabled={selectedPhaseIds.length === 0}
-                          className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-slate-900 text-white text-sm font-bold rounded-xl hover:bg-slate-700 disabled:opacity-40 transition-colors cursor-pointer">
-                          <FileText className="w-4 h-4" /> สร้างใบแจ้งหนี้
-                        </button>
-                        <button onClick={() => setShowInvForm(false)}
-                          className="px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-bold text-slate-500 hover:bg-slate-50 transition-colors cursor-pointer">
-                          ยกเลิก
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-
             </div>
           )}
 

@@ -53,6 +53,9 @@ export interface Subtask {
   status: 'todo' | 'doing' | 'done';
   order: number;
   assignee?: 'Fan' | 'Mod';
+  startDate?: string;
+  dueDate?: string;
+  notes?: string;
 }
 
 export interface Client {
