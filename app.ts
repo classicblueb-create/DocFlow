@@ -1293,7 +1293,7 @@ ${ideasContext || 'ยังไม่มีไอเดีย'}
   });
 
   // Telegram push notification for due-soon tasks (within 5 days)
-  app.post("/api/notify/due-soon", async (req, res) => {
+  const handleDueSoon = async (req: any, res: any) => {
     const token = process.env.TELEGRAM_BOT_TOKEN;
     const chatId = telegramChatId || process.env.TELEGRAM_CHAT_ID;
 
@@ -1368,7 +1368,192 @@ ${ideasContext || 'ยังไม่มีไอเดีย'}
       console.error("[Telegram] Due soon fetch error:", e);
       return res.status(500).json({ error: e.message });
     }
-  });
+  };
+
+  app.get("/api/notify/due-soon", handleDueSoon);
+  app.post("/api/notify/due-soon", handleDueSoon);
+  app.get("/api/cron/due-soon", handleDueSoon);
+  app.post("/api/cron/due-soon", handleDueSoon);
+
+  // GET and POST for daily briefing
+  const handleDailyBriefing = async (req: any, res: any) => {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = telegramChatId || process.env.TELEGRAM_CHAT_ID;
+
+    if (!token) return res.status(503).json({ error: "TELEGRAM_BOT_TOKEN ยังไม่ได้ตั้งค่าในไฟล์ .env" });
+    if (!chatId) return res.status(503).json({ error: "ยังไม่มี TELEGRAM_CHAT_ID — ส่งข้อความหาบอทในแชทก่อน แล้วลองใหม่" });
+
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return res.status(500).json({ error: "Missing Supabase configuration" });
+    }
+
+    try {
+      const supabase = createClient(supabaseUrl, supabaseAnonKey);
+      const [tasksRes, clientsRes, ideasRes] = await Promise.all([
+        supabase.from('tasks').select('*'),
+        supabase.from('clients').select('*'),
+        supabase.from('ideas').select('*')
+      ]);
+
+      const tasks = tasksRes.data || [];
+      const clients = clientsRes.data || [];
+      const ideas = ideasRes.data || [];
+
+      // Filter tasks due today & overdue
+      const localTodayStr = new Date().toLocaleDateString('en-CA'); // Local date YYYY-MM-DD
+      
+      const overdueTasks = tasks.filter(t => {
+        if (!t.dueDate) return false;
+        if (t.status === 'เสร็จสิ้น' || t.status === 'Done') return false;
+        return t.dueDate < localTodayStr;
+      });
+
+      const todayTasks = tasks.filter(t => {
+        if (!t.dueDate) return false;
+        if (t.status === 'เสร็จสิ้น' || t.status === 'Done') return false;
+        return t.dueDate === localTodayStr;
+      });
+
+      const pendingCount = tasks.filter(t => t.status !== 'เสร็จสิ้น' && t.status !== 'Done').length;
+      const completedCount = tasks.filter(t => t.status === 'เสร็จสิ้น' || t.status === 'Done').length;
+
+      const systemInstruction = `คุณคือ "Modty" ผู้ช่วย AI ส่วนตัวแสนดีที่ฉลาดและเป็นกันเอง คุยสนุก ใช้ emoji น่ารักๆ
+หน้าที่ของคุณคือสรุปงานวันนี้ (Daily Briefing) ตอนเช้าให้คุณ Modty (ผู้ใช้งาน) ฟังเป็นภาษาไทยสั้นกระชับ เป็นกันเอง สุภาพแต่เหมือนเพื่อนสนิท`;
+
+      const userPrompt = `วันนี้วันที่: ${new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' })}
+สถานะของบอร์ดงานปัจจุบัน:
+- งานทั้งหมด: ${tasks.length} งาน (เสร็จแล้ว ${completedCount} งาน, กำลังทำ/ค้างอยู่ ${pendingCount} งาน)
+- งานที่ต้องส่งวันนี้: ${todayTasks.length > 0 ? todayTasks.map(t => `- ${t.name} (ลูกค้า: ${t.customer || '-'}, มอบหมาย: ${t.assignee || 'ยังไม่มอบหมาย'})`).join('\n') : 'ไม่มีงานที่ต้องส่งวันนี้'}
+- งานที่เลยกำหนดส่งแล้ว (Overdue): ${overdueTasks.length > 0 ? overdueTasks.map(t => `- ${t.name} (กำหนดส่งเดิม: ${t.dueDate}, มอบหมาย: ${t.assignee || 'ยังไม่มอบหมาย'})`).join('\n') : 'ไม่มีงานเลยกำหนด'}
+- จำนวนลูกค้าทั้งหมด: ${clients.length} ราย
+- จำนวนไอเดียคอนเทนต์: ${ideas.length} ไอเดีย
+
+โปรดสรุปและกล่าวคำทักทายตอนเช้าสั้นๆ ให้พลังบวกและโฟกัสงานที่ต้องทำวันนี้ (เน้นย้ำงานต้องส่งวันนี้ และเตือนเรื่องงานเลยกำหนดแบบสุภาพ/ขี้เล่น)
+ความยาวประมาณ 2-3 ย่อหน้าสั้นๆ ใส่ Emoji สนุกสนานและจัดหน้าอ่านง่าย`;
+
+      const summaryText = await generateWithAI(systemInstruction, userPrompt, 0.7);
+
+      const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: summaryText,
+          parse_mode: "Markdown"
+        })
+      });
+
+      if (!response.ok) {
+        // Fallback if markdown parsing fails
+        await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: summaryText
+          })
+        });
+      }
+
+      return res.json({ ok: true, type: 'daily-briefing', message: 'ส่งรายงานสรุปประจำวันสำเร็จ' });
+    } catch (e: any) {
+      console.error("[Cron Daily Briefing Error]", e);
+      return res.status(500).json({ error: e.message });
+    }
+  };
+
+  app.get("/api/cron/daily-briefing", handleDailyBriefing);
+  app.post("/api/cron/daily-briefing", handleDailyBriefing);
+
+  // GET and POST for weekly business analysis
+  const handleWeeklyAnalysis = async (req: any, res: any) => {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = telegramChatId || process.env.TELEGRAM_CHAT_ID;
+
+    if (!token) return res.status(503).json({ error: "TELEGRAM_BOT_TOKEN ยังไม่ได้ตั้งค่าในไฟล์ .env" });
+    if (!chatId) return res.status(503).json({ error: "ยังไม่มี TELEGRAM_CHAT_ID — ส่งข้อความหาบอทในแชทก่อน แล้วลองใหม่" });
+
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return res.status(500).json({ error: "Missing Supabase configuration" });
+    }
+
+    try {
+      const supabase = createClient(supabaseUrl, supabaseAnonKey);
+      const [tasksRes, clientsRes, ideasRes] = await Promise.all([
+        supabase.from('tasks').select('*'),
+        supabase.from('clients').select('*'),
+        supabase.from('ideas').select('*')
+      ]);
+
+      const tasks = tasksRes.data || [];
+      const clients = clientsRes.data || [];
+      const ideas = ideasRes.data || [];
+
+      // Context construction
+      const tasksContext = tasks.map(t => `- งาน: ${t.name} (ลูกค้า: ${t.customer || 'ไม่มี'}, ผู้รับผิดชอบ: ${t.assignee || 'ยังไม่มอบหมาย'}, สถานะ: ${t.status}, ราคา: ${t.price || 0} บาท, กำหนดส่ง: ${t.dueDate || 'ไม่มี'})`).join('\n');
+      const clientsContext = clients.map(c => `- ลูกค้า: ${c.name} (เป้าหมายงบประมาณ: ${c.targetBudget || 0} บาท, ข้อมูลติดต่อ: ${c.contactInfo || 'ไม่มี'})`).join('\n');
+      const ideasContext = ideas.map(i => `- ไอเดีย: ${i.title} (แนวคิด: ${i.concept || 'ไม่มี'}, แพลตฟอร์ม: ${i.platform || 'ไม่มี'})`).join('\n');
+
+      const systemInstruction = `คุณคือ "Modty" ผู้ช่วย AI และนักวิเคราะห์ธุรกิจส่วนตัวที่เก่งกาจและเป็นกันเอง
+หน้าที่ของคุณคือวิเคราะห์ภาพรวมธุรกิจประจำสัปดาห์ (Weekly Business Analysis / Analyse My Business) จากข้อมูลในระบบ DocFlow และส่งรายงานเป็นภาษาไทยให้เจ้าของธุรกิจอ่านเข้าใจง่าย ได้แรงบันดาลใจ และเห็นทิศทางชัดเจน`;
+
+      const userPrompt = `นี่คือข้อมูลล่าสุดในระบบ:
+---
+[งานทั้งหมด]
+${tasksContext || 'ไม่มีงานในระบบ'}
+
+[ลูกค้าทั้งหมด]
+${clientsContext || 'ไม่มีรายชื่อลูกค้า'}
+
+[ไอเดียคอนเทนต์]
+${ideasContext || 'ไม่มีไอเดียคอนเทนต์'}
+---
+
+ช่วยทำการวิเคราะห์วิเคราะห์ธุรกิจประจำสัปดาห์เชิงลึก (Analyse My Business) โดยครอบคลุมหัวข้อต่อไปนี้:
+1. 📊 *ภาพรวมความคืบหน้า (Business Progress Overview):* สรุปสถานะโครงการ รายได้สะสมหรืองบประมาณรวม
+2. ⚠️ *คอขวดและจุดเสี่ยง (Bottlenecks & Risks):* ชี้จุดที่ค้างส่ง (Overdue) หรืองานที่ใช้เวลานานผิดปกติ
+3. 💡 *โอกาสและไอเดียธุรกิจใหม่ๆ (Ideas & Growth Opportunities):* เสนอแนะการนำไอเดียคอนเทนต์ที่มีอยู่ไปขยายผล หรือแนะนำแพลตฟอร์มที่ควรขยาย
+4. 🚀 *คำแนะนำและสิ่งแรกที่ต้องทำในสัปดาห์นี้ (Actionable Recommendations):* ลำดับความสำคัญสิ่งที่ควรทำทันที 3 ข้อแรก
+
+กรุณาตอบเป็นภาษาไทยจัดย่อหน้าและหัวข้อให้อ่านง่าย มีการใช้ตัวหนา/ตัวเอียง/อีโมจิ เพื่อให้อ่านง่าย สไตล์เพื่อนคุยธุรกิจอย่างเป็นกันเองและกระตือรือร้น`;
+
+      const analysisText = await generateWithAI(systemInstruction, userPrompt, 0.75);
+
+      const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: analysisText,
+          parse_mode: "Markdown"
+        })
+      });
+
+      if (!response.ok) {
+        // Fallback if markdown parsing fails
+        await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: analysisText
+          })
+        });
+      }
+
+      return res.json({ ok: true, type: 'weekly-analysis', message: 'ส่งรายงานวิเคราะห์ประจำสัปดาห์สำเร็จ' });
+    } catch (e: any) {
+      console.error("[Cron Weekly Analysis Error]", e);
+      return res.status(500).json({ error: e.message });
+    }
+  };
+
+  app.get("/api/cron/weekly-analysis", handleWeeklyAnalysis);
+  app.post("/api/cron/weekly-analysis", handleWeeklyAnalysis);
 
   // -----------------------------------------------------------------
   // Health check
