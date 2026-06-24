@@ -522,7 +522,7 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
                     width: i === 0 ? '5%' : i === 1 ? '45%' : i === 2 ? '10%' : '17%',
                   }}>{h}</th>
                 ))}
-                <th style={{ border: '1px solid #d4d4d4', padding: '4px', width: '4%' }} />
+                <th data-no-print style={{ border: '1px solid #d4d4d4', padding: '4px', width: '4%' }} />
               </tr>
             </thead>
             <tbody>
@@ -584,9 +584,11 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
                   <tr>
                     <td style={{ border: '1px solid #d4d4d4', padding: '6px 8px', color: '#444', fontWeight: 500 }}>
                       <span>{d.lbl_wht}</span>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', background: '#fff', padding: '0 4px', border: '1px solid #ddd', borderRadius: '3px', marginLeft: '8px' }}>
+                      {/* แสดง input ตอนแก้ไข, แสดง text ตอน PDF */}
+                      <span data-no-print style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', background: '#fff', padding: '0 4px', border: '1px solid #ddd', borderRadius: '3px', marginLeft: '8px' }}>
                         <input type="number" value={whPct} onChange={e => setWhPct(parseFloat(e.target.value) || 0)} min={0} step={0.5} style={{ width: '30px', textAlign: 'center', border: 'none', outline: 'none', fontSize: '11px', fontFamily: font }} />%
                       </span>
+                      <span style={{ fontSize: '11px', color: '#666', marginLeft: '6px' }}>({whPct}%)</span>
                     </td>
                     <td style={{ border: '1px solid #d4d4d4', padding: '6px 8px', textAlign: 'right', fontWeight: 500 }}>{fmt(wht)}</td>
                   </tr>
