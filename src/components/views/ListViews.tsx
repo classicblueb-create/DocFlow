@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Client, Template } from '../../types';
-import { Users, Library, Plus, Trash2, X } from 'lucide-react';
+import { Users, Library, Plus, Trash2, X, Phone, Mail, User, Building2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { ClientModal } from '../modals/ClientModal';
 
 interface ClientsViewProps {
   clients: Client[];
@@ -10,29 +11,17 @@ interface ClientsViewProps {
 }
 
 export function ClientsView({ clients, onCreateClient, onDeleteClient }: ClientsViewProps) {
-  const [isAdding, setIsAdding] = useState(false);
-  const [name, setName] = useState('');
-  const [address, setAddress] = useState('');
-  const [taxId, setTaxId] = useState('');
-  const [targetBudget, setTargetBudget] = useState('');
-  const [color, setColor] = useState('blue');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) return;
-    onCreateClient({
-      name,
-      address,
-      taxId,
-      targetBudget: Number(targetBudget) || 0,
-      color
-    });
-    setName('');
-    setAddress('');
-    setTaxId('');
-    setTargetBudget('');
-    setColor('blue');
-    setIsAdding(false);
+  const handleCreateClick = () => {
+    setSelectedClient(null);
+    setIsModalOpen(true);
+  };
+
+  const handleEditClick = (client: Client) => {
+    setSelectedClient(client);
+    setIsModalOpen(true);
   };
 
   return (
@@ -44,84 +33,108 @@ export function ClientsView({ clients, onCreateClient, onDeleteClient }: Clients
           </h2>
           <button 
             type="button"
-            onClick={() => setIsAdding(!isAdding)}
+            onClick={handleCreateClick}
             className="flex items-center gap-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-lg shadow transition cursor-pointer"
           >
-            {isAdding ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-            {isAdding ? 'ยกเลิก' : 'เพิ่มลูกค้าใหม่'}
+            <Plus className="w-4 h-4" />
+            เพิ่มลูกค้าใหม่
           </button>
         </div>
-
-        {isAdding && (
-          <form onSubmit={handleSubmit} className="glass-card rounded-xl p-6 mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-2 flex justify-between items-center pb-2 border-b border-white/20">
-              <h3 className="font-bold text-slate-800 text-sm">ระบุข้อมูลลูกค้า</h3>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-650 mb-1">ชื่อลูกค้า / บริษัท *</label>
-              <input type="text" value={name} onChange={e=>setName(e.target.value)} required placeholder="เช่น บริษัท เจริญ จำกัด" className="glass-input w-full px-3 py-2 text-sm focus:ring-1 focus:ring-emerald-500" />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-650 mb-1">เลขประจำตัวผู้เสียภาษี (Tax ID)</label>
-              <input type="text" value={taxId} onChange={e=>setTaxId(e.target.value)} placeholder="เช่น 01055xxxxxxxx" className="glass-input w-full px-3 py-2 text-sm focus:ring-1 focus:ring-emerald-500" />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-xs font-bold text-slate-650 mb-1">ที่อยู่</label>
-              <textarea value={address} onChange={e=>setAddress(e.target.value)} rows={2} placeholder="ที่อยู่ติดต่อผู้รับเอกสาร..." className="glass-input w-full px-3 py-2 text-sm resize-none focus:ring-1 focus:ring-emerald-500" />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-650 mb-1">งบประมาณโครงการประมาณการ (฿)</label>
-              <input type="number" value={targetBudget} onChange={e=>setTargetBudget(e.target.value)} placeholder="0" className="glass-input w-full px-3 py-2 text-sm focus:ring-1 focus:ring-emerald-500" />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-650 mb-1">สีประจำป้ายแท็ก</label>
-              <select value={color} onChange={e=>setColor(e.target.value)} className="glass-input w-full px-3 py-2 text-sm focus:ring-1 focus:ring-emerald-500">
-                <option value="blue">Blue</option>
-                <option value="indigo">Indigo</option>
-                <option value="emerald">Emerald</option>
-                <option value="rose">Rose</option>
-                <option value="amber">Amber</option>
-                <option value="purple">Purple</option>
-              </select>
-            </div>
-            <div className="md:col-span-2 flex justify-end gap-2 pt-2">
-              <button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-lg text-sm transition cursor-pointer">บันทึก</button>
-            </div>
-          </form>
-        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {clients.map(client => {
             const bgClassMap: Record<string, string> = {
-              blue: 'border-l-blue-500',
-              indigo: 'border-l-indigo-500',
-              emerald: 'border-l-emerald-500',
-              rose: 'border-l-rose-500',
-              amber: 'border-l-amber-500',
-              purple: 'border-l-purple-500',
+              blue: 'border-l-blue-500 hover:border-blue-400 hover:shadow-blue-50/50',
+              indigo: 'border-l-indigo-500 hover:border-indigo-400 hover:shadow-indigo-50/50',
+              emerald: 'border-l-emerald-500 hover:border-emerald-400 hover:shadow-emerald-50/50',
+              rose: 'border-l-rose-500 hover:border-rose-400 hover:shadow-rose-50/50',
+              amber: 'border-l-amber-500 hover:border-amber-400 hover:shadow-amber-50/50',
+              purple: 'border-l-purple-500 hover:border-purple-400 hover:shadow-purple-50/50',
             };
-            const borderLeft = bgClassMap[client.color] || 'border-l-indigo-500';
+            const borderLeft = bgClassMap[client.color || 'blue'] || 'border-l-indigo-500';
+
+            const typeLabelMap: Record<string, string> = {
+              company: 'นิติบุคคล',
+              individual: 'บุคคลธรรมดา',
+              government: 'หน่วยงานรัฐ',
+            };
+            const businessTypeLabel = client.businessType ? typeLabelMap[client.businessType] : null;
 
             return (
-              <div key={client.id} className={cn("glass-card rounded-xl border-l-4 p-5 flex flex-col group relative", borderLeft)}>
+              <div 
+                key={client.id} 
+                onClick={() => handleEditClick(client)}
+                className={cn(
+                  "glass-card rounded-xl border-l-4 p-5 flex flex-col group relative cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-lg", 
+                  borderLeft
+                )}
+              >
                 <button 
                   type="button"
-                  onClick={() => onDeleteClient(client.id)}
-                  className="absolute top-4 right-4 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteClient(client.id);
+                  }}
+                  className="absolute top-4 right-4 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10"
                   title="ลบลูกค้า"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
-                <h3 className="font-bold text-slate-800 text-lg mb-1 pr-6">{client.name}</h3>
-                <p className="text-xs text-slate-500 mb-4 whitespace-pre-wrap">{client.address || 'ไม่มีที่อยู่'}</p>
-                <div className="mt-auto space-y-2 text-sm pt-4 border-t border-white/20">
+                
+                {/* Header info */}
+                <div className="mb-2">
+                  <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                    <h3 className="font-bold text-slate-800 text-lg leading-tight pr-6">{client.name}</h3>
+                    {businessTypeLabel && (
+                      <span className="text-[10px] bg-slate-100 text-slate-650 font-bold px-1.5 py-0.5 rounded">
+                        {businessTypeLabel}
+                      </span>
+                    )}
+                  </div>
+                  
+                  {client.industry && (
+                    <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">{client.industry}</p>
+                  )}
+                </div>
+
+                {/* Contact quick view */}
+                <div className="space-y-1.5 my-3 text-xs text-slate-550">
+                  {client.contactName && (
+                    <div className="flex items-center gap-1.5">
+                      <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span className="truncate font-semibold text-slate-600">{client.contactName} {client.contactTitle && `(${client.contactTitle})`}</span>
+                    </div>
+                  )}
+                  {client.email && (
+                    <div className="flex items-center gap-1.5">
+                      <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span className="truncate">{client.email}</span>
+                    </div>
+                  )}
+                  {client.phone && (
+                    <div className="flex items-center gap-1.5">
+                      <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span className="truncate">{client.phone}</span>
+                    </div>
+                  )}
+                  {!client.contactName && !client.email && !client.phone && (
+                    <p className="text-slate-400 italic">ไม่มีข้อมูลติดต่อ</p>
+                  )}
+                </div>
+
+                <p className="text-xs text-slate-500 line-clamp-2 mb-4 bg-slate-50/50 p-2 rounded-lg border border-slate-100/50">
+                  {client.address || 'ไม่มีที่อยู่'}
+                </p>
+
+                {/* Footer finances */}
+                <div className="mt-auto space-y-1.5 text-xs pt-3 border-t border-slate-100">
                   <div className="flex justify-between">
                     <span className="text-slate-450">Tax ID:</span>
                     <span className="font-semibold text-slate-700">{client.taxId || '-'}</span>
                   </div>
                   <div className="flex justify-between text-emerald-600 font-bold">
                     <span>Target Budget:</span>
-                    <span>฿{client.targetBudget.toLocaleString()}</span>
+                    <span>฿{client.targetBudget ? client.targetBudget.toLocaleString() : '0'}</span>
                   </div>
                 </div>
               </div>
@@ -134,6 +147,13 @@ export function ClientsView({ clients, onCreateClient, onDeleteClient }: Clients
           )}
         </div>
       </div>
+
+      <ClientModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSave={onCreateClient}
+        initialClient={selectedClient}
+      />
     </div>
   );
 }

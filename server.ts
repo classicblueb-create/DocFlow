@@ -445,7 +445,7 @@ async function startServer() {
           supabase.from('ideas').select('*')
         ]);
         if (tasksRes.data) {
-          tasksContext = tasksRes.data.map(t => `- งาน: ${t.name} (ลูกค้า: ${t.customer || 'ไม่มี'}, ผู้ทำ: ${t.assignee || 'ยังไม่มอบหมาย'}, สถานะ: ${t.status || 'To Do'}, ราคา: ${t.price || 0} บาท, กำหนดส่ง: ${t.dueDate || 'ไม่มี'}, รายละเอียด: ${t.details || 'ไม่มี'})`).join('\n');
+          tasksContext = tasksRes.data.map(t => `- งาน: ${t.name} (ลูกค้า: ${t.customer || 'ไม่มี'}, ผู้ทำ: ${t.assignee || 'ยังไม่มอบหมาย'}, สถานะ: ${t.status || 'To Do'}, ราคา: ${t.price || 0} บาท, กำหนดส่ง: ${t.endDate || 'ไม่มี'}, รายละเอียด: ${t.details || 'ไม่มี'})`).join('\n');
         }
         if (clientsRes.data) {
           clientsContext = clientsRes.data.map(c => `- ลูกค้า: ${c.name} (Budget: ${c.targetBudget || 0} บาท, อีเมล/ติดต่อ: ${c.contactInfo || 'ไม่มี'})`).join('\n');
@@ -742,18 +742,19 @@ ${ideasContext || 'ไม่มีข้อมูลไอเดีย'}
       return res.status(503).json({ error: "ยังไม่มี TELEGRAM_CHAT_ID — ส่งข้อความหาบอทในแชทก่อน แล้วลองใหม่" });
     }
 
-    const { taskName, assignee, dueDate, fileUrl, details, customer } = req.body;
+    const { taskName, assignee, dueDate, endDate, fileUrl, details, customer } = req.body;
     if (!taskName || !assignee) {
       return res.status(400).json({ error: "ต้องระบุ taskName และ assignee" });
     }
 
+    const targetDate = endDate || dueDate;
     const lines = [
       '📋 มอบหมายงานใหม่!',
       '━━━━━━━━━━━━━━━',
       `✅ งาน: ${taskName}`,
       `👤 มอบให้: ${assignee}`,
       customer   ? `🏢 ลูกค้า: ${customer}` : '',
-      dueDate    ? `📅 กำหนดส่ง: ${dueDate}` : '',
+      targetDate ? `📅 กำหนดส่ง: ${targetDate}` : '',
       details    ? `📝 ${details.slice(0, 120)}${details.length > 120 ? '...' : ''}` : '',
       fileUrl    ? `🔗 ${fileUrl}` : '',
       '━━━━━━━━━━━━━━━',
@@ -815,10 +816,10 @@ ${ideasContext || 'ไม่มีข้อมูลไอเดีย'}
       fiveDaysLater.setHours(23,59,59,999);
 
       const dueSoonTasks = (tasks || []).filter((task: any) => {
-        if (!task.dueDate) return false;
+        if (!task.endDate) return false;
         if (task.status === 'เสร็จสิ้น' || task.status === 'Done') return false;
-        const dueDate = new Date(task.dueDate);
-        return dueDate >= today && dueDate <= fiveDaysLater;
+        const endDateVal = new Date(task.endDate);
+        return endDateVal >= today && endDateVal <= fiveDaysLater;
       });
 
       if (dueSoonTasks.length === 0) {
@@ -830,7 +831,7 @@ ${ideasContext || 'ไม่มีข้อมูลไอเดีย'}
       dueSoonTasks.forEach((task: any) => {
         message += `✅ งาน: ${task.name}\n`;
         message += `👤 มอบหมาย: ${task.assignee || 'ไม่มี'}\n`;
-        message += `📅 กำหนดส่ง: ${task.dueDate}\n`;
+        message += `📅 กำหนดส่ง: ${task.endDate}\n`;
         message += `🏢 ลูกค้า: ${task.customer || '-'}\n`;
         message += `━━━━━━━━━━━━━━━\n`;
       });
@@ -894,15 +895,15 @@ ${ideasContext || 'ไม่มีข้อมูลไอเดีย'}
       const localTodayStr = new Date().toLocaleDateString('en-CA'); // Local date YYYY-MM-DD
       
       const overdueTasks = tasks.filter(t => {
-        if (!t.dueDate) return false;
+        if (!t.endDate) return false;
         if (t.status === 'เสร็จสิ้น' || t.status === 'Done') return false;
-        return t.dueDate < localTodayStr;
+        return t.endDate < localTodayStr;
       });
 
       const todayTasks = tasks.filter(t => {
-        if (!t.dueDate) return false;
+        if (!t.endDate) return false;
         if (t.status === 'เสร็จสิ้น' || t.status === 'Done') return false;
-        return t.dueDate === localTodayStr;
+        return t.endDate === localTodayStr;
       });
 
       const pendingCount = tasks.filter(t => t.status !== 'เสร็จสิ้น' && t.status !== 'Done').length;
@@ -915,7 +916,7 @@ ${ideasContext || 'ไม่มีข้อมูลไอเดีย'}
 สถานะของบอร์ดงานปัจจุบัน:
 - งานทั้งหมด: ${tasks.length} งาน (เสร็จแล้ว ${completedCount} งาน, กำลังทำ/ค้างอยู่ ${pendingCount} งาน)
 - งานที่ต้องส่งวันนี้: ${todayTasks.length > 0 ? todayTasks.map(t => `- ${t.name} (ลูกค้า: ${t.customer || '-'}, มอบหมาย: ${t.assignee || 'ยังไม่มอบหมาย'})`).join('\n') : 'ไม่มีงานที่ต้องส่งวันนี้'}
-- งานที่เลยกำหนดส่งแล้ว (Overdue): ${overdueTasks.length > 0 ? overdueTasks.map(t => `- ${t.name} (กำหนดส่งเดิม: ${t.dueDate}, มอบหมาย: ${t.assignee || 'ยังไม่มอบหมาย'})`).join('\n') : 'ไม่มีงานเลยกำหนด'}
+- งานที่เลยกำหนดส่งแล้ว (Overdue): ${overdueTasks.length > 0 ? overdueTasks.map(t => `- ${t.name} (กำหนดส่งเดิม: ${t.endDate}, มอบหมาย: ${t.assignee || 'ยังไม่มอบหมาย'})`).join('\n') : 'ไม่มีงานเลยกำหนด'}
 - จำนวนลูกค้าทั้งหมด: ${clients.length} ราย
 - จำนวนไอเดียคอนเทนต์: ${ideas.length} ไอเดีย
 
@@ -983,7 +984,7 @@ ${ideasContext || 'ไม่มีข้อมูลไอเดีย'}
       const ideas = ideasRes.data || [];
 
       // Context construction
-      const tasksContext = tasks.map(t => `- งาน: ${t.name} (ลูกค้า: ${t.customer || 'ไม่มี'}, ผู้รับผิดชอบ: ${t.assignee || 'ยังไม่มอบหมาย'}, สถานะ: ${t.status}, ราคา: ${t.price || 0} บาท, กำหนดส่ง: ${t.dueDate || 'ไม่มี'})`).join('\n');
+      const tasksContext = tasks.map(t => `- งาน: ${t.name} (ลูกค้า: ${t.customer || 'ไม่มี'}, ผู้รับผิดชอบ: ${t.assignee || 'ยังไม่มอบหมาย'}, สถานะ: ${t.status}, ราคา: ${t.price || 0} บาท, กำหนดส่ง: ${t.endDate || 'ไม่มี'})`).join('\n');
       const clientsContext = clients.map(c => `- ลูกค้า: ${c.name} (เป้าหมายงบประมาณ: ${c.targetBudget || 0} บาท, ข้อมูลติดต่อ: ${c.contactInfo || 'ไม่มี'})`).join('\n');
       const ideasContext = ideas.map(i => `- ไอเดีย: ${i.title} (แนวคิด: ${i.concept || 'ไม่มี'}, แพลตฟอร์ม: ${i.platform || 'ไม่มี'})`).join('\n');
 

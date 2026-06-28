@@ -827,7 +827,7 @@ ${contextSection}
           supabase.from('ideas').select('*')
         ]);
         if (tasksRes.data) {
-          tasksContext = tasksRes.data.map(t => `- งาน: ${t.name} (ลูกค้า: ${t.customer || 'ไม่มี'}, ผู้ทำ: ${t.assignee || 'ยังไม่มอบหมาย'}, สถานะ: ${t.status || 'To Do'}, ราคา: ${t.price || 0} บาท, กำหนดส่ง: ${t.dueDate || 'ไม่มี'}, รายละเอียด: ${t.details || 'ไม่มี'})`).join('\n');
+          tasksContext = tasksRes.data.map(t => `- งาน: ${t.name} (ลูกค้า: ${t.customer || 'ไม่มี'}, ผู้ทำ: ${t.assignee || 'ยังไม่มอบหมาย'}, สถานะ: ${t.status || 'To Do'}, ราคา: ${t.price || 0} บาท, กำหนดส่ง: ${t.endDate || 'ไม่มี'}, รายละเอียด: ${t.details || 'ไม่มี'})`).join('\n');
         }
         if (clientsRes.data) {
           clientsContext = clientsRes.data.map(c => `- ลูกค้า: ${c.name} (Budget: ${c.targetBudget || 0} บาท, อีเมล/ติดต่อ: ${c.contactInfo || 'ไม่มี'})`).join('\n');
@@ -869,10 +869,10 @@ ${ideasContext || 'ยังไม่มีไอเดีย'}
 {"action":"create_quotation","customerName":"...","taskName":"...","price":0,"details":"...","items":[{"description":"...","amount":0}]}
 
 2. สร้างงานใหม่ (บอกว่า สร้างงาน/เพิ่มงาน/จดไว้หน่อย):
-{"action":"create_task","taskName":"...","customerName":"...","assignee":"...","dueDate":"YYYY-MM-DD หรือ null","details":"...","status":"To Do"}
+{"action":"create_task","taskName":"...","customerName":"...","assignee":"...","endDate":"YYYY-MM-DD หรือ null","details":"...","status":"To Do"}
 
 3. อัปเดตงาน (เปลี่ยนสถานะ/มอบหมาย/กำหนดส่ง ของงานที่มีอยู่):
-{"action":"update_task","taskId":"id ของงาน","taskName":"ชื่องานที่ตรงกับในระบบ","updates":{"status":"...","assignee":"...","dueDate":"...","details":"..."}}
+{"action":"update_task","taskId":"id ของงาน","taskName":"ชื่องานที่ตรงกับในระบบ","updates":{"status":"...","assignee":"...","endDate":"...","details":"..."}}
 
 4. เพิ่มลูกค้าใหม่:
 {"action":"create_client","name":"...","contactInfo":"...","targetBudget":0}
@@ -1006,7 +1006,7 @@ ${ideasContext || 'ยังไม่มีไอเดีย'}
 
       // ── Action: create_task ────────────────────────────────────────────
       } else if (parsed.action === 'create_task') {
-        const { taskName, customerName, assignee, dueDate, details, status } = parsed;
+        const { taskName, customerName, assignee, dueDate, endDate, details, status } = parsed;
         const taskId = `task-tg-${Date.now()}`;
         let dbSaved = false;
 
@@ -1024,7 +1024,7 @@ ${ideasContext || 'ยังไม่มีไอเดีย'}
             customer: customerName || null,
             clientId,
             assignee: assignee || null,
-            dueDate: dueDate || null,
+            endDate: endDate || null,
             details: details || null,
             updatedAt: new Date().toISOString()
           });
@@ -1033,7 +1033,7 @@ ${ideasContext || 'ยังไม่มีไอเดีย'}
         }
 
         const msg = dbSaved
-          ? `✅ *สร้างงานใหม่สำเร็จ!*\n\n📌 ชื่องาน: ${taskName}\n👤 มอบหมาย: ${assignee || 'ยังไม่ได้มอบหมาย'}\n🏢 ลูกค้า: ${customerName || '-'}\n📅 กำหนดส่ง: ${dueDate || 'ยังไม่กำหนด'}\n📝 รายละเอียด: ${details || '-'}\n\nบันทึกเข้าระบบเรียบร้อยแล้วค่ะ 🚀`
+          ? `✅ *สร้างงานใหม่สำเร็จ!*\n\n📌 ชื่องาน: ${taskName}\n👤 มอบหมาย: ${assignee || 'ยังไม่ได้มอบหมาย'}\n🏢 ลูกค้า: ${customerName || '-'}\n📅 กำหนดส่ง: ${endDate || 'ยังไม่กำหนด'}\n📝 รายละเอียด: ${details || '-'}\n\nบันทึกเข้าระบบเรียบร้อยแล้วค่ะ 🚀`
           : `⚠️ ไม่สามารถสร้างงาน "${taskName}" ได้ กรุณาลองใหม่`;
         await sendTelegramMessage(chatId, msg);
 
@@ -1048,7 +1048,12 @@ ${ideasContext || 'ยังไม่มีไอเดีย'}
         let updated = false;
         if (supabaseUrl && supabaseAnonKey && (taskId || taskName)) {
           const supabase = createClient(supabaseUrl, supabaseAnonKey);
-          let query = supabase.from('tasks').update({ ...updates, updatedAt: new Date().toISOString() });
+          const taskUpdates = { ...updates };
+          if (taskUpdates.dueDate !== undefined) {
+            taskUpdates.endDate = taskUpdates.dueDate;
+            delete taskUpdates.dueDate;
+          }
+          let query = supabase.from('tasks').update({ ...taskUpdates, updatedAt: new Date().toISOString() });
           if (taskId) {
             query = query.eq('id', taskId);
           } else {
@@ -1139,7 +1144,7 @@ ${ideasContext || 'ยังไม่มีไอเดีย'}
             doc.text((t.customer || '-').substring(0, 18), 80, y);
             doc.text((t.status || '-').substring(0, 16), 120, y);
             doc.text((t.assignee || '-').substring(0, 14), 150, y);
-            doc.text((t.dueDate || '-'), 175, y);
+            doc.text((t.endDate || '-'), 175, y);
             y += 9;
           });
 
@@ -1159,7 +1164,7 @@ ${ideasContext || 'ยังไม่มีไอเดีย'}
           const headers = ['ชื่องาน','ลูกค้า','สถานะ','ผู้รับผิดชอบ','ราคา','กำหนดส่ง','รายละเอียด'];
           const rows = (tasks || []).map((t: any) => [
             t.name || '', t.customer || '', t.status || '', t.assignee || '',
-            t.price || 0, t.dueDate || '', (t.details || '').replace(/[,"\n]/g, ' ')
+            t.price || 0, t.endDate || '', (t.details || '').replace(/[,"\n]/g, ' ')
           ].map((v: any) => `"${v}"`).join(','));
           const csv = '\uFEFF' + headers.join(',') + '\n' + rows.join('\n');
           const buf = Buffer.from(csv, 'utf-8');
@@ -1457,7 +1462,7 @@ ${ideasContext || 'ยังไม่มีไอเดีย'}
 สถานะของบอร์ดงานปัจจุบัน:
 - งานทั้งหมด: ${tasks.length} งาน (เสร็จแล้ว ${completedCount} งาน, กำลังทำ/ค้างอยู่ ${pendingCount} งาน)
 - งานที่ต้องส่งวันนี้: ${todayTasks.length > 0 ? todayTasks.map(t => `- ${t.name} (ลูกค้า: ${t.customer || '-'}, มอบหมาย: ${t.assignee || 'ยังไม่มอบหมาย'})`).join('\n') : 'ไม่มีงานที่ต้องส่งวันนี้'}
-- งานที่เลยกำหนดส่งแล้ว (Overdue): ${overdueTasks.length > 0 ? overdueTasks.map(t => `- ${t.name} (กำหนดส่งเดิม: ${t.dueDate}, มอบหมาย: ${t.assignee || 'ยังไม่มอบหมาย'})`).join('\n') : 'ไม่มีงานเลยกำหนด'}
+- งานที่เลยกำหนดส่งแล้ว (Overdue): ${overdueTasks.length > 0 ? overdueTasks.map(t => `- ${t.name} (กำหนดส่งเดิม: ${t.endDate}, มอบหมาย: ${t.assignee || 'ยังไม่มอบหมาย'})`).join('\n') : 'ไม่มีงานเลยกำหนด'}
 - จำนวนลูกค้าทั้งหมด: ${clients.length} ราย
 - จำนวนไอเดียคอนเทนต์: ${ideas.length} ไอเดีย
 
@@ -1525,7 +1530,7 @@ ${ideasContext || 'ยังไม่มีไอเดีย'}
       const ideas = ideasRes.data || [];
 
       // Context construction
-      const tasksContext = tasks.map(t => `- งาน: ${t.name} (ลูกค้า: ${t.customer || 'ไม่มี'}, ผู้รับผิดชอบ: ${t.assignee || 'ยังไม่มอบหมาย'}, สถานะ: ${t.status}, ราคา: ${t.price || 0} บาท, กำหนดส่ง: ${t.dueDate || 'ไม่มี'})`).join('\n');
+      const tasksContext = tasks.map(t => `- งาน: ${t.name} (ลูกค้า: ${t.customer || 'ไม่มี'}, ผู้รับผิดชอบ: ${t.assignee || 'ยังไม่มอบหมาย'}, สถานะ: ${t.status}, ราคา: ${t.price || 0} บาท, กำหนดส่ง: ${t.endDate || 'ไม่มี'})`).join('\n');
       const clientsContext = clients.map(c => `- ลูกค้า: ${c.name} (เป้าหมายงบประมาณ: ${c.targetBudget || 0} บาท, ข้อมูลติดต่อ: ${c.contactInfo || 'ไม่มี'})`).join('\n');
       const ideasContext = ideas.map(i => `- ไอเดีย: ${i.title} (แนวคิด: ${i.concept || 'ไม่มี'}, แพลตฟอร์ม: ${i.platform || 'ไม่มี'})`).join('\n');
 

@@ -3,7 +3,7 @@ import { Task, Client } from '../../types';
 import { Plus, DollarSign, Calendar, User, ChevronRight } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
-type PipelineStage = 'lead' | 'proposal' | 'approve' | 'won';
+type PipelineStage = 'lead' | 'opportunity' | 'proposal' | 'negotiation' | 'won' | 'lost';
 
 interface PipelineViewProps {
  tasks: Task[];
@@ -14,10 +14,12 @@ interface PipelineViewProps {
 }
 
 const STAGES: { id: PipelineStage; label: string; color: string; bg: string; border: string; dot: string }[] = [
- { id: 'lead', label: 'Lead', color: 'text-slate-650', bg: 'bg-slate-500/10', border: 'border-slate-500/20', dot: 'bg-slate-400' },
- { id: 'proposal', label: 'เสนอราคา', color: 'text-blue-755', bg: 'bg-blue-500/10', border: 'border-blue-500/20', dot: 'bg-blue-500' },
- { id: 'approve', label: 'รอ Approve', color: 'text-amber-755', bg: 'bg-amber-500/10', border: 'border-amber-500/20', dot: 'bg-amber-500' },
- { id: 'won', label: 'ได้งาน ', color: 'text-emerald-755', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', dot: 'bg-emerald-500' },
+ { id: 'lead', label: 'Lead', color: 'text-slate-600', bg: 'bg-slate-500/10', border: 'border-slate-500/20', dot: 'bg-slate-400' },
+ { id: 'opportunity', label: 'Opportunity', color: 'text-indigo-650', bg: 'bg-indigo-500/10', border: 'border-indigo-500/20', dot: 'bg-indigo-500' },
+ { id: 'proposal', label: 'Proposal / Quote', color: 'text-blue-600', bg: 'bg-blue-500/10', border: 'border-blue-500/20', dot: 'bg-blue-500' },
+ { id: 'negotiation', label: 'Negotiation', color: 'text-amber-600', bg: 'bg-amber-500/10', border: 'border-amber-500/20', dot: 'bg-amber-500' },
+ { id: 'won', label: 'Closed Won', color: 'text-emerald-700', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', dot: 'bg-emerald-500' },
+ { id: 'lost', label: 'Closed Lost', color: 'text-rose-600', bg: 'bg-rose-500/10', border: 'border-rose-500/20', dot: 'bg-rose-500' },
 ];
 
 function fmtMoney(v?: number) {
@@ -28,6 +30,9 @@ function fmtMoney(v?: number) {
 function PipelineCard({ task, clients, onClick }: { task: Task; clients: Client[]; onClick: () => void }) {
  const client = clients.find(c => c.id === task.clientId);
  const price = task.dealValue ?? task.price ?? 0;
+
+ const lostReasonLine = task.details?.split('\n').find(l => l.startsWith('[ไม่ได้งานเนื่องจาก]:'));
+ const lostReason = lostReasonLine ? lostReasonLine.replace('[ไม่ได้งานเนื่องจาก]:', '').trim() : '';
 
  return (
  <div
@@ -59,6 +64,12 @@ function PipelineCard({ task, clients, onClick }: { task: Task; clients: Client[
  )}
  </div>
 
+ {task.pipelineStage === 'lost' && lostReason && (
+ <div className="mt-2.5 text-[11px] text-rose-700 bg-rose-50/70 p-2.5 rounded-xl border border-rose-100/50 leading-relaxed font-semibold">
+ 😞 {lostReason}
+ </div>
+ )}
+
  {task.tags && (
  <div className="flex flex-wrap gap-1 mt-2">
  {task.tags.split(',').slice(0, 3).map(tag => (
@@ -74,6 +85,8 @@ function PipelineCard({ task, clients, onClick }: { task: Task; clients: Client[
 
 export function PipelineView({ tasks, clients, onTaskClick, onUpdateTask, onNewTask }: PipelineViewProps) {
  const [dragOverStage, setDragOverStage] = useState<PipelineStage | null>(null);
+ const [lostTask, setLostTask] = useState<Task | null>(null);
+ const [reasonInput, setReasonInput] = useState('');
 
  const pipelineTasks = tasks.filter(t => t.pipelineStage);
 
@@ -88,14 +101,20 @@ export function PipelineView({ tasks, clients, onTaskClick, onUpdateTask, onNewT
 
  if (targetStage === 'won') {
  // Move to board: remove pipelineStage, set status = 'To Do'
- onUpdateTask({ ...task, pipelineStage: undefined, status: 'To Do' });
+ const cleanDetails = (task.details || '').replace(/\[ไม่ได้งานเนื่องจาก\]:\s*.*\n?/, '').trim();
+ onUpdateTask({ ...task, pipelineStage: undefined, status: 'To Do', details: cleanDetails });
+ } else if (targetStage === 'lost') {
+ setLostTask(task);
  } else {
- onUpdateTask({ ...task, pipelineStage: targetStage });
+ const cleanDetails = (task.details || '').replace(/\[ไม่ได้งานเนื่องจาก\]:\s*.*\n?/, '').trim();
+ onUpdateTask({ ...task, pipelineStage: targetStage, details: cleanDetails });
  }
- setDragOverStage(null);
+ dragOverStage && setDragOverStage(null);
  };
 
- const forecastTotal = pipelineTasks.reduce((s, t) => s + (t.dealValue ?? t.price ?? 0), 0);
+ const forecastTotal = pipelineTasks
+ .filter(t => t.pipelineStage !== 'lost')
+ .reduce((s, t) => s + (t.dealValue ?? t.price ?? 0), 0);
 
  return (
  <div className="flex flex-col h-full overflow-hidden">
@@ -197,6 +216,77 @@ export function PipelineView({ tasks, clients, onTaskClick, onUpdateTask, onNewT
  })}
  </div>
  </div>
+
+ {lostTask && (
+ <div className="fixed inset-0 bg-black/40 z-[90] flex items-center justify-center backdrop-blur-sm p-4 animate-fadeIn">
+ <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl p-6 flex flex-col gap-4 border border-slate-100/50">
+ <div>
+ <h3 className="text-base font-black text-slate-800 flex items-center gap-2">
+ <span className="w-3 h-3 rounded-full bg-rose-500 shrink-0" />
+ ระบุเหตุผลที่ไม่ได้งาน
+ </h3>
+ <p className="text-xs text-slate-400 font-bold mt-1.5 leading-relaxed">
+ ดีล: <span className="text-slate-600 font-extrabold">{lostTask.name}</span>
+ </p>
+ </div>
+
+ <div className="flex flex-wrap gap-1.5 my-1">
+ {['ราคาแพงเกินไป', 'ลูกค้าเงียบหาย', 'คู่แข่งชนะดีล', 'ข้อเสนอไม่ตรงเป้า', 'งบประมาณไม่พอ', 'เลื่อนการลงทุน'].map(opt => (
+ <button
+ key={opt}
+ type="button"
+ onClick={() => setReasonInput(opt)}
+ className="text-[10px] font-black px-2.5 py-1.5 bg-slate-50 hover:bg-rose-50 hover:text-rose-600 text-slate-500 hover:border-rose-200 rounded-xl border border-slate-200/60 transition-all cursor-pointer"
+ >
+ {opt}
+ </button>
+ ))}
+ </div>
+
+ <textarea
+ value={reasonInput}
+ onChange={e => setReasonInput(e.target.value)}
+ placeholder="พิมพ์รายละเอียดหรือเหตุผลเพิ่มเติม..."
+ rows={3}
+ className="w-full border border-slate-200 rounded-2xl px-3 py-2.5 outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-50 text-slate-800 text-xs resize-none"
+ />
+
+ <div className="flex justify-end gap-2 mt-2">
+ <button
+ onClick={() => {
+ setLostTask(null);
+ setReasonInput('');
+ }}
+ className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors rounded-xl font-bold text-xs cursor-pointer"
+ >
+ ยกเลิก
+ </button>
+ <button
+ onClick={() => {
+ if (lostTask) {
+ const cleanDetails = (lostTask.details || '').replace(/\[ไม่ได้งานเนื่องจาก\]:\s*.*\n?/, '').trim();
+ const newDetails = reasonInput.trim() 
+ ? `[ไม่ได้งานเนื่องจาก]: ${reasonInput.trim()}\n${cleanDetails}`.trim()
+ : cleanDetails;
+ 
+ onUpdateTask({
+ ...lostTask,
+ pipelineStage: 'lost',
+ details: newDetails
+ });
+ }
+ setLostTask(null);
+ setReasonInput('');
+ }}
+ className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white transition-colors rounded-xl font-bold text-xs cursor-pointer shadow-sm"
+ >
+ บันทึกเหตุผล
+ </button>
+ </div>
+ </div>
+ </div>
+ )}
+
  </div>
  );
 }

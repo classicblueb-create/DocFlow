@@ -36,7 +36,7 @@ export interface Task {
   aiChatHistory?: string;
   paymentPhases?: string;
   invoices?: string;
-  pipelineStage?: 'lead' | 'proposal' | 'approve' | 'won';
+  pipelineStage?: 'lead' | 'opportunity' | 'proposal' | 'negotiation' | 'won' | 'lost';
   dealValue?: number;
   assignee?: 'Fan' | 'Mod';
   fileUrl?: string;
@@ -65,8 +65,28 @@ export interface Client {
   address?: string;
   taxId?: string;
   targetBudget?: number;
-  businessType?: 'individual' | 'company' | 'government';
+  contactName?: string;
+  contactTitle?: string;
   email?: string;
+  phone?: string;
+  mobile?: string;
+  website?: string;
+  lineId?: string;
+  subDistrict?: string;
+  district?: string;
+  province?: string;
+  postalCode?: string;
+  country?: string;
+  companyRegNo?: string;
+  businessType?: 'individual' | 'company' | 'government';
+  vatRegistered?: boolean;
+  currency?: string;
+  paymentTerms?: string;
+  creditLimit?: number;
+  industry?: string;
+  source?: string;
+  notes?: string;
+  createdAt?: string;
 }
 
 export interface Template {

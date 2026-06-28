@@ -76,7 +76,7 @@ export async function createSpreadsheet(): Promise<string> {
         },
         {
           updateCells: {
-            range: { sheetId: clientsSheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: 6 },
+            range: { sheetId: clientsSheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: 12 },
             rows: [{
               values: [
                 { userEnteredValue: { stringValue: 'id' } },
@@ -85,6 +85,12 @@ export async function createSpreadsheet(): Promise<string> {
                 { userEnteredValue: { stringValue: 'taxId' } },
                 { userEnteredValue: { stringValue: 'targetBudget' } },
                 { userEnteredValue: { stringValue: 'color' } },
+                { userEnteredValue: { stringValue: 'businessType' } },
+                { userEnteredValue: { stringValue: 'email' } },
+                { userEnteredValue: { stringValue: 'phone' } },
+                { userEnteredValue: { stringValue: 'contactName' } },
+                { userEnteredValue: { stringValue: 'paymentTerms' } },
+                { userEnteredValue: { stringValue: 'notes' } },
               ]
             }],
             fields: 'userEnteredValue'
@@ -177,7 +183,7 @@ export async function syncAllTasksToSheet(tasks: Task[]) {
 export async function fetchClientsFromSheet(): Promise<Client[]> {
   const id = await getSpreadsheetId();
   try {
-    const data = await fetchGoogleAPI(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/Clients!A2:F`);
+    const data = await fetchGoogleAPI(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/Clients!A2:L`);
     if (!data.values) return [];
     
     return data.values.map((row: any[]) => ({
@@ -186,7 +192,13 @@ export async function fetchClientsFromSheet(): Promise<Client[]> {
       address: row[2] || '',
       taxId: row[3] || '',
       targetBudget: parseFloat(row[4]) || 0,
-      color: row[5] || 'blue'
+      color: row[5] || 'blue',
+      businessType: row[6] as any || null,
+      email: row[7] || '',
+      phone: row[8] || '',
+      contactName: row[9] || '',
+      paymentTerms: row[10] || '',
+      notes: row[11] || ''
     }));
   } catch (e: any) {
     console.error("Error fetching clients:", e);
@@ -210,10 +222,21 @@ export async function syncAllClientsToSheet(clients: Client[]) {
   if (clients.length === 0) return;
 
   const values = clients.map(c => [
-    c.id, c.name, c.address || '', c.taxId || '', (c.targetBudget || 0).toString(), c.color || 'blue'
+    c.id,
+    c.name,
+    c.address || '',
+    c.taxId || '',
+    (c.targetBudget || 0).toString(),
+    c.color || 'blue',
+    c.businessType || '',
+    c.email || '',
+    c.phone || '',
+    c.contactName || '',
+    c.paymentTerms || '',
+    c.notes || ''
   ]);
   
-  await fetchGoogleAPI(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/Clients!A2:F?valueInputOption=USER_ENTERED`, {
+  await fetchGoogleAPI(`https://sheets.googleapis.com/v4/spreadsheets/${id}/values/Clients!A2:L?valueInputOption=USER_ENTERED`, {
     method: 'PUT',
     body: JSON.stringify({
       values

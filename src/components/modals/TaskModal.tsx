@@ -29,6 +29,7 @@ export function TaskModal({ isOpen, onClose, onSave, initialTask, categories = [
  const [prevAssignee, setPrevAssignee] = useState<string>('');
  const [telegramStatus, setTelegramStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
  const [pipelineStage, setPipelineStage] = useState<string>('');
+ const [lostReason, setLostReason] = useState('');
 
  const [aiAnalyzeEnabled, setAiAnalyzeEnabled] = useState(false);
  const [aiEmailEnabled, setAiEmailEnabled] = useState(false);
@@ -56,11 +57,14 @@ export function TaskModal({ isOpen, onClose, onSave, initialTask, categories = [
  setPrevAssignee((initialTask.assignee as any) || '');
  setFileUrl(initialTask.fileUrl || '');
  setPipelineStage(initialTask.pipelineStage || '');
+ const lostReasonLine = initialTask.details?.split('\n').find(l => l.startsWith('[ไม่ได้งานเนื่องจาก]:'));
+ setLostReason(lostReasonLine ? lostReasonLine.replace('[ไม่ได้งานเนื่องจาก]:', '').trim() : '');
  } else {
  setName(''); setStatus('To Do'); setCustomer('');
  setPriority('ปานกลาง (Medium)'); setPrice(''); setDevCost(''); setMyIncome('');
  setStartDate(''); setEndDate(''); setTags(''); setDetails('');
  setAssignee(''); setCategoryId(''); setPrevAssignee(''); setFileUrl(''); setPipelineStage('');
+ setLostReason('');
  }
  setAiAnalyzeEnabled(false); setAiEmailEnabled(false);
  setAiCourseEnabled(false); setAiSubtasksEnabled(false);
@@ -114,11 +118,16 @@ export function TaskModal({ isOpen, onClose, onSave, initialTask, categories = [
  const priceNum = Number(price) || 0;
  const devCostNum = Number(devCost) || 0;
  const myIncomeNum = myIncome !== '' ? Number(myIncome) : priceNum - devCostNum;
+ const cleanDetails = details.replace(/\[ไม่ได้งานเนื่องจาก\]:\s*.*\n?/, '').trim();
+ const finalDetails = pipelineStage === 'lost' && lostReason.trim()
+   ? `[ไม่ได้งานเนื่องจาก]: ${lostReason.trim()}\n${cleanDetails}`.trim()
+   : cleanDetails;
+
  onSave({
  name, customer, status, price: priceNum,
  devCost: devCostNum || undefined,
  myIncome: myIncomeNum || undefined,
- startDate, endDate, tags, details, subtasks,
+ startDate, endDate, tags, details: finalDetails, subtasks,
  aiAnalysis, aiEmail, aiCourse, priority,
  assignee: assignee || undefined,
  categoryId: categoryId || undefined,
@@ -332,12 +341,26 @@ export function TaskModal({ isOpen, onClose, onSave, initialTask, categories = [
  <label className="block text-xs font-bold text-slate-600 mb-1.5">Pipeline Stage (ถ้ามี)</label>
  <select value={pipelineStage} onChange={e => setPipelineStage(e.target.value)}
  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 outline-none bg-white text-slate-800 cursor-pointer focus:border-indigo-400">
- <option value="">ไม่อยู่ใน Pipeline</option>
- <option value="lead">Lead</option>
- <option value="proposal">เสนอราคา</option>
- <option value="approve">รอ Approve</option>
- <option value="won">ได้งาน</option>
- </select>
+  <option value="">ไม่อยู่ใน Pipeline</option>
+  <option value="lead">Lead</option>
+  <option value="opportunity">Opportunity</option>
+  <option value="proposal">Proposal / Quote</option>
+  <option value="negotiation">Negotiation</option>
+  <option value="won">Closed Won</option>
+  <option value="lost">Closed Lost</option>
+  </select>
+
+ {pipelineStage === 'lost' && (
+   <div className="mt-3">
+     <label className="block text-xs font-bold text-rose-600 mb-1.5 animate-fadeIn">เหตุผลที่ไม่ได้งาน</label>
+     <input 
+       value={lostReason} 
+       onChange={e => setLostReason(e.target.value)} 
+       placeholder="เช่น ราคาแพงเกินไป / ลูกค้าเงียบหาย..."
+       className="w-full border border-rose-200 focus:border-rose-450 focus:ring-rose-50 rounded-xl px-3 py-2.5 outline-none text-slate-800 animate-fadeIn" 
+     />
+   </div>
+ )}
  </div>
 
  <div className="bg-indigo-50/40 rounded-xl border border-indigo-100/60 overflow-hidden">

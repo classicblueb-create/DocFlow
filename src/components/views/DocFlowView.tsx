@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Settings, Download, Plus, X } from 'lucide-react';
+import { Settings, Download, Plus, X, Eye, Pencil } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import type { Client } from '../../types';
@@ -161,6 +161,46 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  const logoInputRef = useRef<HTMLInputElement>(null);
 
  const d = DICT[lang];
+
+  const [mobileTab, setMobileTab] = useState<'edit' | 'preview'>('edit');
+  const [scale, setScale] = useState(1);
+  const [paperHeight, setPaperHeight] = useState(1122);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const updateScale = useCallback(() => {
+    if (!containerRef.current) return;
+    const containerWidth = containerRef.current.clientWidth;
+    const paperWidth = 794; // 210mm in pixels at 96 dpi
+    const padding = 24; // mobile padding
+    const availableWidth = containerWidth - padding;
+    if (availableWidth < paperWidth) {
+      setScale(availableWidth / paperWidth);
+    } else {
+      setScale(1);
+    }
+  }, []);
+
+  useEffect(() => {
+    updateScale();
+    if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
+      const observer = new ResizeObserver(() => {
+        updateScale();
+        if (paperRef.current) {
+          setPaperHeight(paperRef.current.offsetHeight);
+        }
+      });
+      observer.observe(containerRef.current);
+      return () => observer.disconnect();
+    }
+    window.addEventListener('resize', updateScale);
+    return () => window.removeEventListener('resize', updateScale);
+  }, [updateScale]);
+
+  useEffect(() => {
+    if (paperRef.current) {
+      setPaperHeight(paperRef.current.offsetHeight);
+    }
+  }, [items, docType, lang, font, logoUrl, issuerCfg]);
 
  // Apply issuer defaults to paper when lang or docType changes
  const applyIssuer = useCallback((l: Lang, cfg: Record<Lang, IssuerConfig>) => {
@@ -375,38 +415,41 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  {/* ─── Toolbar ──────────────────────────────── */}
  <div className="sticky top-0 z-40 shadow-md">
  {/* Top row */}
- <div className="bg-white border-b border-gray-200 px-5 py-3 flex flex-wrap gap-3 items-center justify-between">
+ {/* Top row */}
+ <div className="bg-white border-b border-gray-200 px-3 md:px-5 py-2.5 flex gap-2 items-center justify-between">
  {/* Doc Type Tabs */}
- <div className="flex gap-1 bg-gray-100 p-1 rounded-lg">
+ <div className="flex gap-0.5 md:gap-1 bg-gray-100 p-0.5 md:p-1 rounded-lg overflow-x-auto hide-scrollbar shrink-0">
  {(['quotation', 'invoice', 'receipt'] as DocType[]).map(dt => (
  <button
  key={dt}
  onClick={() => changeDocType(dt)}
- className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${docType === dt ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
+ className={`px-2.5 md:px-4 py-1 md:py-1.5 rounded-md text-xs md:text-sm font-medium transition-all whitespace-nowrap ${docType === dt ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
  >
  {d.tabLabels[dt]}
  </button>
  ))}
  </div>
- <div className="flex gap-2">
+ <div className="flex gap-1.5 shrink-0">
  <button
  onClick={openSettings}
- className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 border border-gray-200 text-gray-600 rounded-lg text-xs font-semibold hover:bg-gray-200 transition"
+ className="flex items-center gap-1 px-2.5 md:px-3 py-1.5 bg-gray-100 border border-gray-200 text-gray-600 rounded-lg text-xs font-semibold hover:bg-gray-200 transition"
  >
- <Settings className="w-4 h-4" /> {d.ui_settings}
+ <Settings className="w-3.5 h-3.5" />
+ <span className="hidden md:inline">{d.ui_settings}</span>
  </button>
  <button
  onClick={handleExportPdf}
  disabled={exporting}
- className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 transition disabled:opacity-60"
+ className="flex items-center gap-1 px-2.5 md:px-4 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 transition disabled:opacity-60"
  >
- <Download className="w-4 h-4" /> {exporting ? '...' : d.ui_pdf}
+ <Download className="w-3.5 h-3.5" />
+ <span className="hidden md:inline">{exporting ? '...' : d.ui_pdf}</span>
+ <span className="md:hidden">{exporting ? '...' : 'PDF'}</span>
  </button>
  </div>
  </div>
- {/* Sub row */}
- <div className="bg-gray-50 border-b border-gray-200 px-5 py-2 flex flex-wrap gap-4 items-center text-xs text-gray-500">
- {/* Lang toggle */}
+ {/* Sub row — hidden on mobile, visible on md+ */}
+ <div className="hidden md:flex bg-gray-50 border-b border-gray-200 px-5 py-2 gap-4 items-center text-xs text-gray-500">
  <div className="flex items-center gap-2">
  <span>ภาษา:</span>
  <div className="flex bg-gray-200 p-0.5 rounded">
@@ -415,14 +458,12 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  ))}
  </div>
  </div>
- {/* Font */}
  <div className="flex items-center gap-2">
  <span>ฟอนต์:</span>
  <select value={font} onChange={e => changeFont(e.target.value)} className="border border-gray-200 rounded px-2 py-0.5 text-xs bg-white cursor-pointer">
  {FONTS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
  </select>
  </div>
- {/* Logo */}
  <div className="flex items-center gap-2 ml-auto">
  <input ref={logoInputRef} type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
  <button onClick={() => logoInputRef.current?.click()} className="px-2 py-0.5 border border-gray-300 bg-white rounded text-xs hover:bg-gray-50 transition">{d.lbl_upload_logo}</button>
@@ -431,9 +472,46 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  </div>
  </div>
 
+ {/* ─── Mobile tab bar ──────────────────────── */}
+ <div className="flex md:hidden bg-white border-b border-gray-200 px-4">
+ {(['edit', 'preview'] as const).map(tab => (
+ <button
+ key={tab}
+ onClick={() => setMobileTab(tab)}
+ className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold border-b-2 transition-colors ${mobileTab === tab ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-400'}`}
+ >
+ {tab === 'edit' ? <Pencil className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+ {tab === 'edit' ? 'แก้ไข' : 'ดูตัวอย่าง'}
+ </button>
+ ))}
+ </div>
+
  {/* ─── Paper ────────────────────────────────── */}
- <div className="flex-1 overflow-auto p-6 lg:p-10 flex justify-center items-start">
- <div ref={paperRef} style={paperStyle}>
+ <div
+ ref={containerRef}
+ className={`flex-1 overflow-auto p-3 md:p-6 lg:p-10 flex justify-center items-start ${mobileTab === 'preview' ? 'block' : ''}`}
+ >
+ <div
+ style={{
+ width: scale < 1 ? `${794 * scale}px` : undefined,
+ height: scale < 1 ? `${paperHeight * scale}px` : undefined,
+ position: 'relative',
+ flexShrink: 0,
+ }}
+ className={mobileTab === 'preview' ? '' : ''}
+ >
+ <div
+ ref={paperRef}
+ style={{
+ ...paperStyle,
+ ...(scale < 1 ? {
+ transformOrigin: 'top left',
+ transform: `scale(${scale})`,
+ position: 'absolute',
+ top: 0,
+ left: 0,
+ } : {}),
+ }}>
  {/* Header */}
  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', borderBottom: '1px solid #d4d4d4', paddingBottom: '16px', gap: '20px' }}>
  <div style={{ width: '180px', minHeight: '60px', display: 'flex', alignItems: 'flex-start' }}>
@@ -646,6 +724,7 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  <div style={{ marginTop: '4px', fontSize: '12px', color: '#555', display: 'flex', justifyContent: 'center', gap: '4px', alignItems: 'center' }}>
  <span>{d.lbl_sigDate}</span>
  <input type="date" value={sigRDate} onChange={e => setSigRDate(e.target.value)} style={{ ...inputInPaper, width: '110px', textAlign: 'center' }} className={fieldCls} />
+ </div>
  </div>
  </div>
  </div>

@@ -293,20 +293,28 @@ export function generateOpportunities(tasks: Task[], clients: Client[], ideas: I
  // ── Sales Opportunities (Open quotations or pipelines) ──
  tasks.forEach(task => {
  // Check if task is in Proposal or Lead stage
- if (task.pipelineStage === 'proposal' || task.pipelineStage === 'lead') {
- const createdDate = task.updatedAt ? new Date(task.updatedAt) : new Date();
- const ageDays = differenceInDays(today, createdDate);
- 
- opportunities.push({
- id: `opp-sales-${task.id}`,
- type: 'sales',
- title: `ดีลที่รอนำเสนอ: ${task.name}`,
- subtitle: `ดีลอยู่ในขั้นตอน ${task.pipelineStage === 'proposal' ? 'เสนอราคา' : 'ลูกค้ามุ่งหวัง'} มาแล้ว ${ageDays || 1} วัน`,
- value: Number(task.price || task.dealValue || 25000),
- actionLabel: 'ติดตามความคืบหน้า',
- actionPayload: { view: 'pipeline', taskId: task.id }
- });
- }
+  if (task.pipelineStage === 'lead' || task.pipelineStage === 'opportunity' || task.pipelineStage === 'proposal' || task.pipelineStage === 'negotiation') {
+    const createdDate = task.updatedAt ? new Date(task.updatedAt) : new Date();
+    const ageDays = differenceInDays(today, createdDate);
+    
+    const stageLabels: Record<string, string> = {
+      lead: 'Lead',
+      opportunity: 'Opportunity',
+      proposal: 'Proposal / Quote',
+      negotiation: 'Negotiation'
+    };
+    const stageName = stageLabels[task.pipelineStage] || task.pipelineStage;
+    
+    opportunities.push({
+      id: `opp-sales-${task.id}`,
+      type: 'sales',
+      title: `ดีลที่รอนำเสนอ: ${task.name}`,
+      subtitle: `ดีลอยู่ในขั้นตอน ${stageName} มาแล้ว ${ageDays || 1} วัน`,
+      value: Number(task.price || task.dealValue || 25000),
+      actionLabel: 'ติดตามความคืบหน้า',
+      actionPayload: { view: 'pipeline', taskId: task.id }
+    });
+  }
 
  // Check if task has sent/pending invoices
  if (task.invoices) {
@@ -434,7 +442,7 @@ export function compileRevenueData(tasks: Task[]): RevenueSnapshot {
  // Sales Pipeline
  if (t.pipelineStage) {
  const dealVal = Number(t.dealValue || t.price || 0);
- if (t.pipelineStage !== 'won') {
+ if (t.pipelineStage !== 'won' && t.pipelineStage !== 'lost') {
  pipelinePotential += dealVal;
  pendingDeals += 1;
  }
