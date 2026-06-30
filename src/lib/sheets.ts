@@ -31,7 +31,7 @@ export async function createSpreadsheet(): Promise<string> {
     method: 'POST',
     body: JSON.stringify({
       properties: {
-        title: 'DocFlow App Data',
+        title: 'ModtyTasks App Data',
       },
       sheets: [
         { properties: { title: 'Tasks' } },

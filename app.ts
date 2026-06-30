@@ -816,7 +816,7 @@ ${contextSection}
     // ── Built-in commands ──────────────────────────────────────────────
     if (text.startsWith('/start') || text.startsWith('/help')) {
       await sendTelegramMessage(chatId,
-        `🤖 *DocFlow Assistant พร้อมให้บริการ!*\n\n` +
+        `🤖 *ModtyTasks Assistant พร้อมให้บริการ!*\n\n` +
         `คำสั่งที่ใช้ได้:\n` +
         `📋 /tasks — ดูรายการงานทั้งหมด\n` +
         `📊 /summarize — สรุปภาพรวมงานและลูกค้า\n` +
@@ -877,7 +877,7 @@ ${contextSection}
     const today = new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' });
 
     try {
-      const systemPrompt = `คุณคือ "Modty" ผู้ช่วย AI ส่วนตัวที่ฉลาดและเป็นกันเองเหมือนเพื่อนที่รู้ทุกอย่างในระบบ DocFlow
+      const systemPrompt = `คุณคือ "Modty" ผู้ช่วย AI ส่วนตัวที่ฉลาดและเป็นกันเองเหมือนเพื่อนที่รู้ทุกอย่างในระบบ ModtyTasks
 วันนี้: ${today} (ใช้วันนี้ในการคำนวณ "พรุ่งนี้" "สัปดาห์นี้" ฯลฯ)
 
 📌 ข้อมูลปัจจุบันในระบบ:
@@ -976,8 +976,8 @@ ${ideasContext || 'ยังไม่มีไอเดีย'}
           doc.line(20, 32, 190, 32);
           doc.setFontSize(11);
           doc.text("ข้อมูลผู้เสนอราคา:", 20, 42);
-          doc.text("DocFlow Workspace Co., Ltd.", 20, 48);
-          doc.text("อีเมล: contact@docflow.app", 20, 54);
+          doc.text("ModtyTasks", 20, 48);
+          doc.text("อีเมล: contact@modtytasks.app", 20, 54);
           doc.text("ข้อมูลผู้รับเสนอราคา (ลูกค้า):", 110, 42);
           doc.text(customerName || "-", 110, 48);
           doc.line(20, 62, 190, 62);
@@ -1152,7 +1152,7 @@ ${ideasContext || 'ยังไม่มีไอเดีย'}
             doc.setFont('Sarabun');
           }
           doc.setFontSize(18);
-          doc.text(`รายงานงาน DocFlow`, 20, 20);
+          doc.text(`รายงานงาน ModtyTasks`, 20, 20);
           doc.setFontSize(10);
           doc.text(`ออกเมื่อ: ${new Date().toLocaleDateString('th-TH')}  สถานะ: ${filter}  รวม ${filteredTasks.length} รายการ`, 20, 28);
           doc.line(20, 32, 190, 32);
@@ -1338,7 +1338,7 @@ ${ideasContext || 'ยังไม่มีไอเดีย'}
       details    ? `📝 ${details.slice(0, 120)}${details.length > 120 ? '...' : ''}` : '',
       fileUrl    ? `🔗 ${fileUrl}` : '',
       '━━━━━━━━━━━━━━━',
-      'ส่งจาก DocFlow 🚀',
+      'ส่งจาก ModtyTasks 🚀',
     ].filter(Boolean).join('\n');
 
     try {
@@ -1443,7 +1443,7 @@ ${ideasContext || 'ยังไม่มีไอเดีย'}
           message += `━━━━━━━━━━━━━━━\n`;
         });
       }
-      message += `ส่งจาก DocFlow`;
+      message += `ส่งจาก ModtyTasks`;
 
       const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: "POST",
@@ -1604,7 +1604,7 @@ ${ideasContext || 'ยังไม่มีไอเดีย'}
       const contentSummary = `คอนเทนต์ทั้งหมด: ${publishedPlans.length} ชิ้น | เอนเกจดีมาก (A+/B+): ${highPerformers.length} ชิ้น`;
 
       const systemInstruction = `คุณคือ "Modty" ผู้ช่วย AI และนักวิเคราะห์ธุรกิจส่วนตัวที่เก่งกาจและเป็นกันเอง
-หน้าที่ของคุณคือวิเคราะห์ภาพรวมธุรกิจประจำสัปดาห์ (Weekly Business Analysis / Analyse My Business) จากข้อมูลในระบบ DocFlow และส่งรายงานเป็นภาษาไทยให้เจ้าของธุรกิจอ่านเข้าใจง่าย ได้แรงบันดาลใจ และเห็นทิศทางชัดเจน`;
+หน้าที่ของคุณคือวิเคราะห์ภาพรวมธุรกิจประจำสัปดาห์ (Weekly Business Analysis / Analyse My Business) จากข้อมูลในระบบ ModtyTasks และส่งรายงานเป็นภาษาไทยให้เจ้าของธุรกิจอ่านเข้าใจง่าย ได้แรงบันดาลใจ และเห็นทิศทางชัดเจน`;
 
       const userPrompt = `นี่คือข้อมูลล่าสุดในระบบ:
 ---

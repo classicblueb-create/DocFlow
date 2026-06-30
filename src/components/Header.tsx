@@ -23,7 +23,7 @@ const VIEW_TITLES: Record<ViewType, string> = {
  dashboard: 'สถิติ & รายได้ (Dashboard)',
  clients: 'ฐานลูกค้า (Client Portal)',
  templates: 'คลังงาน (Template Library)',
- docflow: 'ออกเอกสาร (DocFlow)',
+ docflow: 'ออกเอกสาร',
  agents: 'คลังผู้ช่วย AI',
  ideas: 'ไอเดีย & นวัตกรรม',
  pipeline: 'Sales Pipeline',

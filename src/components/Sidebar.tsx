@@ -130,7 +130,7 @@ export function Sidebar({ currentView, onViewChange, isMobileOpen, setIsMobileOp
               SYSTEMS
             </p>
             <div className="space-y-0.5">
-              <NavItem view="docflow"   icon={FileText}   label="ออกเอกสาร (DocFlow)" iconClass="text-amber-600" labelClass="text-amber-800" />
+              <NavItem view="docflow"   icon={FileText}   label="ออกเอกสาร" iconClass="text-amber-600" labelClass="text-amber-800" />
               <NavItem view="clients"   icon={Users}      label="ฐานลูกค้า (Clients)" iconClass="text-emerald-600" labelClass="text-emerald-800" />
               <NavItem view="templates" icon={Library}    label="คลังงาน (Templates)" iconClass="text-blue-600" labelClass="text-blue-800" />
             </div>
