@@ -1803,6 +1803,11 @@ ${highPerformersContext || 'ยังไม่มีคอนเทนต์ท�
     res.json({
       status: "ok",
       ai: { provider: "OpenRouter", primaryModel: MODEL_PRIMARY, fallbackModel: MODEL_FALLBACK },
+      google: {
+        clientId: !!process.env.GOOGLE_CLIENT_ID,
+        clientSecret: !!process.env.GOOGLE_CLIENT_SECRET,
+        redirectUri: process.env.GOOGLE_REDIRECT_URI || null,
+      }
     });
   });
 
