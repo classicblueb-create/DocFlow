@@ -1814,6 +1814,7 @@ ${highPerformersContext || 'ยังไม่มีคอนเทนต์ท�
       supabase: {
         url: !!process.env.VITE_SUPABASE_URL,
         key: !!process.env.VITE_SUPABASE_ANON_KEY,
+        urlHint: (process.env.VITE_SUPABASE_URL || '').slice(8, 28),
       },
       google: {
         clientId: !!process.env.GOOGLE_CLIENT_ID,
