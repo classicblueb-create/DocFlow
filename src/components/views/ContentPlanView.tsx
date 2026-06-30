@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Video, Sparkles, Loader2, Plus, X, Trash2, Calendar, Check, Copy, Clock, HelpCircle, Film, Radio, FileText, Flame, ExternalLink, Star, ChevronUp, ChevronDown } from 'lucide-react';
+import { Video, Sparkles, Loader2, Plus, X, Trash2, Calendar, Check, Copy, Clock, HelpCircle, Film, Radio, FileText, Flame, ExternalLink, Star, ChevronUp, ChevronDown, RefreshCw } from 'lucide-react';
 import { ContentPlan } from '../../types';
 import { cn } from '../../lib/utils';
 
@@ -8,6 +8,8 @@ interface ContentPlanViewProps {
  onSaveContentPlan: (plan: ContentPlan) => Promise<void>;
  onDeleteContentPlan: (id: string) => Promise<void>;
  onUpdateContentPlan: (plan: ContentPlan) => Promise<void>;
+ onRefreshContentPlans?: () => Promise<void>;
+ isRefreshingPlans?: boolean;
 }
 
 const PLATFORMS = ['TikTok', 'YouTube', 'Facebook', 'Instagram', 'Blog', 'อื่นๆ'] as const;
@@ -76,7 +78,9 @@ export function ContentPlanView({
  contentPlans,
  onSaveContentPlan,
  onDeleteContentPlan,
- onUpdateContentPlan
+ onUpdateContentPlan,
+ onRefreshContentPlans,
+ isRefreshingPlans = false,
 }: ContentPlanViewProps) {
  // AI Form States
  const [concept, setConcept] = useState('');
@@ -264,6 +268,24 @@ export function ContentPlanView({
  return (
  <div className="flex-1 overflow-y-auto hide-scrollbar p-4 md:p-6 bg-transparent">
  <div className="max-w-6xl w-full mx-auto space-y-6">
+
+  {/* Notion sync bar */}
+  <div className="flex items-center justify-between">
+   <div>
+    <h2 className="text-sm font-black text-slate-700 uppercase tracking-wider">แผนคอนเทนต์</h2>
+    <p className="text-[10px] text-slate-400 mt-0.5">ดึงข้อมูลจาก Notion โดยตรง</p>
+   </div>
+   {onRefreshContentPlans && (
+    <button
+     onClick={onRefreshContentPlans}
+     disabled={isRefreshingPlans}
+     className="flex items-center gap-1.5 px-3 py-1.5 bg-white/70 border border-slate-200 rounded-xl text-[11px] font-bold text-slate-600 hover:bg-white hover:border-indigo-300 hover:text-indigo-700 transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+    >
+     <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingPlans ? 'animate-spin' : ''}`} />
+     {isRefreshingPlans ? 'กำลังดึงข้อมูล...' : 'Sync จาก Notion'}
+    </button>
+   )}
+  </div>
 
  {/* Stats Section */}
  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

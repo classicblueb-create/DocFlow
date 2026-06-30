@@ -305,43 +305,59 @@ export function DashboardView({ tasks, categories }: DashboardViewProps) {
             lead: '#94a3b8', opportunity: '#818cf8', proposal: '#60a5fa',
             negotiation: '#fbbf24', won: '#34d399', lost: '#fb7185',
           };
+          const STAGE_LABELS: Record<string, string> = {
+            lead: 'Lead', opportunity: 'Opportunity', proposal: 'Proposal',
+            negotiation: 'Negotiation', won: 'Won', lost: 'Lost',
+          };
           const pipelineData = STAGES.map(stage => {
             const deals = tasks.filter(t => t.pipelineStage === stage);
-            return { stage, count: deals.length, value: deals.reduce((s, t) => s + Number(t.dealValue || 0), 0) };
+            return {
+              stage: STAGE_LABELS[stage] || stage,
+              stageKey: stage,
+              count: deals.length,
+              value: deals.reduce((s, t) => s + Number(t.dealValue || 0), 0),
+            };
           }).filter(d => d.count > 0);
-          const funnelData = pipelineData.filter(d => d.stage !== 'lost');
+
+          // Pipeline Value chart: exclude lost, only stages that have value
+          const funnelData = pipelineData.filter(d => d.stageKey !== 'lost' && d.value > 0);
+
           if (pipelineData.length === 0) return null;
           return (
             <div className="space-y-4">
               <h3 className="font-black text-sm text-slate-700">Sales Pipeline</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="glass-card rounded-2xl p-5">
-                  <h4 className="font-bold text-xs text-slate-600 mb-3">Pipeline by Stage (Count &amp; Value)</h4>
+                  <h4 className="font-bold text-xs text-slate-600 mb-3">Pipeline by Stage (Count)</h4>
                   <ResponsiveContainer width="100%" height={180}>
-                    <BarChart data={pipelineData} layout="vertical" margin={{ left: 60, right: 20 }}>
+                    <BarChart data={pipelineData} layout="vertical" margin={{ left: 80, right: 20, top: 4, bottom: 4 }}>
                       <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                      <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} />
-                      <YAxis type="category" dataKey="stage" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
-                      <Tooltip formatter={(v: any, name: string) => name === 'value' ? `฿${Number(v).toLocaleString()}` : v} />
-                      <Bar dataKey="count" name="จำนวนดีล" radius={[0, 4, 4, 0]}>
-                        {pipelineData.map((d, i) => <Cell key={i} fill={STAGE_COLORS[d.stage] || '#94a3b8'} />)}
+                      <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} allowDecimals={false} />
+                      <YAxis type="category" dataKey="stage" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} width={75} />
+                      <Tooltip formatter={(v: any) => [`${v} ดีล`, 'จำนวน']} cursor={{ fill: 'rgba(99,102,241,0.06)' }} />
+                      <Bar dataKey="count" name="จำนวนดีล" radius={[0, 8, 8, 0]} maxBarSize={22}>
+                        {pipelineData.map((d, i) => <Cell key={i} fill={STAGE_COLORS[d.stageKey] || '#94a3b8'} />)}
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
                 <div className="glass-card rounded-2xl p-5">
                   <h4 className="font-bold text-xs text-slate-600 mb-3">Pipeline Value (ไม่รวม Lost)</h4>
-                  <ResponsiveContainer width="100%" height={180}>
-                    <BarChart data={funnelData}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="stage" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} tickFormatter={v => `฿${(v/1000).toFixed(0)}k`} />
-                      <Tooltip formatter={(v: any) => `฿${Number(v).toLocaleString()}`} />
-                      <Bar dataKey="value" name="มูลค่า" radius={[4, 4, 0, 0]}>
-                        {funnelData.map((d, i) => <Cell key={i} fill={STAGE_COLORS[d.stage] || '#94a3b8'} />)}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
+                  {funnelData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={180}>
+                      <BarChart data={funnelData} margin={{ left: 8, right: 8, top: 4, bottom: 4 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <XAxis dataKey="stage" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} tickFormatter={v => v >= 1000 ? `฿${(v/1000).toFixed(0)}k` : `฿${v}`} />
+                        <Tooltip formatter={(v: any) => [`฿${Number(v).toLocaleString()}`, 'มูลค่า']} cursor={{ fill: 'rgba(99,102,241,0.06)' }} />
+                        <Bar dataKey="value" name="มูลค่า" radius={[8, 8, 0, 0]} maxBarSize={40}>
+                          {funnelData.map((d, i) => <Cell key={i} fill={STAGE_COLORS[d.stageKey] || '#94a3b8'} />)}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-[180px] flex items-center justify-center text-xs text-slate-400 font-semibold">ยังไม่มีมูลค่าดีลในระบบ</div>
+                  )}
                 </div>
               </div>
             </div>
@@ -362,12 +378,12 @@ export function DashboardView({ tasks, categories }: DashboardViewProps) {
             </div>
             {grossData.some(d => d.gross > 0) ? (
               <ResponsiveContainer width="100%" height={140}>
-                <BarChart data={grossData.slice(-6)}>
+                <BarChart data={grossData.slice(-6)} margin={{ left: 4, right: 4, top: 4, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                   <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                  <Tooltip formatter={(v: any) => `฿${Number(v).toLocaleString()}`} />
-                  <Bar dataKey="gross" name="Gross" fill="#818cf8" radius={[4, 4, 0, 0]} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : `${v}`} />
+                  <Tooltip formatter={(v: any) => `฿${Number(v).toLocaleString()}`} cursor={{ fill: 'rgba(99,102,241,0.06)' }} />
+                  <Bar dataKey="gross" name="Gross" fill="#818cf8" radius={[6, 6, 0, 0]} maxBarSize={32} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -379,12 +395,12 @@ export function DashboardView({ tasks, categories }: DashboardViewProps) {
           <div className="glass-card rounded-2xl p-5">
             <h3 className="font-bold text-sm text-slate-700 mb-4">งานแยกตามความสำคัญ</h3>
             <ResponsiveContainer width="100%" height={140}>
-              <BarChart data={priorityData}>
+              <BarChart data={priorityData} margin={{ left: 4, right: 4, top: 4, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
                 <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} allowDecimals={false} />
-                <Tooltip cursor={{ fill: 'rgba(255,255,255,0.1)' }} />
-                <Bar dataKey="Tasks" fill="#818cf8" radius={[4, 4, 0, 0]} />
+                <Tooltip cursor={{ fill: 'rgba(99,102,241,0.06)' }} />
+                <Bar dataKey="Tasks" fill="#818cf8" radius={[6, 6, 0, 0]} maxBarSize={32} />
               </BarChart>
             </ResponsiveContainer>
           </div>

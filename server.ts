@@ -1162,33 +1162,107 @@ ${ideasContext || 'ไม่มีไอเดียคอนเทนต์'}
     return blocks;
   }
 
-  // GET all Notion content plans
+  // GET all Notion content plans (with blocks for AI fields)
   app.get('/api/notion/content-plans', async (_req, res) => {
     try {
       const dbId = process.env.NOTION_CONTENT_DB_ID;
       if (!process.env.NOTION_TOKEN || !dbId) return res.status(400).json({ error: 'Notion not configured' });
+
       const r = await fetch(`https://api.notion.com/v1/databases/${dbId}/query`, {
         method: 'POST',
         headers: NOTION_HEADERS(),
-        body: JSON.stringify({ sorts: [{ property: 'Created time', direction: 'descending' }] }),
+        body: JSON.stringify({ page_size: 100, sorts: [{ property: 'Created time', direction: 'descending' }] }),
       });
       const data = await r.json() as any;
-      const plans = (data.results || []).map((page: any) => {
+
+      // Helper: extract all plain text from a block's rich_text
+      const blockText = (block: any): string => {
+        const rt = block?.[block?.type]?.rich_text || [];
+        return rt.map((t: any) => t.plain_text || '').join('');
+      };
+
+      // Fetch blocks for each page in parallel (to recover AI-generated content stored as page body)
+      const plans = await Promise.all((data.results || []).map(async (page: any) => {
         const props = page.properties;
-        const platformRaw: string[] = (props['Platform ']?.multi_select || []).map((s: any) => s.name as string);
-        const platformMap: Record<string, string> = { TIKTOK: 'TikTok', FB: 'Facebook', IG: 'Instagram' };
+        const platformRaw: string[] = (props['Platform ']?.multi_select || props['Platform']?.multi_select || []).map((s: any) => s.name as string);
+        const platformMap: Record<string, string> = { TIKTOK: 'TikTok', FB: 'Facebook', IG: 'Instagram', YT: 'YouTube' };
         const s = props['Status']?.status?.name || 'Not started';
+
+        // Map status
+        let status = 'ไอเดีย/ร่าง';
+        if (s === 'Done' || s === 'เผยแพร่แล้ว') status = 'เผยแพร่แล้ว';
+        else if (s === 'In progress' || s === 'กำลังผลิต') status = 'กำลังผลิต';
+        else if (s === 'กำหนดลง' || s === 'Scheduled') status = 'กำหนดลง';
+
+        // Publish date from Notion property
+        const publishDate = props['Publish Date']?.date?.start || props['Date']?.date?.start || undefined;
+
+        // Fetch blocks to get AI-generated body content
+        let aiHooks: string[] = [];
+        let aiOutline = '';
+        let aiScript = '';
+        let aiHashtags = '';
+        let toneOfVoice = '';
+        let targetAudience = '';
+
+        try {
+          const blocksRes = await fetch(`https://api.notion.com/v1/blocks/${page.id}/children?page_size=100`, {
+            headers: NOTION_HEADERS(),
+          });
+          const blocksData = await blocksRes.json() as any;
+          const blocks: any[] = blocksData.results || [];
+
+          let currentSection = '';
+          for (const block of blocks) {
+            const text = blockText(block);
+            const type = block.type;
+
+            if (type === 'heading_2' || type === 'heading_3') {
+              if (text.includes('Hook')) currentSection = 'hooks';
+              else if (text.includes('Outline')) currentSection = 'outline';
+              else if (text.includes('Script') || text.includes('Caption')) currentSection = 'script';
+              else if (text.includes('Hashtag')) currentSection = 'hashtags';
+              else if (text.includes('โทน') || text.includes('กลุ่มเป้าหมาย')) currentSection = 'tone';
+              else currentSection = '';
+            } else if (type === 'paragraph' || type === 'bulleted_list_item') {
+              if (!text.trim()) continue;
+              if (currentSection === 'hooks') {
+                if (text.startsWith('โทน:')) toneOfVoice = text.replace('โทน:', '').trim();
+                else if (text.startsWith('กลุ่มเป้าหมาย:')) targetAudience = text.replace('กลุ่มเป้าหมาย:', '').trim();
+                else aiHooks.push(text);
+              } else if (currentSection === 'tone') {
+                if (text.startsWith('โทน:')) toneOfVoice = text.replace('โทน:', '').trim();
+                else if (text.startsWith('กลุ่มเป้าหมาย:')) targetAudience = text.replace('กลุ่มเป้าหมาย:', '').trim();
+              } else if (currentSection === 'outline') {
+                aiOutline = aiOutline ? aiOutline + '\n' + text : text;
+              } else if (currentSection === 'script') {
+                aiScript = aiScript ? aiScript + '\n' + text : text;
+              } else if (currentSection === 'hashtags') {
+                aiHashtags = text;
+              }
+            }
+          }
+        } catch { /* blocks fetch optional - skip if fails */ }
+
         return {
           id: page.id,
           notionPageId: page.id,
-          title: props['Name']?.title?.[0]?.plain_text || props['name']?.title?.[0]?.plain_text || '',
-          concept: props['Details']?.rich_text?.[0]?.plain_text || '',
+          title: props['Name']?.title?.[0]?.plain_text || props['name']?.title?.[0]?.plain_text || '(ไม่มีชื่อ)',
+          concept: props['Details']?.rich_text?.[0]?.plain_text || props['Concept']?.rich_text?.[0]?.plain_text || '',
           platform: platformMap[platformRaw[0]] || platformRaw[0] || 'อื่นๆ',
-          status: s === 'Done' ? 'เผยแพร่แล้ว' : s === 'In progress' ? 'กำลังผลิต' : 'ไอเดีย/ร่าง',
+          status,
           createdAt: page.created_time,
           notionUrl: page.url,
+          publishDate,
+          toneOfVoice: toneOfVoice || undefined,
+          targetAudience: targetAudience || undefined,
+          aiHooks: aiHooks.length > 0 ? aiHooks : undefined,
+          aiOutline: aiOutline || undefined,
+          aiScript: aiScript || undefined,
+          aiHashtags: aiHashtags || undefined,
         };
-      });
+      }));
+
       res.json(plans);
     } catch (e: any) {
       res.status(500).json({ error: e.message });

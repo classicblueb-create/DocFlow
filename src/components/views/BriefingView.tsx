@@ -4,9 +4,10 @@ import { CustomTrackerWidget } from '../widgets/CustomTrackerWidget';
 import { 
   TrendingUp, Users, CheckCircle, FileText, AlertCircle, Sparkles, Loader2,
   DollarSign, Wallet, Hourglass, CalendarDays, ChevronRight, CheckSquare,
-  ListTodo, Plus, Target, ShieldAlert, Sparkle, BrainCircuit, RefreshCw, Send, Bot, ClipboardCheck, UserCircle2
+  ListTodo, Plus, Target, ShieldAlert, Sparkle, BrainCircuit, RefreshCw, Send, Bot, ClipboardCheck, UserCircle2,
+  Video, Radio, Flame, HelpCircle, ExternalLink
 } from 'lucide-react';
-import { Task, Client, Idea, Subtask, ProjectCategory } from '../../types';
+import { Task, Client, Idea, Subtask, ProjectCategory, ContentPlan } from '../../types';
 import { cn, getTaskPrice } from '../../lib/utils';
 import {
   calculateTaskPriorityScore,
@@ -21,6 +22,7 @@ interface BriefingViewProps {
   clients: Client[];
   ideas: Idea[];
   categories: ProjectCategory[];
+  contentPlans: ContentPlan[];
   onTaskClick: (task: Task) => void;
   onUpdateTask: (task: Task) => void;
   onSaveTask: (task: Partial<Task>) => Promise<void>;
@@ -35,6 +37,7 @@ export function BriefingView({
   clients,
   ideas,
   categories,
+  contentPlans,
   onTaskClick,
   onUpdateTask,
   onSaveTask,
@@ -46,16 +49,65 @@ export function BriefingView({
   // ── Google Calendar ──
   const [gcalEvents, setGcalEvents] = useState<{ id: string; title: string; start: string; end: string; location?: string; htmlLink?: string; allDay?: boolean }[]>([]);
   const [gcalConnected, setGcalConnected] = useState(false);
+  const [gcalLoading, setGcalLoading] = useState(true);
 
   useEffect(() => {
+    setGcalLoading(true);
     fetch('/api/google/events')
       .then(r => r.json())
       .then(data => { setGcalConnected(data.connected); setGcalEvents(data.events || []); })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setGcalLoading(false));
   }, []);
 
   const todayStr = new Date().toISOString().slice(0, 10);
+  const weekEnd = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const todayMeetings = gcalEvents.filter(e => (e.start || '').startsWith(todayStr));
+  const upcomingMeetings = gcalEvents.filter(e => {
+    const d = (e.start || '').slice(0, 10);
+    return d > todayStr && d <= weekEnd;
+  }).slice(0, 5);
+
+  // ── Notion Content Plan AI Priority state ──
+  const [contentPriority, setContentPriority] = useState<{ summary: string; priorities: { title: string; reason: string; platform: string; status: string }[]; nextAction: string } | null>(null);
+  const [isAnalyzingContent, setIsAnalyzingContent] = useState(false);
+
+  const pendingContentPlans = useMemo(() => contentPlans.filter(p => p.status !== 'เผยแพร่แล้ว'), [contentPlans]);
+
+  const analyzeContentPriority = async () => {
+    if (pendingContentPlans.length === 0 || isAnalyzingContent) return;
+    setIsAnalyzingContent(true);
+    const plansSummary = pendingContentPlans.map((p, i) =>
+      `${i + 1}. "${p.title}" — Platform: ${p.platform}, Status: ${p.status}${p.concept ? `, Concept: ${p.concept.slice(0, 100)}` : ''}`
+    ).join('\n');
+    try {
+      const res = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{ role: 'user', text: `วิเคราะห์แผนคอนเทนต์ที่ยังไม่ได้เผยแพร่ต่อไปนี้ แล้วแนะนำ Priority ว่าควรทำอันไหนก่อนเพื่อสร้าง Engagement และรายได้สูงสุด:\n${plansSummary}\n\nตอบ JSON: {"summary": "...", "priorities": [{"title": "...", "reason": "...", "platform": "...", "status": "..."}], "nextAction": "..."}` }],
+          agentTitle: 'Content Priority Advisor',
+          agentInstructions: 'คุณคือ Content Strategist ผู้เชี่ยวชาญ วิเคราะห์ Priority แผนคอนเทนต์เพื่อ Personal Brand และรายได้',
+          contextData: {}
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        const clean = data.result.replace(/```json|```/g, '').trim();
+        setContentPriority(JSON.parse(clean));
+      }
+    } catch { /* silent */ } finally {
+      setIsAnalyzingContent(false);
+    }
+  };
+
+  // Auto-analyze when content plans load
+  useEffect(() => {
+    if (pendingContentPlans.length > 0 && !contentPriority) {
+      analyzeContentPriority();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingContentPlans.length]);
 
   // ── Local state for Brain Dump ──
   const [dumpInput, setDumpInput] = useState('');
@@ -355,39 +407,173 @@ export function BriefingView({
         ))}
       </div>
 
-      {/* Google Calendar: Today's Meetings */}
-      {gcalConnected && todayMeetings.length > 0 && (
-        <div className="bg-white border border-emerald-100 rounded-[24px] p-5 flex flex-col gap-3 shadow-sm shrink-0">
+
+      {/* ── Google Calendar + Notion Content Plans Row ──────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 shrink-0">
+
+        {/* Google Calendar block — always visible */}
+        <div className="bg-white border border-slate-100 rounded-[24px] p-5 flex flex-col gap-3 shadow-sm">
           <div className="flex items-center gap-2">
             <CalendarDays className="w-4 h-4 text-emerald-500" />
-            <h2 className="text-xs font-bold text-slate-900 uppercase tracking-widest">การประชุมวันนี้</h2>
-            <span className="ml-auto text-[10px] bg-emerald-50 text-emerald-600 font-bold px-2 py-0.5 rounded-full border border-emerald-100">{todayMeetings.length} รายการ</span>
-          </div>
-          <div className="flex flex-col gap-2">
-            {todayMeetings.map(ev => (
-              <a key={ev.id} href={ev.htmlLink || '#'} target="_blank" rel="noopener noreferrer"
-                className="flex items-center gap-3 p-3 rounded-xl bg-emerald-50/50 border border-emerald-100 hover:bg-emerald-50 transition-colors">
-                <div className="shrink-0 w-10 text-center">
-                  <p className="text-xs font-black text-emerald-700">{ev.allDay ? 'All' : new Date(ev.start).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}</p>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-slate-800 truncate">{ev.title}</p>
-                  {ev.location && <p className="text-[11px] text-slate-400 truncate">{ev.location}</p>}
-                </div>
-                <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
+            <h2 className="text-xs font-bold text-slate-900 uppercase tracking-widest">Google Calendar</h2>
+            {gcalConnected && (
+              <span className="ml-auto text-[10px] bg-emerald-50 text-emerald-600 font-bold px-2 py-0.5 rounded-full border border-emerald-100">
+                {todayMeetings.length + upcomingMeetings.length} events
+              </span>
+            )}
+            {!gcalConnected && !gcalLoading && (
+              <a href="/api/google/auth" target="_blank" rel="noopener noreferrer"
+                className="ml-auto text-[10px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors px-2 py-0.5 rounded-full border border-indigo-100 bg-indigo-50">
+                เชื่อมเลย →
               </a>
-            ))}
+            )}
           </div>
+
+          {gcalLoading ? (
+            <div className="flex items-center gap-2 py-4 justify-center text-slate-400">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span className="text-xs font-semibold">กำลังโหลด...</span>
+            </div>
+          ) : !gcalConnected ? (
+            <div className="py-6 text-center space-y-2">
+              <CalendarDays className="w-8 h-8 text-slate-200 mx-auto" />
+              <p className="text-xs text-slate-400 font-semibold">เชื่อมต่อ Google Calendar<br />เพื่อดูตารางนัดหมายของคุณ</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {/* Today */}
+              {todayMeetings.length > 0 && (
+                <div>
+                  <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1.5">วันนี้ ({todayMeetings.length})</p>
+                  <div className="flex flex-col gap-1.5">
+                    {todayMeetings.map(ev => (
+                      <a key={ev.id} href={ev.htmlLink || '#'} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-3 p-2.5 rounded-xl bg-emerald-50/60 border border-emerald-100 hover:bg-emerald-50 transition-colors">
+                        <div className="shrink-0 w-10 text-center">
+                          <p className="text-xs font-black text-emerald-700">{ev.allDay ? 'All' : new Date(ev.start).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}</p>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-slate-800 truncate">{ev.title}</p>
+                          {ev.location && <p className="text-[10px] text-slate-400 truncate">{ev.location}</p>}
+                        </div>
+                        <ExternalLink className="w-3 h-3 text-slate-300 shrink-0" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {/* Upcoming week */}
+              {upcomingMeetings.length > 0 && (
+                <div>
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">7 วันข้างหน้า ({upcomingMeetings.length})</p>
+                  <div className="flex flex-col gap-1.5">
+                    {upcomingMeetings.map(ev => (
+                      <a key={ev.id} href={ev.htmlLink || '#'} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100 transition-colors">
+                        <div className="shrink-0 w-14 text-center">
+                          <p className="text-[10px] font-black text-slate-500">{new Date(ev.start).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}</p>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-slate-700 truncate">{ev.title}</p>
+                        </div>
+                        <ExternalLink className="w-3 h-3 text-slate-300 shrink-0" />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {todayMeetings.length === 0 && upcomingMeetings.length === 0 && (
+                <div className="py-4 text-center text-xs text-slate-400 font-semibold">ไม่มีนัดหมายใน 7 วันนี้ 🎉</div>
+              )}
+            </div>
+          )}
         </div>
-      )}
-      {!gcalConnected && (
-        <div className="bg-white border border-slate-100 rounded-[24px] p-4 flex items-center gap-3 shadow-sm shrink-0">
-          <CalendarDays className="w-4 h-4 text-slate-400 shrink-0" />
-          <p className="text-xs text-slate-400 flex-1">เชื่อม Google Calendar เพื่อดูการประชุมวันนี้</p>
-          <a href="/api/google/auth" target="_blank" rel="noopener noreferrer"
-            className="text-xs font-bold text-indigo-600 hover:text-indigo-800 shrink-0 transition-colors">เชื่อมเลย →</a>
+
+        {/* Notion Content Plans — AI Priority */}
+        <div className="bg-white border border-slate-100 rounded-[24px] p-5 flex flex-col gap-3 shadow-sm">
+          <div className="flex items-center gap-2">
+            <Video className="w-4 h-4 text-indigo-500" />
+            <h2 className="text-xs font-bold text-slate-900 uppercase tracking-widest">Content Plan Priority</h2>
+            <span className="ml-auto text-[10px] bg-indigo-50 text-indigo-600 font-bold px-2 py-0.5 rounded-full border border-indigo-100">
+              {pendingContentPlans.length} รายการ
+            </span>
+            <button
+              onClick={analyzeContentPriority}
+              disabled={isAnalyzingContent || pendingContentPlans.length === 0}
+              className="shrink-0 w-6 h-6 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:border-indigo-200 transition-all disabled:opacity-40"
+              title="วิเคราะห์ใหม่"
+            >
+              <RefreshCw className={`w-3 h-3 ${isAnalyzingContent ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+
+          {pendingContentPlans.length === 0 ? (
+            <div className="py-6 text-center space-y-2">
+              <Flame className="w-8 h-8 text-slate-200 mx-auto" />
+              <p className="text-xs text-slate-400 font-semibold">ไม่มีแผนคอนเทนต์ที่รอดำเนินการ</p>
+              <button onClick={() => onViewChange('content_plan')} className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors">
+                ไปสร้างแผนใหม่ →
+              </button>
+            </div>
+          ) : isAnalyzingContent && !contentPriority ? (
+            <div className="flex flex-col items-center justify-center py-6 gap-2 text-slate-400">
+              <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
+              <p className="text-xs font-semibold">AI กำลังวิเคราะห์ Priority คอนเทนต์...</p>
+            </div>
+          ) : contentPriority ? (
+            <div className="flex flex-col gap-3">
+              {/* AI Summary */}
+              <div className="bg-indigo-50/50 border border-indigo-100/70 rounded-xl p-3">
+                <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1 flex items-center gap-1">
+                  <Sparkles className="w-3 h-3" /> AI Analysis
+                </p>
+                <p className="text-xs text-slate-600 font-medium leading-relaxed">{contentPriority.summary}</p>
+              </div>
+              {/* Priority list */}
+              <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto hide-scrollbar pr-1">
+                {contentPriority.priorities.slice(0, 5).map((p, i) => (
+                  <div key={i} className="flex gap-2.5 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${i === 0 ? 'bg-rose-500 text-white' : i === 1 ? 'bg-amber-400 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                      {i + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-bold text-slate-800 truncate">{p.title}</p>
+                      <p className="text-[10px] text-slate-500 font-medium mt-0.5 leading-relaxed line-clamp-2">{p.reason}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[9px] font-bold bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-100">{p.platform}</span>
+                        <span className="text-[9px] font-bold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">{p.status}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {/* Next Action */}
+              <div className="bg-emerald-50/60 border border-emerald-100 rounded-xl p-3">
+                <p className="text-[9px] font-black text-emerald-700 uppercase tracking-widest mb-1">🎯 Next Action</p>
+                <p className="text-xs text-emerald-800 font-semibold">{contentPriority.nextAction}</p>
+              </div>
+              <button
+                onClick={() => onViewChange('content_plan')}
+                className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors text-right"
+              >
+                ดูแผนทั้งหมด ({pendingContentPlans.length}) →
+              </button>
+            </div>
+          ) : (
+            /* Pending plans list when no AI analysis yet */
+            <div className="flex flex-col gap-1.5 max-h-[250px] overflow-y-auto hide-scrollbar">
+              {pendingContentPlans.slice(0, 6).map(p => (
+                <div key={p.id} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                  <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${p.status === 'กำลังผลิต' ? 'bg-amber-400' : p.status === 'กำหนดลง' ? 'bg-blue-400' : 'bg-slate-300'}`} />
+                  <p className="text-xs text-slate-700 font-semibold flex-1 truncate">{p.title}</p>
+                  <span className="text-[9px] font-bold text-slate-400 shrink-0">{p.platform}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      )}
+
+      </div>
 
       {/* Main Layout Area */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

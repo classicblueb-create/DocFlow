@@ -1670,12 +1670,20 @@ ${highPerformersContext || 'ยังไม่มีคอนเทนต์ท�
   // -----------------------------------------------------------------
   // Google Calendar OAuth
   // -----------------------------------------------------------------
-  app.get("/api/google/auth", (_req, res) => {
+  // Derive redirect URI from request host — works on any domain without GOOGLE_REDIRECT_URI env var
+  const getRedirectUri = (req: any): string => {
+    if (process.env.GOOGLE_REDIRECT_URI) return process.env.GOOGLE_REDIRECT_URI;
+    const proto = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const host = req.headers['x-forwarded-host'] || req.headers.host || '';
+    return `${proto}://${host}/api/google/callback`;
+  };
+
+  app.get("/api/google/auth", (req: any, res: any) => {
     const clientId = process.env.GOOGLE_CLIENT_ID;
-    const redirectUri = process.env.GOOGLE_REDIRECT_URI;
-    if (!clientId || !redirectUri) {
-      return res.status(503).json({ error: "GOOGLE_CLIENT_ID / GOOGLE_REDIRECT_URI ยังไม่ได้ตั้งค่า" });
+    if (!clientId) {
+      return res.status(503).json({ error: "GOOGLE_CLIENT_ID ยังไม่ได้ตั้งค่า" });
     }
+    const redirectUri = getRedirectUri(req);
     const params = new URLSearchParams({
       client_id: clientId,
       redirect_uri: redirectUri,
@@ -1694,10 +1702,10 @@ ${highPerformersContext || 'ยังไม่มีคอนเทนต์ท�
 
     const clientId = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    const redirectUri = process.env.GOOGLE_REDIRECT_URI;
-    if (!clientId || !clientSecret || !redirectUri) {
+    if (!clientId || !clientSecret) {
       return res.status(503).json({ error: "Google OAuth env vars missing" });
     }
+    const redirectUri = getRedirectUri(req);
 
     try {
       const tokenRes = await fetch('https://oauth2.googleapis.com/token', {

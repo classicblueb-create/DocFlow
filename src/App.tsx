@@ -27,7 +27,7 @@ import { ThemeSettingsModal } from './components/modals/ThemeSettingsModal';
 import { ViewType, Task, Client, Template, Idea, ContentPlan, ProjectCategory } from './types';
 import {
  subscribeTasks, subscribeClients, subscribeTemplates, subscribeIdeas,
- subscribeCategories, subscribeContentPlans,
+ subscribeCategories,
  saveTask, deleteTask as dbDeleteTask,
  saveClient, deleteClient as dbDeleteClient,
  saveTemplate, deleteTemplate as dbDeleteTemplate,
@@ -86,6 +86,7 @@ export default function App() {
  const [templates, setTemplates] = useState<Template[]>(() => lsGet(LS_TEMPLATES, []));
  const [ideas, setIdeas] = useState<Idea[]>(() => lsGet(LS_IDEAS, []));
  const [contentPlans, setContentPlans] = useState<ContentPlan[]>([]);
+ const [isRefreshingPlans, setIsRefreshingPlans] = useState(false);
  const [categories, setCategories] = useState<ProjectCategory[]>([]);
 
  // ── Apply theme on mount ──────────────────────────────────────────────────
@@ -131,6 +132,22 @@ export default function App() {
  applyBgImage(null);
  };
 
+  // ── Notion Content Plans loader (useCallback so it can be passed as prop) ─
+  const loadNotionContentPlans = useCallback(async () => {
+    setIsRefreshingPlans(true);
+    try {
+      const res = await fetch('/api/notion/content-plans');
+      if (res.ok) {
+        const notionPlans: ContentPlan[] = await res.json();
+        setContentPlans(notionPlans);
+      }
+    } catch (e) {
+      console.warn('[Notion] Failed to load content plans:', e);
+    } finally {
+      setIsRefreshingPlans(false);
+    }
+  }, []);
+
  // ── Realtime subscriptions (only when authed) ─────────────────────────────
  useEffect(() => {
  if (!authed) return;
@@ -154,20 +171,8 @@ export default function App() {
  const unsubCategories = subscribeCategories(data => {
  setCategories(data);
  });
- const unsubContentPlans = subscribeContentPlans(async data => {
- // One-time migration: push any localStorage plans not yet in Supabase
- if (data.length === 0) {
- try {
- const local = localStorage.getItem('docflow_local_content_plans');
- if (local) {
- const localPlans: ContentPlan[] = JSON.parse(local);
- for (const p of localPlans) await saveContentPlan(p).catch(() => {});
- localStorage.removeItem('docflow_local_content_plans');
- }
- } catch { /* skip */ }
- }
- setContentPlans(data);
- });
+ // Fetch Content Plans from Notion (primary source)
+ loadNotionContentPlans();
 
  return () => {
  unsubTasks();
@@ -175,9 +180,8 @@ export default function App() {
  unsubTemplates();
  unsubIdeas();
  unsubCategories();
- unsubContentPlans();
  };
- }, [authed]);
+ }, [authed, loadNotionContentPlans]);
 
  // ── Notification helper ───────────────────────────────────────────────────
  const showNotification = useCallback((message: string, isError = false) => {
@@ -403,6 +407,7 @@ export default function App() {
  <BriefingView
  tasks={filteredTasks} clients={clients} ideas={ideas}
  categories={categories}
+ contentPlans={contentPlans}
  onTaskClick={handleTaskClick}
  onUpdateTask={handleUpdateTask}
  onSaveTask={handleSaveTask}
@@ -511,6 +516,8 @@ export default function App() {
  onSaveContentPlan={handleSaveContentPlan}
  onDeleteContentPlan={handleDeleteContentPlan}
  onUpdateContentPlan={handleUpdateContentPlan}
+ onRefreshContentPlans={loadNotionContentPlans}
+ isRefreshingPlans={isRefreshingPlans}
  />
  );
 
