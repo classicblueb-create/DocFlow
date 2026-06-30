@@ -583,10 +583,10 @@ ${categoriesListStr}
               </span>
             )}
             {!gcalConnected && !gcalLoading && (
-              <a href="/api/google/auth" target="_blank" rel="noopener noreferrer"
-                className="ml-auto text-[10px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors px-2 py-0.5 rounded-full border border-indigo-100 bg-indigo-50">
+              <button onClick={() => window.open('/api/google/auth', 'gcal_oauth', 'width=500,height=600,left=200,top=100')}
+                className="ml-auto text-[10px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors px-2 py-0.5 rounded-full border border-indigo-100 bg-indigo-50 cursor-pointer">
                 เชื่อมเลย →
-              </a>
+              </button>
             )}
           </div>
 
@@ -596,9 +596,13 @@ ${categoriesListStr}
               <span className="text-xs font-semibold">กำลังโหลด...</span>
             </div>
           ) : !gcalConnected ? (
-            <div className="py-6 text-center space-y-2">
+            <div className="py-6 text-center space-y-3">
               <CalendarDays className="w-8 h-8 text-slate-200 mx-auto" />
               <p className="text-xs text-slate-400 font-semibold">เชื่อมต่อ Google Calendar<br />เพื่อดูตารางนัดหมายของคุณ</p>
+              <button onClick={() => window.open('/api/google/auth', 'gcal_oauth', 'width=500,height=600,left=200,top=100')}
+                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 px-3 py-1.5 rounded-lg border border-indigo-100 bg-indigo-50 hover:bg-indigo-100 transition-colors cursor-pointer">
+                เชื่อม Google Calendar →
+              </button>
             </div>
           ) : (
             <div className="flex flex-col gap-3">

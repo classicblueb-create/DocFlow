@@ -68,11 +68,11 @@ export function CalendarView({ tasks }: ViewProps) {
           </div>
           <div className="flex items-center gap-2">
             {!gcalLoading && !gcalConnected && (
-              <a href="/api/google/auth" target="_blank" rel="noopener noreferrer"
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-white/30 hover:bg-white/50 rounded-lg text-xs font-bold text-slate-700 border border-white/40 transition-colors">
+              <button onClick={() => window.open('/api/google/auth', 'gcal_oauth', 'width=500,height=600,left=200,top=100')}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white/30 hover:bg-white/50 rounded-lg text-xs font-bold text-slate-700 border border-white/40 transition-colors cursor-pointer">
                 <CalendarDays className="w-3.5 h-3.5 text-indigo-500" />
                 เชื่อม Google Calendar
-              </a>
+              </button>
             )}
             {gcalConnected && (
               <span className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500/20 rounded-lg text-xs font-bold text-green-700 border border-green-500/30">
