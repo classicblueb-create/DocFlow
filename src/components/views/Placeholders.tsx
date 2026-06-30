@@ -24,7 +24,7 @@ export function CalendarView({ tasks }: ViewProps) {
   const [gcalConnected, setGcalConnected] = useState(false);
   const [gcalLoading, setGcalLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchGcalEvents = () => {
     fetch('/api/google/events')
       .then(r => r.json())
       .then(data => {
@@ -33,6 +33,15 @@ export function CalendarView({ tasks }: ViewProps) {
       })
       .catch(() => {})
       .finally(() => setGcalLoading(false));
+  };
+
+  useEffect(() => {
+    fetchGcalEvents();
+    const onMessage = (e: MessageEvent) => {
+      if (e.data === 'gcal_connected') fetchGcalEvents();
+    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
   }, []);
 
   const daysInMonth = eachDayOfInterval({

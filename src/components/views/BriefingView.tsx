@@ -51,13 +51,22 @@ export function BriefingView({
   const [gcalConnected, setGcalConnected] = useState(false);
   const [gcalLoading, setGcalLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchGcalEvents = () => {
     setGcalLoading(true);
     fetch('/api/google/events')
       .then(r => r.json())
       .then(data => { setGcalConnected(data.connected); setGcalEvents(data.events || []); })
       .catch(() => {})
       .finally(() => setGcalLoading(false));
+  };
+
+  useEffect(() => {
+    fetchGcalEvents();
+    const onMessage = (e: MessageEvent) => {
+      if (e.data === 'gcal_connected') fetchGcalEvents();
+    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
   }, []);
 
   const todayStr = new Date().toISOString().slice(0, 10);

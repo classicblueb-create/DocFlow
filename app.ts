@@ -1729,7 +1729,10 @@ ${highPerformersContext || 'ยังไม่มีคอนเทนต์ท�
         updated_at: new Date().toISOString()
       });
 
-      return res.send('<html><body><script>window.close();</script><p>Google Calendar เชื่อมต่อสำเร็จ ✅ ปิดหน้าต่างนี้ได้เลย</p></body></html>');
+      return res.send(`<html><body><script>
+        if (window.opener) { window.opener.postMessage('gcal_connected', '*'); }
+        setTimeout(() => window.close(), 500);
+      </script><p style="font-family:sans-serif;text-align:center;margin-top:80px;font-size:18px">✅ Google Calendar เชื่อมต่อสำเร็จ<br><small style="color:#888">กำลังปิดหน้าต่าง...</small></p></body></html>`);
     } catch (e: any) {
       return res.status(500).json({ error: e.message });
     }
