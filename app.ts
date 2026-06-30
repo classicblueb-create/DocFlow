@@ -1807,14 +1807,18 @@ ${highPerformersContext || 'ยังไม่มีคอนเทนต์ท�
   // -----------------------------------------------------------------
   // Health check
   // -----------------------------------------------------------------
-  app.get("/api/health", (_req, res) => {
+  app.get("/api/health", (req: any, res: any) => {
     res.json({
       status: "ok",
       ai: { provider: "OpenRouter", primaryModel: MODEL_PRIMARY, fallbackModel: MODEL_FALLBACK },
+      supabase: {
+        url: !!process.env.VITE_SUPABASE_URL,
+        key: !!process.env.VITE_SUPABASE_ANON_KEY,
+      },
       google: {
         clientId: !!process.env.GOOGLE_CLIENT_ID,
         clientSecret: !!process.env.GOOGLE_CLIENT_SECRET,
-        redirectUri: process.env.GOOGLE_REDIRECT_URI || null,
+        redirectUri: process.env.GOOGLE_REDIRECT_URI || getRedirectUri(req),
       }
     });
   });

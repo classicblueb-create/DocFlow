@@ -119,6 +119,82 @@ export function BriefingView({
   const [analysisReport, setAnalysisReport] = useState<any | null>(null);
   const [showAnalysisModal, setShowAnalysisModal] = useState(false);
 
+  // ── Auto Strategic Brand & Income Potential Analysis ──
+  const [autoAnalysis, setAutoAnalysis] = useState<{
+    potentialCategory: string;
+    whyThisPotential: string;
+    contentFocus: string;
+    brandStrategy: string;
+    recommendedActions: string[];
+  } | null>(() => {
+    try {
+      const cached = sessionStorage.getItem('modty_auto_brief_analysis');
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [isAutoAnalyzing, setIsAutoAnalyzing] = useState(false);
+
+  const runAutoAnalysis = async () => {
+    if (tasks.length === 0 || isAutoAnalyzing) return;
+    setIsAutoAnalyzing(true);
+
+    const categoriesListStr = categoryAnalysisData
+      .map(c => `- หมวดหมู่ "${c.name}": มีงานทั้งหมด ${c.count} งาน`)
+      .join('\n');
+
+    const prompt = `กรุณาวิเคราะห์สถิติจำนวนงานในแต่ละหมวดหมู่ (Categories) ดังนี้:
+${categoriesListStr}
+
+แล้ววิเคราะห์ศักยภาพแบบรอบด้านเพื่อพัฒนาแบรนด์และสร้างรายได้ให้ฉันอย่างลึกซึ้ง:
+1. หมวดหมู่ใดที่มีศักยภาพสูงสุด (Potential Category) ตามปริมาณงานและความถนัด
+2. วิเคราะห์สาเหตุความคุ้มค่า/ทำไมหมวดหมู่นี้มีศักยภาพสูงสุด (Why)
+3. ทิศทางการโฟกัสทำคอนเทนต์ (Content Focus Direction) เพื่อสร้างแบรนด์บุคคลและเพิ่มยอดติดตาม/การมองเห็น
+4. กลยุทธ์ต่อยอดแบรนด์และรายได้ (Brand & Income Strategy)
+5. 3 แอคชั่นแนะนำปฏิบัติจริงได้วันนี้ (Recommended Actions)
+
+ตอบกลับในรูปแบบ JSON ต่อไปนี้เท่านั้น (ไม่ต้องใส่ markdown tags หรือคำอธิบายอภิปรายอื่นใดนอกเหนือจาก JSON เด็ดขาด):
+{
+  "potentialCategory": "ชื่อหมวดหมู่ศักยภาพสูงสุด",
+  "whyThisPotential": "วิเคราะห์เจาะลึกว่าเพราะเหตุใดหมวดหมู่นี้ถึงสำคัญที่สุด",
+  "contentFocus": "หัวข้อหรือแนวทางผลิตคอนเทนต์ที่ต้องโฟกัสสร้างกระแสในสัปดาห์นี้",
+  "brandStrategy": "แผนระยะยาวเพื่อเปลี่ยนผู้ติดตามเป็นรายได้และยกระดับแบรนด์",
+  "recommendedActions": ["คำแนะนำปฏิบัติข้อ 1", "คำแนะนำปฏิบัติข้อ 2", "คำแนะนำปฏิบัติข้อ 3"]
+}`;
+
+    try {
+      const response = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [{ role: 'user', text: prompt }],
+          agentTitle: 'MODTY Brand & Potential Analyst',
+          agentInstructions: 'คุณคือที่ปรึกษากลยุทธ์แบรนด์ระดับโลก วิเคราะห์ศักยภาพธุรกิจและการเพิ่มรายได้จากช่องทางโซเชียลมีเดีย',
+          contextData: { tasks, categories }
+        }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        const clean = data.result.replace(/```json|```/g, '').trim();
+        const parsed = JSON.parse(clean);
+        setAutoAnalysis(parsed);
+        sessionStorage.setItem('modty_auto_brief_analysis', JSON.stringify(parsed));
+      }
+    } catch (e) {
+      console.error('[MODTY AI Analysis Error]', e);
+    } finally {
+      setIsAutoAnalyzing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!autoAnalysis && tasks.length > 0) {
+      runAutoAnalysis();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks.length, categories.length]);
+
   // ── Compile calculations ──
   const revenueData = useMemo(() => compileRevenueData(tasks), [tasks]);
   
@@ -375,6 +451,82 @@ export function BriefingView({
           <Sparkle className="w-3.5 h-3.5 text-zinc-950" /> Analyze My Business
         </button>
       </div>
+
+      {/* ── AI Brand & Business Potential Insights (Auto-loads) ── */}
+      {isAutoAnalyzing && !autoAnalysis && (
+        <div className="bg-white border border-slate-100 rounded-[24px] p-6 shadow-sm flex items-center justify-center gap-3 py-8">
+          <Loader2 className="w-5 h-5 text-indigo-600 animate-spin" />
+          <p className="text-xs font-bold text-slate-500 animate-pulse">MODTY AI กำลังวิเคราะห์ศักยภาพธุรกิจตามหมวดหมู่และกลยุทธ์คอนเทนต์...</p>
+        </div>
+      )}
+
+      {autoAnalysis && (
+        <div className="bg-gradient-to-br from-slate-900 to-zinc-950 text-white rounded-[24px] p-6 border border-zinc-800 shadow-xl relative overflow-hidden shrink-0">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/10 rounded-full blur-[80px] pointer-events-none" />
+          
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-800 pb-4 mb-5">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center">
+                <BrainCircuit className="w-4.5 h-4.5 text-indigo-400" />
+              </div>
+              <div>
+                <h2 className="text-sm font-black uppercase tracking-wider text-white">AI Brand &amp; Income Potential Analysis</h2>
+                <p className="text-[9px] text-zinc-400 font-bold mt-0.5">วิเคราะห์สถิติจำนวนงานตามหมวดหมู่เพื่อพัฒนาแบรนด์และรายได้</p>
+              </div>
+            </div>
+            <button
+              onClick={runAutoAnalysis}
+              disabled={isAutoAnalyzing}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-[10px] rounded-lg transition border border-zinc-700 disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3 h-3 ${isAutoAnalyzing ? 'animate-spin' : ''}`} />
+              อัปเดตบทวิเคราะห์
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            
+            {/* Box 1: Potential Category */}
+            <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4.5 space-y-2">
+              <div className="flex items-center gap-1.5 text-amber-400">
+                <Sparkles className="w-4 h-4" />
+                <span className="text-[10px] font-black uppercase tracking-wider">จุดเด่น / ศักยภาพสูงสุด</span>
+              </div>
+              <h3 className="text-sm font-black text-white">{autoAnalysis.potentialCategory}</h3>
+              <p className="text-xs text-zinc-400 leading-relaxed font-semibold">{autoAnalysis.whyThisPotential}</p>
+            </div>
+
+            {/* Box 2: Next Content Focus */}
+            <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4.5 space-y-2">
+              <div className="flex items-center gap-1.5 text-indigo-400">
+                <Target className="w-4 h-4" />
+                <span className="text-[10px] font-black uppercase tracking-wider">ทิศทางการทำคอนเทนต์ถัดไป</span>
+              </div>
+              <p className="text-xs text-zinc-200 leading-relaxed font-bold">{autoAnalysis.contentFocus}</p>
+              <p className="text-[11px] text-zinc-400 leading-relaxed font-semibold">{autoAnalysis.brandStrategy}</p>
+            </div>
+
+            {/* Box 3: Strategic Action Steps */}
+            <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4.5 space-y-2.5">
+              <div className="flex items-center gap-1.5 text-emerald-400">
+                <ClipboardCheck className="w-4 h-4" />
+                <span className="text-[10px] font-black uppercase tracking-wider">แนวทางปฏิบัติเพื่อเพิ่มรายได้</span>
+              </div>
+              <div className="space-y-2">
+                {autoAnalysis.recommendedActions.map((act, i) => (
+                  <div key={i} className="flex gap-2">
+                    <span className="w-5 h-5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center text-[10px] font-black shrink-0">
+                      {i + 1}
+                    </span>
+                    <span className="text-xs text-zinc-300 font-bold leading-normal">{act}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
 
       {/* Module 1: MODTY Daily Briefing / Business Snapshot */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 shrink-0">
