@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ProductRevenueWidget } from '../widgets/ProductRevenueWidget';
 import { CustomTrackerWidget } from '../widgets/CustomTrackerWidget';
 import { 
@@ -43,6 +43,20 @@ export function BriefingView({
   onConsultAgent,
   showNotification
 }: BriefingViewProps) {
+  // ── Google Calendar ──
+  const [gcalEvents, setGcalEvents] = useState<{ id: string; title: string; start: string; end: string; location?: string; htmlLink?: string; allDay?: boolean }[]>([]);
+  const [gcalConnected, setGcalConnected] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/google/events')
+      .then(r => r.json())
+      .then(data => { setGcalConnected(data.connected); setGcalEvents(data.events || []); })
+      .catch(() => {});
+  }, []);
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayMeetings = gcalEvents.filter(e => (e.start || '').startsWith(todayStr));
+
   // ── Local state for Brain Dump ──
   const [dumpInput, setDumpInput] = useState('');
   const [isClassifying, setIsClassifying] = useState(false);
@@ -340,6 +354,40 @@ export function BriefingView({
           </div>
         ))}
       </div>
+
+      {/* Google Calendar: Today's Meetings */}
+      {gcalConnected && todayMeetings.length > 0 && (
+        <div className="bg-white border border-emerald-100 rounded-[24px] p-5 flex flex-col gap-3 shadow-sm shrink-0">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="w-4 h-4 text-emerald-500" />
+            <h2 className="text-xs font-bold text-slate-900 uppercase tracking-widest">การประชุมวันนี้</h2>
+            <span className="ml-auto text-[10px] bg-emerald-50 text-emerald-600 font-bold px-2 py-0.5 rounded-full border border-emerald-100">{todayMeetings.length} รายการ</span>
+          </div>
+          <div className="flex flex-col gap-2">
+            {todayMeetings.map(ev => (
+              <a key={ev.id} href={ev.htmlLink || '#'} target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-3 p-3 rounded-xl bg-emerald-50/50 border border-emerald-100 hover:bg-emerald-50 transition-colors">
+                <div className="shrink-0 w-10 text-center">
+                  <p className="text-xs font-black text-emerald-700">{ev.allDay ? 'All' : new Date(ev.start).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}</p>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-slate-800 truncate">{ev.title}</p>
+                  {ev.location && <p className="text-[11px] text-slate-400 truncate">{ev.location}</p>}
+                </div>
+                <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+      {!gcalConnected && (
+        <div className="bg-white border border-slate-100 rounded-[24px] p-4 flex items-center gap-3 shadow-sm shrink-0">
+          <CalendarDays className="w-4 h-4 text-slate-400 shrink-0" />
+          <p className="text-xs text-slate-400 flex-1">เชื่อม Google Calendar เพื่อดูการประชุมวันนี้</p>
+          <a href="/api/google/auth" target="_blank" rel="noopener noreferrer"
+            className="text-xs font-bold text-indigo-600 hover:text-indigo-800 shrink-0 transition-colors">เชื่อมเลย →</a>
+        </div>
+      )}
 
       {/* Main Layout Area */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

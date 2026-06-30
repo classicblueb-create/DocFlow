@@ -1396,13 +1396,32 @@ ${ideasContext || 'ยังไม่มีไอเดีย'}
       fiveDaysLater.setHours(23,59,59,999);
 
       const dueSoonTasks = (tasks || []).filter((task: any) => {
-        if (!task.dueDate) return false;
+        if (!task.endDate) return false;
         if (task.status === 'เสร็จสิ้น' || task.status === 'Done') return false;
-        const dueDate = new Date(task.dueDate);
+        const dueDate = new Date(task.endDate);
         return dueDate >= today && dueDate <= fiveDaysLater;
       });
 
-      if (dueSoonTasks.length === 0) {
+      // Collect due-soon subtasks
+      interface DueSubtask { name: string; parentName: string; assignee: string; dueDate: string; }
+      const dueSoonSubtasks: DueSubtask[] = [];
+      (tasks || []).forEach((task: any) => {
+        if (!task.subtasks) return;
+        try {
+          const subs = JSON.parse(task.subtasks);
+          if (!Array.isArray(subs)) return;
+          subs.forEach((sub: any) => {
+            if (sub.status === 'done') return;
+            if (!sub.dueDate) return;
+            const d = new Date(sub.dueDate);
+            if (d >= today && d <= fiveDaysLater) {
+              dueSoonSubtasks.push({ name: sub.name, parentName: task.name, assignee: sub.assignee || task.assignee || 'ไม่มี', dueDate: sub.dueDate });
+            }
+          });
+        } catch {}
+      });
+
+      if (dueSoonTasks.length === 0 && dueSoonSubtasks.length === 0) {
         return res.json({ ok: true, message: "ไม่มีงานที่ใกล้ครบกำหนดใน 5 วัน" });
       }
 
@@ -1411,11 +1430,20 @@ ${ideasContext || 'ยังไม่มีไอเดีย'}
       dueSoonTasks.forEach((task: any) => {
         message += `✅ งาน: ${task.name}\n`;
         message += `👤 มอบหมาย: ${task.assignee || 'ไม่มี'}\n`;
-        message += `📅 กำหนดส่ง: ${task.dueDate}\n`;
+        message += `📅 กำหนดส่ง: ${task.endDate}\n`;
         message += `🏢 ลูกค้า: ${task.customer || '-'}\n`;
         message += `━━━━━━━━━━━━━━━\n`;
       });
-      message += `ส่งจาก DocFlow 🚀`;
+      if (dueSoonSubtasks.length > 0) {
+        message += `\n📋 *งานย่อยใกล้ครบกำหนด*\n━━━━━━━━━━━━━━━\n`;
+        dueSoonSubtasks.forEach((sub) => {
+          message += `↳ ${sub.name}\n`;
+          message += `   งานหลัก: ${sub.parentName}\n`;
+          message += `   มอบหมาย: ${sub.assignee}  |  กำหนด: ${sub.dueDate}\n`;
+          message += `━━━━━━━━━━━━━━━\n`;
+        });
+      }
+      message += `ส่งจาก DocFlow`;
 
       const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: "POST",
@@ -1553,20 +1581,27 @@ ${ideasContext || 'ยังไม่มีไอเดีย'}
 
     try {
       const supabase = createClient(supabaseUrl, supabaseAnonKey);
-      const [tasksRes, clientsRes, ideasRes] = await Promise.all([
+      const [tasksRes, clientsRes, ideasRes, contentPlansRes] = await Promise.all([
         supabase.from('tasks').select('*'),
         supabase.from('clients').select('*'),
-        supabase.from('ideas').select('*')
+        supabase.from('ideas').select('*'),
+        supabase.from('content_plans').select('*')
       ]);
 
       const tasks = tasksRes.data || [];
       const clients = clientsRes.data || [];
       const ideas = ideasRes.data || [];
+      const contentPlans = contentPlansRes.data || [];
+
+      const highPerformers = contentPlans.filter((p: any) => p.engagementRating === 'A+' || p.engagementRating === 'B+');
+      const publishedPlans = contentPlans.filter((p: any) => p.status === 'เผยแพร่แล้ว');
 
       // Context construction
       const tasksContext = tasks.map(t => `- งาน: ${t.name} (ลูกค้า: ${t.customer || 'ไม่มี'}, ผู้รับผิดชอบ: ${t.assignee || 'ยังไม่มอบหมาย'}, สถานะ: ${t.status}, ราคา: ${t.price || 0} บาท, กำหนดส่ง: ${t.endDate || 'ไม่มี'})`).join('\n');
       const clientsContext = clients.map(c => `- ลูกค้า: ${c.name} (เป้าหมายงบประมาณ: ${c.targetBudget || 0} บาท, ข้อมูลติดต่อ: ${c.contactInfo || 'ไม่มี'})`).join('\n');
       const ideasContext = ideas.map(i => `- ไอเดีย: ${i.title} (แนวคิด: ${i.concept || 'ไม่มี'}, แพลตฟอร์ม: ${i.platform || 'ไม่มี'})`).join('\n');
+      const highPerformersContext = highPerformers.map((p: any) => `- "${p.title}" (แพลตฟอร์ม: ${p.platform}, ระดับ: ${p.engagementRating}, วิว: ${p.viewCount || 'ไม่ระบุ'}, ไลค์: ${p.likeCount || 'ไม่ระบุ'})`).join('\n');
+      const contentSummary = `คอนเทนต์ทั้งหมด: ${publishedPlans.length} ชิ้น | เอนเกจดีมาก (A+/B+): ${highPerformers.length} ชิ้น`;
 
       const systemInstruction = `คุณคือ "Modty" ผู้ช่วย AI และนักวิเคราะห์ธุรกิจส่วนตัวที่เก่งกาจและเป็นกันเอง
 หน้าที่ของคุณคือวิเคราะห์ภาพรวมธุรกิจประจำสัปดาห์ (Weekly Business Analysis / Analyse My Business) จากข้อมูลในระบบ DocFlow และส่งรายงานเป็นภาษาไทยให้เจ้าของธุรกิจอ่านเข้าใจง่าย ได้แรงบันดาลใจ และเห็นทิศทางชัดเจน`;
@@ -1581,13 +1616,20 @@ ${clientsContext || 'ไม่มีรายชื่อลูกค้า'}
 
 [ไอเดียคอนเทนต์]
 ${ideasContext || 'ไม่มีไอเดียคอนเทนต์'}
+
+[สรุปคอนเทนต์]
+${contentSummary}
+
+[คอนเทนต์ที่เอนเกจดีมาก (B+/A+)]
+${highPerformersContext || 'ยังไม่มีคอนเทนต์ที่มีคะแนนเอนเกจสูง'}
 ---
 
 ช่วยทำการวิเคราะห์วิเคราะห์ธุรกิจประจำสัปดาห์เชิงลึก (Analyse My Business) โดยครอบคลุมหัวข้อต่อไปนี้:
 1. 📊 *ภาพรวมความคืบหน้า (Business Progress Overview):* สรุปสถานะโครงการ รายได้สะสมหรืองบประมาณรวม
 2. ⚠️ *คอขวดและจุดเสี่ยง (Bottlenecks & Risks):* ชี้จุดที่ค้างส่ง (Overdue) หรืองานที่ใช้เวลานานผิดปกติ
 3. 💡 *โอกาสและไอเดียธุรกิจใหม่ๆ (Ideas & Growth Opportunities):* เสนอแนะการนำไอเดียคอนเทนต์ที่มีอยู่ไปขยายผล หรือแนะนำแพลตฟอร์มที่ควรขยาย
-4. 🚀 *คำแนะนำและสิ่งแรกที่ต้องทำในสัปดาห์นี้ (Actionable Recommendations):* ลำดับความสำคัญสิ่งที่ควรทำทันที 3 ข้อแรก
+4. 🎬 *วิเคราะห์ทิศทางคอนเทนต์สัปดาห์นี้ (Content Direction):* จากคอนเทนต์ที่เอนเกจดี วิเคราะห์ว่าควรทำคอนเทนต์แนวไหนต่อ รูปแบบ/หัวข้อ/แพลตฟอร์มที่แนะนำ พร้อมไอเดียหัวข้อใหม่ 3 ข้อจากรูปแบบที่เคยได้ผล
+5. 🚀 *คำแนะนำและสิ่งแรกที่ต้องทำในสัปดาห์นี้ (Actionable Recommendations):* ลำดับความสำคัญสิ่งที่ควรทำทันที 3 ข้อแรก
 
 กรุณาตอบเป็นภาษาไทยจัดย่อหน้าและหัวข้อให้อ่านง่าย มีการใช้ตัวหนา/ตัวเอียง/อีโมจิ เพื่อให้อ่านง่าย สไตล์เพื่อนคุยธุรกิจอย่างเป็นกันเองและกระตือรือร้น`;
 
@@ -1624,6 +1666,135 @@ ${ideasContext || 'ไม่มีไอเดียคอนเทนต์'}
 
   app.get("/api/cron/weekly-analysis", handleWeeklyAnalysis);
   app.post("/api/cron/weekly-analysis", handleWeeklyAnalysis);
+
+  // -----------------------------------------------------------------
+  // Google Calendar OAuth
+  // -----------------------------------------------------------------
+  app.get("/api/google/auth", (_req, res) => {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI;
+    if (!clientId || !redirectUri) {
+      return res.status(503).json({ error: "GOOGLE_CLIENT_ID / GOOGLE_REDIRECT_URI ยังไม่ได้ตั้งค่า" });
+    }
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: 'https://www.googleapis.com/auth/calendar.readonly',
+      access_type: 'offline',
+      prompt: 'consent'
+    });
+    return res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
+  });
+
+  app.get("/api/google/callback", async (req: any, res: any) => {
+    const { code, error } = req.query;
+    if (error) return res.status(400).json({ error });
+    if (!code) return res.status(400).json({ error: "No code returned from Google" });
+
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI;
+    if (!clientId || !clientSecret || !redirectUri) {
+      return res.status(503).json({ error: "Google OAuth env vars missing" });
+    }
+
+    try {
+      const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ code, client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri, grant_type: 'authorization_code' })
+      });
+      const tokens = await tokenRes.json() as any;
+      if (tokens.error) return res.status(400).json(tokens);
+
+      const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+      const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+      const supabase = createClient(supabaseUrl, supabaseAnonKey);
+      await supabase.from('google_tokens').upsert({
+        id: 'default',
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+        expiry_date: tokens.expires_in ? Date.now() + tokens.expires_in * 1000 : null,
+        scope: tokens.scope,
+        token_type: tokens.token_type,
+        updated_at: new Date().toISOString()
+      });
+
+      return res.send('<html><body><script>window.close();</script><p>Google Calendar เชื่อมต่อสำเร็จ ✅ ปิดหน้าต่างนี้ได้เลย</p></body></html>');
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.get("/api/google/events", async (_req: any, res: any) => {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    if (!clientId || !clientSecret) {
+      return res.status(503).json({ error: "Google OAuth env vars missing", connected: false });
+    }
+
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+    try {
+      const { data: tokenRow } = await supabase.from('google_tokens').select('*').eq('id', 'default').single();
+      if (!tokenRow) return res.json({ connected: false, events: [] });
+
+      let accessToken = tokenRow.access_token;
+
+      // Refresh token if expired
+      if (tokenRow.expiry_date && Date.now() > tokenRow.expiry_date - 60000) {
+        const refreshRes = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, refresh_token: tokenRow.refresh_token, grant_type: 'refresh_token' })
+        });
+        const refreshed = await refreshRes.json() as any;
+        if (refreshed.access_token) {
+          accessToken = refreshed.access_token;
+          await supabase.from('google_tokens').update({
+            access_token: refreshed.access_token,
+            expiry_date: refreshed.expires_in ? Date.now() + refreshed.expires_in * 1000 : tokenRow.expiry_date,
+            updated_at: new Date().toISOString()
+          }).eq('id', 'default');
+        }
+      }
+
+      const now = new Date().toISOString();
+      const twoWeeksLater = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+      const calRes = await fetch(
+        `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${now}&timeMax=${twoWeeksLater}&singleEvents=true&orderBy=startTime&maxResults=50`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      const calData = await calRes.json() as any;
+      if (calData.error) return res.status(400).json({ error: calData.error.message, connected: true });
+
+      const events = (calData.items || []).map((e: any) => ({
+        id: e.id,
+        title: e.summary || '(ไม่มีชื่อ)',
+        start: e.start?.dateTime || e.start?.date,
+        end: e.end?.dateTime || e.end?.date,
+        location: e.location || '',
+        description: e.description || '',
+        htmlLink: e.htmlLink || '',
+        allDay: !e.start?.dateTime
+      }));
+
+      return res.json({ connected: true, events });
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.delete("/api/google/disconnect", async (_req: any, res: any) => {
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+    await supabase.from('google_tokens').delete().eq('id', 'default');
+    return res.json({ ok: true });
+  });
 
   // -----------------------------------------------------------------
   // Health check
