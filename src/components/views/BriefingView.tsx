@@ -463,9 +463,9 @@ ${categoriesListStr}
 
       {/* ── AI Brand & Business Potential Insights (Auto-loads) ── */}
       {isAutoAnalyzing && !autoAnalysis && (
-        <div className="bg-white border border-slate-100 rounded-[24px] p-6 shadow-sm flex items-center justify-center gap-3 py-8">
+        <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-[24px] p-6 flex items-center justify-center gap-3 py-8">
           <Loader2 className="w-5 h-5 text-indigo-600 animate-spin" />
-          <p className="text-xs font-bold text-slate-500 animate-pulse">MODTY AI กำลังวิเคราะห์ศักยภาพธุรกิจตามหมวดหมู่และกลยุทธ์คอนเทนต์...</p>
+          <p className="text-xs font-bold text-white/60 animate-pulse">MODTY AI กำลังวิเคราะห์ศักยภาพธุรกิจตามหมวดหมู่และกลยุทธ์คอนเทนต์...</p>
         </div>
       )}
 
@@ -546,23 +546,23 @@ ${categoriesListStr}
           { label: 'Overdue Tasks', val: `${overdueCount} งานด่วน`, color: 'rose', icon: AlertCircle, sub: 'เกินกำหนดส่งแล้ว' },
           { label: 'ค้างรับเงิน (Invoices)', val: `฿${revenueData.outstandingInvoices.toLocaleString()}`, color: 'amber', icon: Hourglass, sub: `เกินกำหนด ฿${revenueData.overdueInvoices.toLocaleString()}` }
         ].map(kpi => (
-          <div key={kpi.label} className="bg-white hover:-translate-y-0.5 border border-slate-100 shadow-sm hover:shadow-md transition-premium rounded-[20px] p-4 flex flex-col justify-between h-28 relative overflow-hidden group">
+          <div key={kpi.label} className="bg-white/10 hover:-translate-y-0.5 backdrop-blur-md border border-white/20 hover:bg-white/20 transition-premium rounded-[20px] p-4 flex flex-col justify-between h-28 relative overflow-hidden group">
             <div className="flex justify-between items-start">
-              <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">{kpi.label}</span>
+              <span className="text-[9px] text-white/50 font-bold uppercase tracking-wider">{kpi.label}</span>
               <div className={cn(
                 'w-7 h-7 rounded-lg flex items-center justify-center border shadow-sm',
-                kpi.color === 'indigo' ? 'bg-indigo-50 border-indigo-100 text-indigo-600' :
-                kpi.color === 'emerald' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' :
-                kpi.color === 'orange' ? 'bg-orange-50 border-orange-100 text-orange-600' :
-                kpi.color === 'rose' ? 'bg-rose-50 border-rose-100 text-rose-600' :
-                                       'bg-amber-50 border-amber-100 text-amber-600'
+                kpi.color === 'indigo' ? 'bg-indigo-500/20 border-indigo-500/30 text-indigo-300' :
+                kpi.color === 'emerald' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300' :
+                kpi.color === 'orange' ? 'bg-orange-500/20 border-orange-500/30 text-orange-300' :
+                kpi.color === 'rose' ? 'bg-rose-500/20 border-rose-500/30 text-rose-300' :
+                                       'bg-amber-500/20 border-amber-500/30 text-amber-300'
               )}>
                 <kpi.icon className="w-3.5 h-3.5" />
               </div>
             </div>
             <div>
-              <p className="text-lg font-black text-slate-900 leading-none mb-1 group-hover:text-indigo-600 transition-colors">{kpi.val}</p>
-              <span className="text-[9px] text-slate-400 font-semibold">{kpi.sub}</span>
+              <p className="text-lg font-black text-white leading-none mb-1 group-hover:text-indigo-600 transition-colors">{kpi.val}</p>
+              <span className="text-[9px] text-white/50 font-semibold">{kpi.sub}</span>
             </div>
           </div>
         ))}
@@ -573,34 +573,34 @@ ${categoriesListStr}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 shrink-0">
 
         {/* Google Calendar block — always visible */}
-        <div className="bg-white border border-slate-100 rounded-[24px] p-5 flex flex-col gap-3 shadow-sm">
+        <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-[24px] p-5 flex flex-col gap-3">
           <div className="flex items-center gap-2">
             <CalendarDays className="w-4 h-4 text-emerald-500" />
-            <h2 className="text-xs font-bold text-slate-900 uppercase tracking-widest">Google Calendar</h2>
+            <h2 className="text-xs font-bold text-white uppercase tracking-widest">Google Calendar</h2>
             {gcalConnected && (
-              <span className="ml-auto text-[10px] bg-emerald-50 text-emerald-600 font-bold px-2 py-0.5 rounded-full border border-emerald-100">
+              <span className="ml-auto text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-2 py-0.5 rounded-full border border-emerald-500/30">
                 {todayMeetings.length + upcomingMeetings.length} events
               </span>
             )}
             {!gcalConnected && !gcalLoading && (
               <button onClick={() => window.open('/api/google/auth', 'gcal_oauth', 'width=500,height=600,left=200,top=100')}
-                className="ml-auto text-[10px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors px-2 py-0.5 rounded-full border border-indigo-100 bg-indigo-50 cursor-pointer">
+                className="ml-auto text-[10px] font-bold text-indigo-300 hover:text-indigo-200 transition-colors px-2 py-0.5 rounded-full border border-indigo-500/30 bg-indigo-500/15 cursor-pointer">
                 เชื่อมเลย →
               </button>
             )}
           </div>
 
           {gcalLoading ? (
-            <div className="flex items-center gap-2 py-4 justify-center text-slate-400">
+            <div className="flex items-center gap-2 py-4 justify-center text-white/50">
               <Loader2 className="w-4 h-4 animate-spin" />
               <span className="text-xs font-semibold">กำลังโหลด...</span>
             </div>
           ) : !gcalConnected ? (
             <div className="py-6 text-center space-y-3">
               <CalendarDays className="w-8 h-8 text-slate-200 mx-auto" />
-              <p className="text-xs text-slate-400 font-semibold">เชื่อมต่อ Google Calendar<br />เพื่อดูตารางนัดหมายของคุณ</p>
+              <p className="text-xs text-white/50 font-semibold">เชื่อมต่อ Google Calendar<br />เพื่อดูตารางนัดหมายของคุณ</p>
               <button onClick={() => window.open('/api/google/auth', 'gcal_oauth', 'width=500,height=600,left=200,top=100')}
-                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 px-3 py-1.5 rounded-lg border border-indigo-100 bg-indigo-50 hover:bg-indigo-100 transition-colors cursor-pointer">
+                className="text-xs font-bold text-indigo-300 hover:text-indigo-200 px-3 py-1.5 rounded-lg border border-indigo-500/30 bg-indigo-500/15 hover:bg-indigo-500/25 transition-colors cursor-pointer">
                 เชื่อม Google Calendar →
               </button>
             </div>
@@ -618,8 +618,8 @@ ${categoriesListStr}
                           <p className="text-xs font-black text-emerald-700">{ev.allDay ? 'All' : new Date(ev.start).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}</p>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-slate-800 truncate">{ev.title}</p>
-                          {ev.location && <p className="text-[10px] text-slate-400 truncate">{ev.location}</p>}
+                          <p className="text-xs font-bold text-white/90 truncate">{ev.title}</p>
+                          {ev.location && <p className="text-[10px] text-white/50 truncate">{ev.location}</p>}
                         </div>
                         <ExternalLink className="w-3 h-3 text-slate-300 shrink-0" />
                       </a>
@@ -630,16 +630,16 @@ ${categoriesListStr}
               {/* Upcoming week */}
               {upcomingMeetings.length > 0 && (
                 <div>
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1.5">7 วันข้างหน้า ({upcomingMeetings.length})</p>
+                  <p className="text-[9px] font-black text-white/50 uppercase tracking-widest mb-1.5">7 วันข้างหน้า ({upcomingMeetings.length})</p>
                   <div className="flex flex-col gap-1.5">
                     {upcomingMeetings.map(ev => (
                       <a key={ev.id} href={ev.htmlLink || '#'} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 border border-slate-100 hover:bg-slate-100 transition-colors">
+                        className="flex items-center gap-3 p-2.5 rounded-xl bg-white/10 border border-white/20 hover:bg-white/15 transition-colors">
                         <div className="shrink-0 w-14 text-center">
-                          <p className="text-[10px] font-black text-slate-500">{new Date(ev.start).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}</p>
+                          <p className="text-[10px] font-black text-white/60">{new Date(ev.start).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}</p>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-slate-700 truncate">{ev.title}</p>
+                          <p className="text-xs font-bold text-white/80 truncate">{ev.title}</p>
                         </div>
                         <ExternalLink className="w-3 h-3 text-slate-300 shrink-0" />
                       </a>
@@ -648,24 +648,24 @@ ${categoriesListStr}
                 </div>
               )}
               {todayMeetings.length === 0 && upcomingMeetings.length === 0 && (
-                <div className="py-4 text-center text-xs text-slate-400 font-semibold">ไม่มีนัดหมายใน 7 วันนี้ 🎉</div>
+                <div className="py-4 text-center text-xs text-white/50 font-semibold">ไม่มีนัดหมายใน 7 วันนี้ 🎉</div>
               )}
             </div>
           )}
         </div>
 
         {/* Notion Content Plans — AI Priority */}
-        <div className="bg-white border border-slate-100 rounded-[24px] p-5 flex flex-col gap-3 shadow-sm">
+        <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-[24px] p-5 flex flex-col gap-3">
           <div className="flex items-center gap-2">
             <Video className="w-4 h-4 text-indigo-500" />
-            <h2 className="text-xs font-bold text-slate-900 uppercase tracking-widest">Content Plan Priority</h2>
+            <h2 className="text-xs font-bold text-white uppercase tracking-widest">Content Plan Priority</h2>
             <span className="ml-auto text-[10px] bg-indigo-50 text-indigo-600 font-bold px-2 py-0.5 rounded-full border border-indigo-100">
               {pendingContentPlans.length} รายการ
             </span>
             <button
               onClick={analyzeContentPriority}
               disabled={isAnalyzingContent || pendingContentPlans.length === 0}
-              className="shrink-0 w-6 h-6 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 hover:text-indigo-600 hover:border-indigo-200 transition-all disabled:opacity-40"
+              className="shrink-0 w-6 h-6 rounded-lg bg-white/10 border border-white/25 flex items-center justify-center text-white/50 hover:text-indigo-600 hover:border-indigo-200 transition-all disabled:opacity-40"
               title="วิเคราะห์ใหม่"
             >
               <RefreshCw className={`w-3 h-3 ${isAnalyzingContent ? 'animate-spin' : ''}`} />
@@ -675,13 +675,13 @@ ${categoriesListStr}
           {pendingContentPlans.length === 0 ? (
             <div className="py-6 text-center space-y-2">
               <Flame className="w-8 h-8 text-slate-200 mx-auto" />
-              <p className="text-xs text-slate-400 font-semibold">ไม่มีแผนคอนเทนต์ที่รอดำเนินการ</p>
-              <button onClick={() => onViewChange('content_plan')} className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors">
+              <p className="text-xs text-white/50 font-semibold">ไม่มีแผนคอนเทนต์ที่รอดำเนินการ</p>
+              <button onClick={() => onViewChange('content_plan')} className="text-[11px] font-bold text-indigo-300 hover:text-indigo-200 transition-colors">
                 ไปสร้างแผนใหม่ →
               </button>
             </div>
           ) : isAnalyzingContent && !contentPriority ? (
-            <div className="flex flex-col items-center justify-center py-6 gap-2 text-slate-400">
+            <div className="flex flex-col items-center justify-center py-6 gap-2 text-white/50">
               <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
               <p className="text-xs font-semibold">AI กำลังวิเคราะห์ Priority คอนเทนต์...</p>
             </div>
@@ -692,21 +692,21 @@ ${categoriesListStr}
                 <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1 flex items-center gap-1">
                   <Sparkles className="w-3 h-3" /> AI Analysis
                 </p>
-                <p className="text-xs text-slate-600 font-medium leading-relaxed">{contentPriority.summary}</p>
+                <p className="text-xs text-white/70 font-medium leading-relaxed">{contentPriority.summary}</p>
               </div>
               {/* Priority list */}
               <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto hide-scrollbar pr-1">
                 {contentPriority.priorities.slice(0, 5).map((p, i) => (
-                  <div key={i} className="flex gap-2.5 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${i === 0 ? 'bg-rose-500 text-white' : i === 1 ? 'bg-amber-400 text-white' : 'bg-slate-200 text-slate-600'}`}>
+                  <div key={i} className="flex gap-2.5 p-2.5 rounded-xl bg-white/10 border border-white/20">
+                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${i === 0 ? 'bg-rose-500 text-white' : i === 1 ? 'bg-amber-400 text-white' : 'bg-white/20 text-white/70'}`}>
                       {i + 1}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs font-bold text-slate-800 truncate">{p.title}</p>
-                      <p className="text-[10px] text-slate-500 font-medium mt-0.5 leading-relaxed line-clamp-2">{p.reason}</p>
+                      <p className="text-xs font-bold text-white/90 truncate">{p.title}</p>
+                      <p className="text-[10px] text-white/60 font-medium mt-0.5 leading-relaxed line-clamp-2">{p.reason}</p>
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-[9px] font-bold bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded border border-indigo-100">{p.platform}</span>
-                        <span className="text-[9px] font-bold bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">{p.status}</span>
+                        <span className="text-[9px] font-bold bg-white/15 text-white/60 px-1.5 py-0.5 rounded">{p.status}</span>
                       </div>
                     </div>
                   </div>
@@ -719,7 +719,7 @@ ${categoriesListStr}
               </div>
               <button
                 onClick={() => onViewChange('content_plan')}
-                className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors text-right"
+                className="text-[11px] font-bold text-indigo-300 hover:text-indigo-200 transition-colors text-right"
               >
                 ดูแผนทั้งหมด ({pendingContentPlans.length}) →
               </button>
@@ -728,10 +728,10 @@ ${categoriesListStr}
             /* Pending plans list when no AI analysis yet */
             <div className="flex flex-col gap-1.5 max-h-[250px] overflow-y-auto hide-scrollbar">
               {pendingContentPlans.slice(0, 6).map(p => (
-                <div key={p.id} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                <div key={p.id} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white/10 border border-white/20">
                   <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${p.status === 'กำลังผลิต' ? 'bg-amber-400' : p.status === 'กำหนดลง' ? 'bg-blue-400' : 'bg-slate-300'}`} />
-                  <p className="text-xs text-slate-700 font-semibold flex-1 truncate">{p.title}</p>
-                  <span className="text-[9px] font-bold text-slate-400 shrink-0">{p.platform}</span>
+                  <p className="text-xs text-white/80 font-semibold flex-1 truncate">{p.title}</p>
+                  <span className="text-[9px] font-bold text-white/50 shrink-0">{p.platform}</span>
                 </div>
               ))}
             </div>
@@ -747,15 +747,15 @@ ${categoriesListStr}
         <div className="lg:col-span-2 flex flex-col gap-6">
           
           {/* Priorities Section (Priority Engine) */}
-          <div className="bg-white border border-slate-100 rounded-[24px] p-6 flex flex-col gap-4 shadow-sm">
+          <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-[24px] p-6 flex flex-col gap-4">
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-2">
                 <ListTodo className="w-5 h-5 text-indigo-600" />
-                <h2 className="text-xs font-bold text-slate-900 uppercase tracking-widest">Today's Priorities</h2>
+                <h2 className="text-xs font-bold text-white uppercase tracking-widest">Today's Priorities</h2>
               </div>
               <button 
                 onClick={() => onViewChange('board')}
-                className="text-[10px] font-bold text-slate-400 hover:text-indigo-600 flex items-center gap-0.5 transition-colors cursor-pointer"
+                className="text-[10px] font-bold text-white/50 hover:text-indigo-600 flex items-center gap-0.5 transition-colors cursor-pointer"
               >
                 ดูทั้งหมด <ChevronRight className="w-3 h-3" />
               </button>
@@ -769,26 +769,26 @@ ${categoriesListStr}
                 </div>
                 <div className="space-y-1 min-w-0 flex-1">
                   <span className="text-[9px] bg-indigo-600 text-white font-black px-2 py-0.5 rounded-full uppercase tracking-wider">Focus Target</span>
-                  <h3 className="font-extrabold text-sm text-slate-800 leading-snug truncate">{topPriorityTask.name}</h3>
+                  <h3 className="font-extrabold text-sm text-white/90 leading-snug truncate">{topPriorityTask.name}</h3>
                   <div className="flex items-center gap-2 mt-2">
                     <span className="text-[10px] text-indigo-500 font-semibold uppercase tracking-wider">วิเคราะห์ความคุ้มค่า:</span>
-                    <p className="text-xs text-slate-600 font-medium leading-relaxed italic">"{topPriorityTask.prioReason}"</p>
+                    <p className="text-xs text-white/70 font-medium leading-relaxed italic">"{topPriorityTask.prioReason}"</p>
                   </div>
                 </div>
-                <div className="flex flex-col items-center justify-center shrink-0 bg-white border border-slate-100 rounded-xl px-2.5 py-1">
-                  <span className="text-[9px] text-slate-400 font-bold uppercase">Priority</span>
+                <div className="flex flex-col items-center justify-center shrink-0 bg-white/10 border border-white/20 rounded-xl px-2.5 py-1">
+                  <span className="text-[9px] text-white/50 font-bold uppercase">Priority</span>
                   <span className="text-base font-black text-indigo-600">{topPriorityTask.prioScore}</span>
                 </div>
               </div>
             ) : (
-              <div className="border border-slate-100 rounded-[18px] p-8 text-center text-slate-400 font-semibold text-xs">
+              <div className="border border-white/20 rounded-[18px] p-8 text-center text-white/50 font-semibold text-xs">
                 ไม่มีเป้าหมายงานค้างให้ประเมิน จัดลำดับ Priority ว่างเปล่า
               </div>
             )}
 
             {/* Top 3 Prioritized Tasks List */}
             {prioritizedTasks.length > 0 && (
-              <div className="divide-y divide-slate-100 border-t border-slate-100">
+              <div className="divide-y divide-slate-100 border-t border-white/20">
                 {prioritizedTasks.slice(0, 3).map(task => (
                   <div key={task.id} className="py-3 flex items-center justify-between gap-3 group">
                     <div className="flex items-center gap-3 min-w-0">
@@ -801,12 +801,12 @@ ${categoriesListStr}
                       </button>
                       <button 
                         onClick={() => onTaskClick(task)}
-                        className="text-left font-bold text-xs text-slate-700 hover:text-indigo-600 transition-colors truncate"
+                        className="text-left font-bold text-xs text-white/80 hover:text-indigo-600 transition-colors truncate"
                       >
                         {task.name}
                       </button>
                       {task.customer && (
-                        <span className="text-[10px] bg-slate-50 text-slate-400 font-semibold px-2 py-0.5 rounded border border-slate-100 truncate max-w-[120px]">
+                        <span className="text-[10px] bg-white/10 text-white/50 font-semibold px-2 py-0.5 rounded border border-white/20 truncate max-w-[120px]">
                           {task.customer}
                         </span>
                       )}
@@ -816,12 +816,12 @@ ${categoriesListStr}
                       {task.endDate && (
                         <span className={cn(
                           'text-[10px] font-semibold',
-                          task.endDate < new Date().toISOString().split('T')[0] ? 'text-rose-600' : 'text-slate-400'
+                          task.endDate < new Date().toISOString().split('T')[0] ? 'text-rose-600' : 'text-white/50'
                         )}>
                           {task.endDate}
                         </span>
                       )}
-                      <span className="w-10 text-right text-xs font-black text-slate-900 bg-slate-50 border border-slate-100 rounded-md px-1.5 py-0.5">{task.prioScore}</span>
+                      <span className="w-10 text-right text-xs font-black text-white bg-white/10 border border-white/20 rounded-md px-1.5 py-0.5">{task.prioScore}</span>
                     </div>
                   </div>
                 ))}
@@ -830,10 +830,10 @@ ${categoriesListStr}
           </div>
 
           {/* Module 5: Team Task Summary */}
-          <div className="bg-white border border-slate-100 rounded-[24px] p-6 flex flex-col gap-4 shadow-sm">
+          <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-[24px] p-6 flex flex-col gap-4">
             <div className="flex items-center gap-2">
               <UserCircle2 className="w-5 h-5 text-violet-500" />
-              <h2 className="text-xs font-bold text-slate-900 uppercase tracking-widest">Team Overview</h2>
+              <h2 className="text-xs font-bold text-white uppercase tracking-widest">Team Overview</h2>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -843,18 +843,18 @@ ${categoriesListStr}
                 const completedCount = fanDone.length + fanSubDone.length;
                 const urgent = fanTasks.filter(t => t.priority === 'ด่วน (Urgent)' || t.priority === 'สูง (High)');
                 return (
-                  <div className="rounded-[18px] bg-slate-50/50 border border-slate-100 p-5 flex flex-col gap-3">
+                  <div className="rounded-[18px] bg-white/5 border border-white/20 p-5 flex flex-col gap-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-black">F</div>
                         <div>
-                          <p className="text-sm font-black text-slate-800">Fan</p>
+                          <p className="text-sm font-black text-white/90">Fan</p>
                           <p className="text-[10px] text-indigo-500 font-bold uppercase tracking-wider">Admin</p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-xl font-black text-slate-800">{activeCount}</p>
-                        <p className="text-[9px] text-slate-400">งานค้าง ({fanTasks.length} หลัก / {fanSubtasks.length} ซับ)</p>
+                        <p className="text-xl font-black text-white/90">{activeCount}</p>
+                        <p className="text-[9px] text-white/50">งานค้าง ({fanTasks.length} หลัก / {fanSubtasks.length} ซับ)</p>
                       </div>
                     </div>
                     {urgent.length > 0 && (
@@ -867,13 +867,13 @@ ${categoriesListStr}
                       </div>
                     )}
                     <div className="flex flex-col gap-1 max-h-32 overflow-y-auto pr-1">
-                      {activeCount === 0 && <p className="text-[11px] text-slate-400 text-center py-2 font-medium">ไม่มีงานค้าง</p>}
+                      {activeCount === 0 && <p className="text-[11px] text-white/50 text-center py-2 font-medium">ไม่มีงานค้าง</p>}
                       
                       {/* Parent Tasks */}
                       {fanTasks.map(t => (
                         <div key={String(t.id)} className="flex items-center gap-2">
                           <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', t.priority === 'ด่วน (Urgent)' ? 'bg-rose-500' : t.priority === 'สูง (High)' ? 'bg-orange-400' : 'bg-slate-300')} />
-                          <p className="text-[11px] text-slate-600 truncate flex-1 font-semibold">{t.name}</p>
+                          <p className="text-[11px] text-white/70 truncate flex-1 font-semibold">{t.name}</p>
                           <span className="text-[9px] text-indigo-500 shrink-0 font-bold uppercase tracking-wider">งานหลัก ({t.status})</span>
                         </div>
                       ))}
@@ -882,16 +882,16 @@ ${categoriesListStr}
                       {fanSubtasks.map(({ sub, parentName }) => (
                         <div key={String(sub.id)} className="flex items-center gap-2 pl-3 border-l-2 border-indigo-200">
                           <span className="w-1 h-1 rounded-full shrink-0 bg-indigo-400" />
-                          <p className="text-[11px] text-slate-600 truncate flex-1 font-medium">
-                            <span className="text-slate-400 font-normal mr-1">[ซับ]</span>
-                            {sub.name} <span className="text-[9px] text-slate-400 font-normal">({parentName})</span>
+                          <p className="text-[11px] text-white/70 truncate flex-1 font-medium">
+                            <span className="text-white/50 font-normal mr-1">[ซับ]</span>
+                            {sub.name} <span className="text-[9px] text-white/50 font-normal">({parentName})</span>
                           </p>
-                          <span className="text-[9px] text-slate-400 shrink-0 font-bold uppercase tracking-wider">{sub.status}</span>
+                          <span className="text-[9px] text-white/50 shrink-0 font-bold uppercase tracking-wider">{sub.status}</span>
                         </div>
                       ))}
                     </div>
-                    <div className="flex items-center justify-between pt-2.5 border-t border-slate-100">
-                      <span className="text-[10px] text-slate-400">เสร็จแล้ว</span>
+                    <div className="flex items-center justify-between pt-2.5 border-t border-white/20">
+                      <span className="text-[10px] text-white/50">เสร็จแล้ว</span>
                       <span className="text-[11px] font-black text-emerald-600">{completedCount} ({fanDone.length} หลัก / {fanSubDone.length} ซับ)</span>
                     </div>
                   </div>
@@ -904,18 +904,18 @@ ${categoriesListStr}
                 const completedCount = modDone.length + modSubDone.length;
                 const urgent = modTasks.filter(t => t.priority === 'ด่วน (Urgent)' || t.priority === 'สูง (High)');
                 return (
-                  <div className="rounded-[18px] bg-slate-50/50 border border-slate-100 p-5 flex flex-col gap-3">
+                  <div className="rounded-[18px] bg-white/5 border border-white/20 p-5 flex flex-col gap-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full bg-zinc-900 flex items-center justify-center text-white text-xs font-black">M</div>
                         <div>
-                          <p className="text-sm font-black text-slate-800">Mod</p>
+                          <p className="text-sm font-black text-white/90">Mod</p>
                           <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">Owner</p>
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-xl font-black text-slate-800">{activeCount}</p>
-                        <p className="text-[9px] text-slate-400">งานค้าง ({modTasks.length} หลัก / {modSubtasks.length} ซับ)</p>
+                        <p className="text-xl font-black text-white/90">{activeCount}</p>
+                        <p className="text-[9px] text-white/50">งานค้าง ({modTasks.length} หลัก / {modSubtasks.length} ซับ)</p>
                       </div>
                     </div>
                     {urgent.length > 0 && (
@@ -928,13 +928,13 @@ ${categoriesListStr}
                       </div>
                     )}
                     <div className="flex flex-col gap-1 max-h-32 overflow-y-auto pr-1">
-                      {activeCount === 0 && <p className="text-[11px] text-slate-400 text-center py-2 font-medium">ไม่มีงานค้าง</p>}
+                      {activeCount === 0 && <p className="text-[11px] text-white/50 text-center py-2 font-medium">ไม่มีงานค้าง</p>}
                       
                       {/* Parent Tasks */}
                       {modTasks.map(t => (
                         <div key={String(t.id)} className="flex items-center gap-2">
                           <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', t.priority === 'ด่วน (Urgent)' ? 'bg-rose-500' : t.priority === 'สูง (High)' ? 'bg-orange-400' : 'bg-slate-300')} />
-                          <p className="text-[11px] text-slate-600 truncate flex-1 font-semibold">{t.name}</p>
+                          <p className="text-[11px] text-white/70 truncate flex-1 font-semibold">{t.name}</p>
                           <span className="text-[9px] text-emerald-600 shrink-0 font-bold uppercase tracking-wider">งานหลัก ({t.status})</span>
                         </div>
                       ))}
@@ -943,16 +943,16 @@ ${categoriesListStr}
                       {modSubtasks.map(({ sub, parentName }) => (
                         <div key={String(sub.id)} className="flex items-center gap-2 pl-3 border-l-2 border-emerald-100">
                           <span className="w-1 h-1 rounded-full shrink-0 bg-emerald-400" />
-                          <p className="text-[11px] text-slate-600 truncate flex-1 font-medium">
-                            <span className="text-slate-400 font-normal mr-1">[ซับ]</span>
-                            {sub.name} <span className="text-[9px] text-slate-400 font-normal">({parentName})</span>
+                          <p className="text-[11px] text-white/70 truncate flex-1 font-medium">
+                            <span className="text-white/50 font-normal mr-1">[ซับ]</span>
+                            {sub.name} <span className="text-[9px] text-white/50 font-normal">({parentName})</span>
                           </p>
-                          <span className="text-[9px] text-slate-400 shrink-0 font-bold uppercase tracking-wider">{sub.status}</span>
+                          <span className="text-[9px] text-white/50 shrink-0 font-bold uppercase tracking-wider">{sub.status}</span>
                         </div>
                       ))}
                     </div>
-                    <div className="flex items-center justify-between pt-2.5 border-t border-slate-100">
-                      <span className="text-[10px] text-slate-400">เสร็จแล้ว</span>
+                    <div className="flex items-center justify-between pt-2.5 border-t border-white/20">
+                      <span className="text-[10px] text-white/50">เสร็จแล้ว</span>
                       <span className="text-[11px] font-black text-emerald-600">{completedCount} ({modDone.length} หลัก / {modSubDone.length} ซับ)</span>
                     </div>
                   </div>
@@ -962,74 +962,74 @@ ${categoriesListStr}
           </div>
 
           {/* Module 6: Revenue Command Center */}
-          <div className="bg-white border border-slate-100 rounded-[24px] p-6 flex flex-col gap-5 shadow-sm">
-            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
+          <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-[24px] p-6 flex flex-col gap-5">
+            <div className="flex justify-between items-center border-b border-white/20 pb-3">
               <div className="flex items-center gap-2">
                 <Wallet className="w-5 h-5 text-indigo-600" />
-                <h2 className="text-xs font-bold text-slate-900 uppercase tracking-widest">Revenue Command Center</h2>
+                <h2 className="text-xs font-bold text-white uppercase tracking-widest">Revenue Command Center</h2>
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               
               {/* Box A: Revenue Overview */}
-              <div className="bg-slate-50/50 border border-slate-100 rounded-2xl p-4.5 space-y-3">
-                <h3 className="text-[9px] text-slate-400 font-black uppercase tracking-wider flex items-center gap-1.5">
+              <div className="bg-white/5 border border-white/20 rounded-2xl p-4.5 space-y-3">
+                <h3 className="text-[9px] text-white/50 font-black uppercase tracking-wider flex items-center gap-1.5">
                   <DollarSign className="w-3.5 h-3.5 text-indigo-500" /> Revenue Overview
                 </h3>
-                <div className="space-y-2.5 text-xs text-slate-700">
+                <div className="space-y-2.5 text-xs text-white/80">
                   <div className="flex justify-between">
-                    <span className="font-semibold text-slate-400">Monthly</span>
-                    <span className="font-black text-slate-800">฿{revenueData.monthly.toLocaleString()}</span>
+                    <span className="font-semibold text-white/50">Monthly</span>
+                    <span className="font-black text-white/90">฿{revenueData.monthly.toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between border-t border-slate-200/50 pt-2">
-                    <span className="font-semibold text-slate-400">Quarterly</span>
-                    <span className="font-black text-slate-800">฿{revenueData.quarterly.toLocaleString()}</span>
+                  <div className="flex justify-between border-t border-white/25/50 pt-2">
+                    <span className="font-semibold text-white/50">Quarterly</span>
+                    <span className="font-black text-white/90">฿{revenueData.quarterly.toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between border-t border-slate-200/50 pt-2">
-                    <span className="font-semibold text-slate-400">Annual</span>
-                    <span className="font-black text-slate-800">฿{revenueData.annual.toLocaleString()}</span>
+                  <div className="flex justify-between border-t border-white/25/50 pt-2">
+                    <span className="font-semibold text-white/50">Annual</span>
+                    <span className="font-black text-white/90">฿{revenueData.annual.toLocaleString()}</span>
                   </div>
                 </div>
               </div>
 
               {/* Box B: Sales Pipeline */}
-              <div className="bg-slate-50/50 border border-slate-100 rounded-2xl p-4.5 space-y-3">
-                <h3 className="text-[9px] text-slate-400 font-black uppercase tracking-wider flex items-center gap-1.5">
+              <div className="bg-white/5 border border-white/20 rounded-2xl p-4.5 space-y-3">
+                <h3 className="text-[9px] text-white/50 font-black uppercase tracking-wider flex items-center gap-1.5">
                   <TrendingUp className="w-3.5 h-3.5 text-emerald-500" /> Sales Pipeline
                 </h3>
-                <div className="space-y-2.5 text-xs text-slate-700">
+                <div className="space-y-2.5 text-xs text-white/80">
                   <div className="flex justify-between">
-                    <span className="font-semibold text-slate-400">Potential Val</span>
-                    <span className="font-black text-slate-800">฿{revenueData.pipelinePotential.toLocaleString()}</span>
+                    <span className="font-semibold text-white/50">Potential Val</span>
+                    <span className="font-black text-white/90">฿{revenueData.pipelinePotential.toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between border-t border-slate-200/50 pt-2">
-                    <span className="font-semibold text-slate-400">Open Quotations</span>
-                    <span className="font-black text-slate-800">{revenueData.openQuotations} ใบ</span>
+                  <div className="flex justify-between border-t border-white/25/50 pt-2">
+                    <span className="font-semibold text-white/50">Open Quotations</span>
+                    <span className="font-black text-white/90">{revenueData.openQuotations} ใบ</span>
                   </div>
-                  <div className="flex justify-between border-t border-slate-200/50 pt-2">
-                    <span className="font-semibold text-slate-400">Pending Deals</span>
-                    <span className="font-black text-slate-800">{revenueData.pendingDeals} ดีล</span>
+                  <div className="flex justify-between border-t border-white/25/50 pt-2">
+                    <span className="font-semibold text-white/50">Pending Deals</span>
+                    <span className="font-black text-white/90">{revenueData.pendingDeals} ดีล</span>
                   </div>
                 </div>
               </div>
 
               {/* Box C: Cash Flow */}
-              <div className="bg-slate-50/50 border border-slate-100 rounded-2xl p-4.5 space-y-3">
-                <h3 className="text-[9px] text-slate-400 font-black uppercase tracking-wider flex items-center gap-1.5">
+              <div className="bg-white/5 border border-white/20 rounded-2xl p-4.5 space-y-3">
+                <h3 className="text-[9px] text-white/50 font-black uppercase tracking-wider flex items-center gap-1.5">
                   <Hourglass className="w-3.5 h-3.5 text-amber-500" /> Cash Flow
                 </h3>
-                <div className="space-y-2.5 text-xs text-slate-700">
+                <div className="space-y-2.5 text-xs text-white/80">
                   <div className="flex justify-between">
-                    <span className="font-semibold text-slate-400">Paid Invoices</span>
+                    <span className="font-semibold text-white/50">Paid Invoices</span>
                     <span className="font-black text-emerald-600">฿{revenueData.paidInvoices.toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between border-t border-slate-200/50 pt-2">
-                    <span className="font-semibold text-slate-400">Outstanding</span>
+                  <div className="flex justify-between border-t border-white/25/50 pt-2">
+                    <span className="font-semibold text-white/50">Outstanding</span>
                     <span className="font-black text-amber-600">฿{revenueData.outstandingInvoices.toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between border-t border-slate-200/50 pt-2">
-                    <span className="font-semibold text-slate-400">Overdue Invoices</span>
+                  <div className="flex justify-between border-t border-white/25/50 pt-2">
+                    <span className="font-semibold text-white/50">Overdue Invoices</span>
                     <span className="font-black text-rose-600">฿{revenueData.overdueInvoices.toLocaleString()}</span>
                   </div>
                 </div>
@@ -1056,27 +1056,27 @@ ${categoriesListStr}
             const healthColor = winRate > 50 ? 'bg-emerald-500' : winRate >= 20 ? 'bg-amber-500' : 'bg-rose-500';
             const healthLabel = winRate > 50 ? 'Healthy' : winRate >= 20 ? 'Needs Attention' : 'At Risk';
             return (
-              <div className="bg-white border border-slate-100 rounded-[24px] p-6 flex flex-col gap-4 shadow-sm">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-[24px] p-6 flex flex-col gap-4">
+                <div className="flex items-center justify-between border-b border-white/20 pb-3">
                   <div className="flex items-center gap-2">
                     <TrendingUp className="w-5 h-5 text-emerald-600" />
-                    <h2 className="text-xs font-bold text-slate-900 uppercase tracking-widest">Sales Pipeline Health</h2>
+                    <h2 className="text-xs font-bold text-white uppercase tracking-widest">Sales Pipeline Health</h2>
                   </div>
                   <span className={`text-[10px] font-black px-2.5 py-1 rounded-full text-white ${healthColor}`}>{healthLabel}</span>
                 </div>
                 <div className="space-y-2">
                   {byStage.filter(d => d.count > 0).map(d => (
                     <div key={d.stage} className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-slate-500 capitalize w-28">{d.stage}</span>
-                      <span className="font-bold text-slate-700">{d.count} ดีล</span>
-                      <span className="font-bold text-slate-700">฿{d.value.toLocaleString()}</span>
+                      <span className="font-semibold text-white/60 capitalize w-28">{d.stage}</span>
+                      <span className="font-bold text-white/80">{d.count} ดีล</span>
+                      <span className="font-bold text-white/80">฿{d.value.toLocaleString()}</span>
                     </div>
                   ))}
                 </div>
-                <div className="border-t border-slate-100 pt-3 space-y-1.5 text-xs text-slate-600">
-                  <div className="flex justify-between"><span className="text-slate-400 font-semibold">Total Pipeline Value</span><span className="font-black text-slate-800">฿{totalValue.toLocaleString()}</span></div>
-                  <div className="flex justify-between"><span className="text-slate-400 font-semibold">Win Rate</span><span className="font-black text-slate-800">{winRate}%</span></div>
-                  {biggest && <div className="flex justify-between"><span className="text-slate-400 font-semibold">Biggest Deal</span><span className="font-black text-slate-800 truncate max-w-[150px]">{biggest.name}</span></div>}
+                <div className="border-t border-white/20 pt-3 space-y-1.5 text-xs text-white/70">
+                  <div className="flex justify-between"><span className="text-white/50 font-semibold">Total Pipeline Value</span><span className="font-black text-white/90">฿{totalValue.toLocaleString()}</span></div>
+                  <div className="flex justify-between"><span className="text-white/50 font-semibold">Win Rate</span><span className="font-black text-white/90">{winRate}%</span></div>
+                  {biggest && <div className="flex justify-between"><span className="text-white/50 font-semibold">Biggest Deal</span><span className="font-black text-white/90 truncate max-w-[150px]">{biggest.name}</span></div>}
                 </div>
               </div>
             );
@@ -1088,14 +1088,14 @@ ${categoriesListStr}
         <div className="flex flex-col gap-6">
 
           {/* Module 8: Brain Dump Inbox */}
-          <div className="bg-white border border-slate-100 rounded-[24px] p-6 flex flex-col gap-4 relative overflow-hidden shadow-sm">
+          <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-[24px] p-6 flex flex-col gap-4 relative overflow-hidden">
             
             <div className="flex items-center gap-2">
               <BrainCircuit className="w-5 h-5 text-indigo-600" />
-              <h2 className="text-xs font-bold text-slate-900 uppercase tracking-widest">Brain Dump Inbox</h2>
+              <h2 className="text-xs font-bold text-white uppercase tracking-widest">Brain Dump Inbox</h2>
             </div>
             
-            <p className="text-[11px] text-slate-400 font-semibold leading-relaxed">
+            <p className="text-[11px] text-white/50 font-semibold leading-relaxed">
               โยนความคิด ไอเดีย หรือภารกิจด่วนลงในกล่องนี้ เพื่อให้ระบบ AI ทำการประเมินความสำคัญ คัดแยกประเภท และจดบันทึกเข้าระบบทันที
             </p>
 
@@ -1106,12 +1106,12 @@ ${categoriesListStr}
                 placeholder="เช่น: สร้าง AI Agent สำหรับร้านอาหาร"
                 rows={3}
                 required
-                className="w-full px-4 py-3 text-xs border border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 rounded-2xl outline-none resize-none transition bg-white text-slate-800 placeholder-slate-400 font-medium"
+                className="w-full px-4 py-3 text-xs border border-white/25 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30 rounded-2xl outline-none resize-none transition bg-white/10 text-white placeholder-white/40 font-medium"
               />
               <button
                 type="submit"
                 disabled={isClassifying || !dumpInput.trim()}
-                className="w-full flex items-center justify-center gap-2 bg-zinc-950 text-white hover:bg-zinc-850 disabled:bg-slate-200 disabled:text-slate-400 disabled:border-slate-200 font-bold text-xs py-3 rounded-xl transition-all cursor-pointer disabled:cursor-not-allowed"
+                className="w-full flex items-center justify-center gap-2 bg-zinc-950 text-white hover:bg-zinc-850 disabled:bg-white/20 disabled:text-white/50 disabled:border-white/25 font-bold text-xs py-3 rounded-xl transition-all cursor-pointer disabled:cursor-not-allowed"
               >
                 {isClassifying ? (
                   <>
@@ -1146,22 +1146,22 @@ ${categoriesListStr}
           </div>
 
           {/* Module 3: Project Health Score */}
-          <div className="bg-white border border-slate-100 rounded-[24px] p-6 flex flex-col gap-4 shadow-sm">
+          <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-[24px] p-6 flex flex-col gap-4">
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-2">
                 <ShieldAlert className="w-5 h-5 text-indigo-600" />
-                <h2 className="text-xs font-bold text-slate-900 uppercase tracking-widest">Project Health Status</h2>
+                <h2 className="text-xs font-bold text-white uppercase tracking-widest">Project Health Status</h2>
               </div>
             </div>
 
             <div className="space-y-4 max-h-[350px] overflow-y-auto hide-scrollbar">
               {projectHealths.length > 0 ? (
                 projectHealths.map(proj => (
-                  <div key={proj.id} className="bg-slate-50/30 border border-slate-100 rounded-2xl p-4 space-y-2.5">
+                  <div key={proj.id} className="bg-white/10/30 border border-white/20 rounded-2xl p-4 space-y-2.5">
                     <div className="flex justify-between items-start gap-2">
                       <button 
                         onClick={() => onTaskClick(proj)}
-                        className="text-xs font-extrabold text-slate-800 hover:text-indigo-600 transition-colors text-left truncate flex-1"
+                        className="text-xs font-extrabold text-white/90 hover:text-indigo-600 transition-colors text-left truncate flex-1"
                       >
                         {proj.name}
                       </button>
@@ -1178,7 +1178,7 @@ ${categoriesListStr}
 
                     {/* Progress Bar & Health score */}
                     <div className="space-y-1">
-                      <div className="flex justify-between text-[9px] text-slate-400 font-bold">
+                      <div className="flex justify-between text-[9px] text-white/50 font-bold">
                         <span>สุขภาพโครงการ</span>
                         <span className={cn(
                           'font-black',
@@ -1186,7 +1186,7 @@ ${categoriesListStr}
                           proj.healthStatus === 'Warning' ? 'text-amber-600' : 'text-indigo-600'
                         )}>{proj.healthScore} / 100</span>
                       </div>
-                      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-1.5 bg-white/15 rounded-full overflow-hidden">
                         <div 
                            className={cn(
                              'h-full rounded-full transition-all duration-500',
@@ -1201,13 +1201,13 @@ ${categoriesListStr}
                     </div>
 
                     {/* Health explanation */}
-                    <div className="text-[10px] text-slate-500 leading-relaxed font-semibold italic">
+                    <div className="text-[10px] text-white/60 leading-relaxed font-semibold italic">
                       • {proj.healthReasons[0]}
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="bg-slate-50 border border-slate-100 rounded-2xl p-8 text-center text-slate-400 font-semibold text-xs">
+                <div className="bg-white/10 border border-white/20 rounded-2xl p-8 text-center text-white/50 font-semibold text-xs">
                   ไม่มีโครงการที่กำลังดำเนินการอยู่ขณะนี้
                 </div>
               )}
@@ -1215,26 +1215,26 @@ ${categoriesListStr}
           </div>
 
           {/* Recent Activities Feed */}
-          <div className="bg-white border border-slate-100 rounded-[24px] p-6 flex flex-col gap-4 shadow-sm">
+          <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-[24px] p-6 flex flex-col gap-4">
             <div className="flex items-center gap-2">
               <CalendarDays className="w-5 h-5 text-indigo-600" />
-              <h2 className="text-xs font-bold text-slate-900 uppercase tracking-widest">Recent Activities</h2>
+              <h2 className="text-xs font-bold text-white uppercase tracking-widest">Recent Activities</h2>
             </div>
 
             <div className="space-y-3">
               {tasks.slice(0, 4).map((task, idx) => (
                 <div key={task.id} className="flex gap-3 text-xs leading-relaxed group">
                   <div className="flex flex-col items-center shrink-0">
-                    <div className="w-6 h-6 rounded-full bg-slate-50 border border-slate-150 text-slate-500 flex items-center justify-center text-[10px] font-bold">
+                    <div className="w-6 h-6 rounded-full bg-white/10 border border-slate-150 text-white/60 flex items-center justify-center text-[10px] font-bold">
                       {idx + 1}
                     </div>
                     {idx < 3 && <div className="w-[1px] h-full bg-slate-150 mt-1" />}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-slate-700 group-hover:text-indigo-600 transition-colors">
+                    <p className="font-semibold text-white/80 group-hover:text-indigo-600 transition-colors">
                       อัปเดตงาน: <b>{task.name}</b>
                     </p>
-                    <span className="text-[9px] text-slate-400 font-bold block">
+                    <span className="text-[9px] text-white/50 font-bold block">
                       {task.updatedAt ? new Date(task.updatedAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : 'เมื่อเร็วๆ นี้'} · สถานะ: {task.status}
                     </span>
                   </div>
@@ -1250,33 +1250,33 @@ ${categoriesListStr}
       {/* Module 7: MODTY Business Analysis Modal */}
       {showAnalysisModal && (
         <div className="fixed inset-0 bg-black/20 z-[95] flex items-center justify-center backdrop-blur-sm p-4 animate-fade-in">
-          <div className="glass-modal border border-slate-100 rounded-[28px] max-w-2xl w-full p-6 md:p-8 shadow-2xl flex flex-col max-h-[85vh] relative overflow-hidden">
+          <div className="glass-modal border border-white/20 rounded-[28px] max-w-2xl w-full p-6 md:p-8 shadow-2xl flex flex-col max-h-[85vh] relative overflow-hidden">
             <div className="absolute top-0 right-0 w-48 h-48 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none" />
             
-            <div className="flex justify-between items-center border-b border-slate-100 pb-4 shrink-0">
+            <div className="flex justify-between items-center border-b border-white/20 pb-4 shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-md">
                   <Sparkles className="w-5 h-5 text-amber-300" />
                 </div>
                 <div>
-                  <h2 className="text-base font-black text-slate-800">MODTY Business Intelligent report</h2>
+                  <h2 className="text-base font-black text-white/90">MODTY Business Intelligent report</h2>
                   <p className="text-[10px] text-indigo-500 font-bold uppercase tracking-wider">AI Chief of Staff Advisor</p>
                 </div>
               </div>
               <button 
                 onClick={() => { setShowAnalysisModal(false); setAnalysisReport(null); }}
-                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 cursor-pointer transition-colors"
+                className="p-1.5 rounded-lg hover:bg-white/15 text-white/50 cursor-pointer transition-colors"
               >
                 ×
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto py-5 space-y-6 hide-scrollbar text-sm text-slate-700">
+            <div className="flex-1 overflow-y-auto py-5 space-y-6 hide-scrollbar text-sm text-white/80">
               {isAnalyzing || !analysisReport ? (
                 <div className="flex flex-col items-center justify-center py-20 gap-4">
                   <Loader2 className="w-12 h-12 text-indigo-600 animate-spin" />
-                  <p className="font-extrabold text-sm text-slate-800 animate-pulse">MODTY AI กำลังวิเคราะห์สถานการณ์ธุรกิจของคุณอย่างละเอียด...</p>
-                  <p className="text-xs text-slate-400 font-medium">กระบวนการนี้อาจใช้เวลาประมวลผลประมาณ 5-10 วินาทีค่ะ</p>
+                  <p className="font-extrabold text-sm text-white/90 animate-pulse">MODTY AI กำลังวิเคราะห์สถานการณ์ธุรกิจของคุณอย่างละเอียด...</p>
+                  <p className="text-xs text-white/50 font-medium">กระบวนการนี้อาจใช้เวลาประมวลผลประมาณ 5-10 วินาทีค่ะ</p>
                 </div>
               ) : (
                 <div className="space-y-6">
@@ -1287,8 +1287,8 @@ ${categoriesListStr}
                       <span className="text-2xl font-black text-indigo-600">{analysisReport.healthScore}%</span>
                     </div>
                     <div className="space-y-1">
-                      <h3 className="text-sm font-bold text-slate-800">คะแนนสุขภาพธุรกิจโดยรวม</h3>
-                      <p className="text-xs text-slate-500 font-medium leading-relaxed">{analysisReport.summary}</p>
+                      <h3 className="text-sm font-bold text-white/90">คะแนนสุขภาพธุรกิจโดยรวม</h3>
+                      <p className="text-xs text-white/60 font-medium leading-relaxed">{analysisReport.summary}</p>
                     </div>
                   </div>
 
@@ -1297,7 +1297,7 @@ ${categoriesListStr}
                     <h4 className="text-xs font-black text-rose-600 uppercase tracking-widest flex items-center gap-1.5">
                       <ShieldAlert className="w-4 h-4" /> ความเสี่ยงที่ตรวจพบ (Risks)
                     </h4>
-                    <ul className="list-disc list-inside space-y-1.5 text-xs text-slate-600 pl-1">
+                    <ul className="list-disc list-inside space-y-1.5 text-xs text-white/70 pl-1">
                       {analysisReport.risks.map((risk: string, i: number) => (
                         <li key={i} className="font-semibold">{risk}</li>
                       ))}
@@ -1309,7 +1309,7 @@ ${categoriesListStr}
                     <h4 className="text-xs font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1.5">
                       <TrendingUp className="w-4 h-4" /> โอกาสสร้างรายได้ (Opportunities)
                     </h4>
-                    <ul className="list-disc list-inside space-y-1.5 text-xs text-slate-600 pl-1">
+                    <ul className="list-disc list-inside space-y-1.5 text-xs text-white/70 pl-1">
                       {analysisReport.opportunities.map((opp: string, i: number) => (
                         <li key={i} className="font-semibold">{opp}</li>
                       ))}
@@ -1323,11 +1323,11 @@ ${categoriesListStr}
                     </h4>
                     <div className="space-y-2.5">
                       {analysisReport.recommendedActions.map((act: string, i: number) => (
-                        <div key={i} className="flex gap-3 bg-slate-50 border border-slate-200/50 rounded-xl p-3">
+                        <div key={i} className="flex gap-3 bg-white/10 border border-white/25/50 rounded-xl p-3">
                           <span className="w-6 h-6 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-600 flex items-center justify-center text-xs font-black shrink-0">
                             {i + 1}
                           </span>
-                          <span className="text-xs text-slate-700 font-extrabold flex-1 self-center">{act}</span>
+                          <span className="text-xs text-white/80 font-extrabold flex-1 self-center">{act}</span>
                         </div>
                       ))}
                     </div>
@@ -1337,10 +1337,10 @@ ${categoriesListStr}
               )}
             </div>
 
-            <div className="border-t border-slate-100 pt-4 shrink-0 flex gap-3">
+            <div className="border-t border-white/20 pt-4 shrink-0 flex gap-3">
               <button
                 onClick={() => { setShowAnalysisModal(false); setAnalysisReport(null); }}
-                className="flex-1 py-3 border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold rounded-xl transition cursor-pointer"
+                className="flex-1 py-3 border border-white/25 hover:bg-white/10 text-white/70 text-xs font-bold rounded-xl transition cursor-pointer"
               >
                 เสร็จสิ้น / ปิดหน้าต่าง
               </button>
