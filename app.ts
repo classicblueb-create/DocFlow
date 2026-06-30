@@ -1804,6 +1804,23 @@ ${highPerformersContext || 'ยังไม่มีคอนเทนต์ท�
     return res.json({ ok: true });
   });
 
+  // Temporary debug: test Supabase write for google_tokens
+  app.get("/api/google/test-write", async (_req: any, res: any) => {
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+    const { data, error } = await supabase.from('google_tokens').upsert({
+      id: 'default',
+      access_token: 'test_token',
+      refresh_token: 'test_refresh',
+      expiry_date: Date.now() + 3600000,
+      scope: 'test',
+      token_type: 'Bearer',
+      updated_at: new Date().toISOString()
+    }).select();
+    return res.json({ data, error });
+  });
+
   // -----------------------------------------------------------------
   // Health check
   // -----------------------------------------------------------------
