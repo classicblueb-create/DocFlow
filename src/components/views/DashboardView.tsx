@@ -4,12 +4,13 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart as RechartsPie, Pie, Cell, Area, AreaChart,
 } from 'recharts';
-import { Task } from '../../types';
+import { Task, ProjectCategory } from '../../types';
 import { TrendingUp, CheckCircle, Clock } from 'lucide-react';
-import { cn } from '../../lib/utils';
+import { cn, getTaskPrice, getTaskProfit } from '../../lib/utils';
 
 interface DashboardViewProps {
   tasks: Task[];
+  categories: ProjectCategory[];
 }
 
 // ── Stripe-style metric card with line chart ──────────────────────────────────
@@ -81,21 +82,61 @@ function KpiChip({ label, value, sub, accent }: { label: string; value: string; 
   );
 }
 
-export function DashboardView({ tasks }: DashboardViewProps) {
+export function DashboardView({ tasks, categories }: DashboardViewProps) {
   const todoCount       = tasks.filter(t => t.status === 'To Do' || t.status === 'รอดำเนินการ').length;
   const inProgressCount = tasks.filter(t => t.status === 'In Progress' || t.status === 'กำลังทำ').length;
   const doneCount       = tasks.filter(t => t.status === 'Done' || t.status === 'เสร็จสิ้น').length;
 
-  const totalRevenue   = tasks.reduce((s, t) => s + Number(t.price || 0), 0);
-  const earnedRevenue  = tasks.filter(t => t.status === 'Done' || t.status === 'เสร็จสิ้น')
-                              .reduce((s, t) => s + Number(t.price || 0), 0);
-  const pendingRevenue = totalRevenue - earnedRevenue;
+  const { totalRevenue, earnedRevenue, pendingRevenue, totalProfit } = useMemo(() => {
+    let tr = 0;
+    let er = 0;
+    let pr = 0;
+    let tp = 0;
+
+    tasks.forEach(t => {
+      let price = Number(t.price || 0);
+      let hasPhases = false;
+      let phasePaidSum = 0;
+      let phaseUnpaidSum = 0;
+
+      if (t.paymentPhases) {
+        try {
+          const phases = JSON.parse(t.paymentPhases);
+          if (Array.isArray(phases) && phases.length > 0) {
+            hasPhases = true;
+            price = phases.reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+            phases.forEach((p: any) => {
+              const amt = Number(p.amount || 0);
+              if (p.paid) {
+                phasePaidSum += amt;
+              } else {
+                phaseUnpaidSum += amt;
+              }
+            });
+          }
+        } catch (e) {}
+      }
+
+      tr += price;
+
+      if (hasPhases) {
+        er += phasePaidSum;
+        pr += phaseUnpaidSum;
+      } else {
+        if (t.status === 'Done' || t.status === 'เสร็จสิ้น') {
+          er += price;
+        } else {
+          pr += price;
+        }
+      }
+
+      tp += getTaskProfit(t);
+    });
+
+    return { totalRevenue: tr, earnedRevenue: er, pendingRevenue: pr, totalProfit: tp };
+  }, [tasks]);
+
   const totalDevCost   = tasks.reduce((s, t) => s + Number(t.devCost || 0), 0);
-  const totalProfit    = tasks.reduce((s, t) => {
-    const p = Number(t.price || 0);
-    const d = Number(t.devCost || 0);
-    return s + (t.myIncome !== undefined ? Number(t.myIncome) : p - d);
-  }, 0);
 
   // ── Build monthly time-series (last 12 months) ──────────────────────────────
   const { grossData, netData, customerData } = useMemo(() => {
@@ -119,9 +160,8 @@ export function DashboardView({ tasks }: DashboardViewProps) {
       const key = d?.slice(0, 7);
       if (!key || !gross.hasOwnProperty(key)) return;
 
-      const price  = Number(t.price || 0);
-      const dc     = Number(t.devCost || 0);
-      const profit = t.myIncome !== undefined ? Number(t.myIncome) : price - dc;
+      const price  = getTaskPrice(t);
+      const profit = getTaskProfit(t);
 
       gross[key] += price;
       net[key]   += profit;
@@ -174,6 +214,30 @@ export function DashboardView({ tasks }: DashboardViewProps) {
   ].filter(d => d.value > 0), [tasks]);
 
   const ASSIGNEE_COLORS = ['#8b5cf6', '#10b981', '#94a3b8'];
+
+  const categoryChartData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    tasks.forEach(t => {
+      const catId = t.categoryId || 'uncategorized';
+      counts[catId] = (counts[catId] || 0) + 1;
+    });
+
+    return Object.entries(counts).map(([catId, count]) => {
+      if (catId === 'uncategorized') {
+        return {
+          name: 'ไม่ระบุโปรเจค',
+          value: count,
+          color: '#94a3b8'
+        };
+      }
+      const cat = categories.find(c => c.id === catId);
+      return {
+        name: cat?.name || 'ไม่รู้จัก',
+        value: count,
+        color: cat?.color || '#cbd5e1'
+      };
+    }).sort((a, b) => b.value - a.value);
+  }, [tasks, categories]);
 
   const thb = (v: number) => `฿${v.toLocaleString()}`;
 
@@ -233,6 +297,56 @@ export function DashboardView({ tasks }: DashboardViewProps) {
             </div>
           ))}
         </div>
+
+        {/* Sales Pipeline Charts */}
+        {(() => {
+          const STAGES = ['lead','opportunity','proposal','negotiation','won','lost'] as const;
+          const STAGE_COLORS: Record<string, string> = {
+            lead: '#94a3b8', opportunity: '#818cf8', proposal: '#60a5fa',
+            negotiation: '#fbbf24', won: '#34d399', lost: '#fb7185',
+          };
+          const pipelineData = STAGES.map(stage => {
+            const deals = tasks.filter(t => t.pipelineStage === stage);
+            return { stage, count: deals.length, value: deals.reduce((s, t) => s + Number(t.dealValue || 0), 0) };
+          }).filter(d => d.count > 0);
+          const funnelData = pipelineData.filter(d => d.stage !== 'lost');
+          if (pipelineData.length === 0) return null;
+          return (
+            <div className="space-y-4">
+              <h3 className="font-black text-sm text-slate-700">Sales Pipeline</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="glass-card rounded-2xl p-5">
+                  <h4 className="font-bold text-xs text-slate-600 mb-3">Pipeline by Stage (Count &amp; Value)</h4>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <BarChart data={pipelineData} layout="vertical" margin={{ left: 60, right: 20 }}>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                      <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} />
+                      <YAxis type="category" dataKey="stage" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748b' }} />
+                      <Tooltip formatter={(v: any, name: string) => name === 'value' ? `฿${Number(v).toLocaleString()}` : v} />
+                      <Bar dataKey="count" name="จำนวนดีล" radius={[0, 4, 4, 0]}>
+                        {pipelineData.map((d, i) => <Cell key={i} fill={STAGE_COLORS[d.stage] || '#94a3b8'} />)}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="glass-card rounded-2xl p-5">
+                  <h4 className="font-bold text-xs text-slate-600 mb-3">Pipeline Value (ไม่รวม Lost)</h4>
+                  <ResponsiveContainer width="100%" height={180}>
+                    <BarChart data={funnelData}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="stage" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} tickFormatter={v => `฿${(v/1000).toFixed(0)}k`} />
+                      <Tooltip formatter={(v: any) => `฿${Number(v).toLocaleString()}`} />
+                      <Bar dataKey="value" name="มูลค่า" radius={[4, 4, 0, 0]}>
+                        {funnelData.map((d, i) => <Cell key={i} fill={STAGE_COLORS[d.stage] || '#94a3b8'} />)}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Charts row */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -324,6 +438,33 @@ export function DashboardView({ tasks }: DashboardViewProps) {
               </>
             ) : (
               <div className="h-[140px] flex items-center justify-center text-xs text-slate-400 font-semibold">ยังไม่มีข้อมูล</div>
+            )}
+          </div>
+
+          {/* Category Donut chart */}
+          <div className="glass-card rounded-2xl p-5 flex flex-col">
+            <h3 className="font-bold text-sm text-slate-700 mb-4">สัดส่วนงานแยกตามประเภท (Categories)</h3>
+            {categoryChartData.length > 0 ? (
+              <>
+                <ResponsiveContainer width="100%" height={140}>
+                  <RechartsPie>
+                    <Pie data={categoryChartData} cx="50%" cy="50%" innerRadius={40} outerRadius={60} paddingAngle={4} dataKey="value">
+                      {categoryChartData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                    </Pie>
+                    <Tooltip />
+                  </RechartsPie>
+                </ResponsiveContainer>
+                <div className="flex flex-wrap gap-3 justify-center mt-2 max-h-[100px] overflow-y-auto hide-scrollbar">
+                  {categoryChartData.map(d => (
+                    <div key={d.name} className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-600">
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: d.color }} />
+                      {d.name} ({d.value})
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="h-[140px] flex items-center justify-center text-xs text-slate-400 font-semibold">ยังไม่มีข้อมูลประเภทงาน</div>
             )}
           </div>
 

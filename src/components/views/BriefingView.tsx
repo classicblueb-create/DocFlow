@@ -6,8 +6,8 @@ import {
   DollarSign, Wallet, Hourglass, CalendarDays, ChevronRight, CheckSquare,
   ListTodo, Plus, Target, ShieldAlert, Sparkle, BrainCircuit, RefreshCw, Send, Bot, ClipboardCheck, UserCircle2
 } from 'lucide-react';
-import { Task, Client, Idea, Subtask } from '../../types';
-import { cn } from '../../lib/utils';
+import { Task, Client, Idea, Subtask, ProjectCategory } from '../../types';
+import { cn, getTaskPrice } from '../../lib/utils';
 import {
   calculateTaskPriorityScore,
   calculateProjectHealthScore,
@@ -20,6 +20,7 @@ interface BriefingViewProps {
   tasks: Task[];
   clients: Client[];
   ideas: Idea[];
+  categories: ProjectCategory[];
   onTaskClick: (task: Task) => void;
   onUpdateTask: (task: Task) => void;
   onSaveTask: (task: Partial<Task>) => Promise<void>;
@@ -33,6 +34,7 @@ export function BriefingView({
   tasks,
   clients,
   ideas,
+  categories,
   onTaskClick,
   onUpdateTask,
   onSaveTask,
@@ -125,7 +127,7 @@ export function BriefingView({
   // AI Recommendation sum
   const potentialImpactValue = useMemo(() => {
     // Sum top 3 priority tasks
-    return prioritizedTasks.slice(0, 3).reduce((sum, t) => sum + Number(t.price || 0), 0);
+    return prioritizedTasks.slice(0, 3).reduce((sum, t) => sum + getTaskPrice(t), 0);
   }, [prioritizedTasks]);
 
   // ── Handle Brain Dump Submission ──
@@ -191,18 +193,48 @@ export function BriefingView({
     }
   };
 
+  const categoryAnalysisData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    tasks.forEach(t => {
+      const catId = t.categoryId || 'uncategorized';
+      counts[catId] = (counts[catId] || 0) + 1;
+    });
+
+    return categories.map(cat => {
+      const count = counts[cat.id] || 0;
+      return {
+        name: cat.name,
+        count: count
+      };
+    });
+  }, [tasks, categories]);
+
   // ── Handle Business Analysis ──
   const handleAnalyzeBusiness = async () => {
     setIsAnalyzing(true);
     setShowAnalysisModal(true);
 
+    const categoriesListStr = categoryAnalysisData
+      .map(c => `- หมวดหมู่ "${c.name}": มีงานทั้งหมด ${c.count} งาน`)
+      .join('\n');
+
     const userPrompt = `กรุณาวิเคราะห์สภาพธุรกิจของฉันแบบสรุปภาพรวมทั้งหมดอย่างกระชับ
-    ดึงข้อมูลจากระบบ เช่น งานค้าง, ลูกค้า, รายได้ และไอเดียที่มี วิเคราะห์สถานะสุขภาพธุรกิจ (Business Health Score) ออกมาเป็นตัวเลข (0-100) และสรุปความเสี่ยง (Risks), โอกาสสร้างรายได้ (Opportunities), และการดำเนินการแนะนำ 3 ข้อ (Recommended Actions).
+    ดึงข้อมูลจากระบบ เช่น งานค้าง, ลูกค้า, รายได้ และไอเดียที่มี
     
-    ตอบเป็นรูปแบบ JSON ต่อไปนี้เท่านั้น (ไม่ต้องใส่ markdown blocks):
+    ข้อมูลเพิ่มเติมด้านประเภทงาน (Categories):
+    ${categoriesListStr || 'ไม่มีข้อมูลหมวดหมู่'}
+    
+    คำแนะนำพิเศษ:
+    - ให้วิเคราะห์สถิติจำนวนงานในแต่ละหมวดหมู่ (Categories) ข้างต้นอย่างลึกซึ้ง
+    - วิเคราะห์หาศักยภาพ (Potential) ว่าเรามีความเชี่ยวชาญหรือมีโอกาสเติบโตในด้านใดมากที่สุด (พิจารณาจากจำนวนงานและรายได้)
+    - แนะนำว่าเราควรโฟกัสทำคอนเทนต์ (Content Creation) ในหัวข้อหรือหมวดหมู่ใดต่อไปเพื่อพัฒนาแบรนด์ส่วนบุคคล (Personal Brand) และเพิ่มรายได้ (Income) ของฉันให้เติบโตอย่างมั่นคง
+    
+    วิเคราะห์สถานะสุขภาพธุรกิจ (Business Health Score) ออกมาเป็นตัวเลข (0-100) และสรุปความเสี่ยง (Risks), โอกาสสร้างรายได้ (Opportunities) ที่เชื่อมโยงกับแนวทางแบรนด์/คอนเทนต์, และการดำเนินการแนะนำ 3 ข้อ (Recommended Actions) ในการทำงานและการตลาด.
+    
+    ตอบเป็นรูปแบบ JSON ต่อไปนี้เท่านั้น (ไม่ต้องใส่ markdown blocks หรือข้อความอื่นนอกเหนือจาก JSON):
     {
       "healthScore": number,
-      "summary": string,
+      "summary": "สรุปคะแนนสุขภาพธุรกิจ พร้อมทั้งการวิเคราะห์ศักยภาพด้านประเภทงานและข้อเสนอแนะว่าควรทำคอนเทนต์ด้านใดต่อไปเพื่อพัฒนาแบรนด์และรายได้ (ตอบสรุปอย่างละเอียดแต่กระชับ)",
       "risks": [string],
       "opportunities": [string],
       "recommendedActions": [string]
@@ -216,7 +248,7 @@ export function BriefingView({
           messages: [{ role: 'user', text: userPrompt }],
           agentTitle: 'MODTY Business Analysis Agent',
           agentInstructions: 'คุณคือสุดยอด AI วิเคราะห์และประเมินธุรกิจ ที่ได้รับความไว้วางใจในการทำ Business Intelligence',
-          contextData: { tasks, clients, ideas }
+          contextData: { tasks, clients, ideas, categories }
         }),
       });
       const data = await response.json();
@@ -606,6 +638,50 @@ export function BriefingView({
 
             </div>
           </div>
+
+          {/* Module 7: Sales Pipeline Health */}
+          {(() => {
+            const STAGES = ['lead','opportunity','proposal','negotiation','won','lost'] as const;
+            const pipelineTasks = tasks.filter(t => t.pipelineStage);
+            if (pipelineTasks.length === 0) return null;
+            const byStage = STAGES.map(stage => ({
+              stage,
+              count: pipelineTasks.filter(t => t.pipelineStage === stage).length,
+              value: pipelineTasks.filter(t => t.pipelineStage === stage).reduce((s, t) => s + Number(t.dealValue || 0), 0),
+            }));
+            const won = byStage.find(d => d.stage === 'won')?.count || 0;
+            const lost = byStage.find(d => d.stage === 'lost')?.count || 0;
+            const winRate = (won + lost) > 0 ? Math.round((won / (won + lost)) * 100) : 0;
+            const totalValue = byStage.filter(d => d.stage !== 'lost').reduce((s, d) => s + d.value, 0);
+            const biggest = [...pipelineTasks].sort((a, b) => Number(b.dealValue || 0) - Number(a.dealValue || 0))[0];
+            const healthColor = winRate > 50 ? 'bg-emerald-500' : winRate >= 20 ? 'bg-amber-500' : 'bg-rose-500';
+            const healthLabel = winRate > 50 ? 'Healthy' : winRate >= 20 ? 'Needs Attention' : 'At Risk';
+            return (
+              <div className="bg-white border border-slate-100 rounded-[24px] p-6 flex flex-col gap-4 shadow-sm">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-emerald-600" />
+                    <h2 className="text-xs font-bold text-slate-900 uppercase tracking-widest">Sales Pipeline Health</h2>
+                  </div>
+                  <span className={`text-[10px] font-black px-2.5 py-1 rounded-full text-white ${healthColor}`}>{healthLabel}</span>
+                </div>
+                <div className="space-y-2">
+                  {byStage.filter(d => d.count > 0).map(d => (
+                    <div key={d.stage} className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-slate-500 capitalize w-28">{d.stage}</span>
+                      <span className="font-bold text-slate-700">{d.count} ดีล</span>
+                      <span className="font-bold text-slate-700">฿{d.value.toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="border-t border-slate-100 pt-3 space-y-1.5 text-xs text-slate-600">
+                  <div className="flex justify-between"><span className="text-slate-400 font-semibold">Total Pipeline Value</span><span className="font-black text-slate-800">฿{totalValue.toLocaleString()}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-400 font-semibold">Win Rate</span><span className="font-black text-slate-800">{winRate}%</span></div>
+                  {biggest && <div className="flex justify-between"><span className="text-slate-400 font-semibold">Biggest Deal</span><span className="font-black text-slate-800 truncate max-w-[150px]">{biggest.name}</span></div>}
+                </div>
+              </div>
+            );
+          })()}
 
         </div>
 

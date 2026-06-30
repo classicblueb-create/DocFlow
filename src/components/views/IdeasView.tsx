@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Lightbulb, Plus, X, Sparkles, Loader2, ChevronDown, ChevronUp, Trash2, Tag, Clock, Zap, TrendingUp, AlertTriangle, CheckCircle2, Target } from 'lucide-react';
+import { Lightbulb, Plus, X, Sparkles, Loader2, ChevronDown, ChevronUp, Trash2, Tag, Clock, Zap, TrendingUp, Pencil, Check } from 'lucide-react';
 import { Idea } from '../../types';
 import { cn } from '../../lib/utils';
 
@@ -37,12 +37,33 @@ const EFFORT_COLORS: Record<string, string> = {
 function IdeaCard({ idea, onDelete, onUpdate }: { key?: React.Key; idea: Idea; onDelete: (id: string) => void; onUpdate: (idea: Idea) => void }) {
  const [isAnalyzing, setIsAnalyzing] = useState(false);
  const [showAnalysis, setShowAnalysis] = useState(!!idea.aiAnalysis);
- const [expanded, setExpanded] = useState(false);
+ const [isEditing, setIsEditing] = useState(false);
+ const [editTitle, setEditTitle] = useState(idea.title);
+ const [editDescription, setEditDescription] = useState(idea.description);
+ const [editCategory, setEditCategory] = useState(idea.category || '');
+ const [editTags, setEditTags] = useState(idea.tags || '');
+ const [editPriority, setEditPriority] = useState<Idea['priority']>(idea.priority);
+ const [editEffort, setEditEffort] = useState<Idea['effort']>(idea.effort);
+ const [editStatus, setEditStatus] = useState<Idea['status']>(idea.status);
+
+ const handleEditSave = (e: React.FormEvent) => {
+   e.preventDefault();
+   onUpdate({
+     ...idea,
+     title: editTitle.trim(),
+     description: editDescription.trim(),
+     category: editCategory || undefined,
+     tags: editTags || undefined,
+     priority: editPriority,
+     effort: editEffort,
+     status: editStatus,
+   });
+   setIsEditing(false);
+ };
 
  const handleAnalyze = async () => {
  setIsAnalyzing(true);
  setShowAnalysis(true);
- setExpanded(true);
 
  const systemPrompt = `คุณคือ AI ที่ปรึกษาธุรกิจและผู้เชี่ยวชาญด้านการประเมินไอเดีย มีประสบการณ์ทั้ง Startup, Freelance, และ Product Development
 คุณต้องวิเคราะห์ไอเดียของผู้ใช้อย่างละเอียดและตรงไปตรงมา โดยใช้ภาษาไทยผสมอังกฤษตามความเหมาะสม ตอบในรูปแบบ HTML สวยงาม`;
@@ -93,7 +114,52 @@ function IdeaCard({ idea, onDelete, onUpdate }: { key?: React.Key; idea: Idea; o
  };
 
  return (
- <div className="glass-card rounded-[20px] hover:shadow-md transition-all duration-200 overflow-hidden group">
+ <div className="glass-card rounded-[20px] hover:shadow-md transition-all duration-200 overflow-hidden group relative">
+ {/* Inline Edit Overlay */}
+ {isEditing && (
+   <form onSubmit={handleEditSave} className="absolute inset-0 z-10 bg-white/95 backdrop-blur-sm rounded-[20px] p-5 flex flex-col gap-3 overflow-y-auto">
+     <div className="flex items-center justify-between mb-1">
+       <span className="text-xs font-black text-[#0f172a]">แก้ไขไอเดีย</span>
+       <button type="button" onClick={() => setIsEditing(false)} className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 cursor-pointer"><X className="w-4 h-4" /></button>
+     </div>
+     <input
+       required value={editTitle} onChange={e => setEditTitle(e.target.value)}
+       placeholder="ชื่อไอเดีย" className="glass-input w-full px-3 py-1.5 text-xs"
+     />
+     <textarea
+       required rows={3} value={editDescription} onChange={e => setEditDescription(e.target.value)}
+       placeholder="รายละเอียด" className="glass-input w-full px-3 py-1.5 text-xs resize-none"
+     />
+     <select value={editCategory} onChange={e => setEditCategory(e.target.value)} className="glass-input w-full px-3 py-1.5 text-xs cursor-pointer">
+       <option value="">หมวดหมู่...</option>
+       {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+     </select>
+     <input value={editTags} onChange={e => setEditTags(e.target.value)} placeholder="แท็ก (คั่นด้วยจุลภาค)" className="glass-input w-full px-3 py-1.5 text-xs" />
+     <div className="flex gap-1">
+       {PRIORITIES.map(p => (
+         <button key={p} type="button" onClick={() => setEditPriority(p)}
+           className={cn('flex-1 text-[10px] font-bold py-1.5 rounded-lg border transition cursor-pointer', editPriority === p ? PRIORITY_COLORS[p!] : 'bg-white/10 text-slate-400 border-white/20')}
+         >{p}</button>
+       ))}
+     </div>
+     <div className="flex gap-1">
+       {EFFORTS.map(ef => (
+         <button key={ef} type="button" onClick={() => setEditEffort(ef)}
+           className={cn('flex-1 text-[10px] font-bold py-1.5 rounded-lg border transition cursor-pointer', editEffort === ef ? EFFORT_COLORS[ef!] : 'bg-white/10 text-slate-400 border-white/20')}
+         >{ef}</button>
+       ))}
+     </div>
+     <select value={editStatus} onChange={e => setEditStatus(e.target.value as Idea['status'])} className="glass-input w-full px-3 py-1.5 text-xs cursor-pointer">
+       {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+     </select>
+     <div className="flex gap-2 pt-1">
+       <button type="submit" className="flex-1 flex items-center justify-center gap-1.5 bg-[#0f172a] text-white text-xs font-bold py-2 rounded-xl cursor-pointer">
+         <Check className="w-3.5 h-3.5" /> บันทึก
+       </button>
+       <button type="button" onClick={() => setIsEditing(false)} className="px-4 py-2 border border-white/20 text-slate-500 text-xs font-semibold rounded-xl hover:bg-white/10 cursor-pointer">ยกเลิก</button>
+     </div>
+   </form>
+ )}
  <div className="p-5">
  {/* Top row */}
  <div className="flex items-start justify-between gap-3 mb-3">
@@ -103,12 +169,20 @@ function IdeaCard({ idea, onDelete, onUpdate }: { key?: React.Key; idea: Idea; o
  </div>
  <h3 className="font-bold text-[#0f172a] text-sm leading-snug">{idea.title}</h3>
  </div>
+ <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-all">
+ <button
+   onClick={() => setIsEditing(true)}
+   className="p-1.5 rounded-lg hover:bg-indigo-500/10 text-slate-400 hover:text-indigo-500 transition-all cursor-pointer"
+ >
+   <Pencil className="w-3.5 h-3.5" />
+ </button>
  <button
  onClick={() => onDelete(idea.id)}
- className="shrink-0 opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-red-500/10 text-slate-400 hover:text-red-500 transition-all cursor-pointer"
+ className="p-1.5 rounded-lg hover:bg-red-500/10 text-slate-400 hover:text-red-500 transition-all cursor-pointer"
  >
  <Trash2 className="w-3.5 h-3.5" />
  </button>
+ </div>
  </div>
 
  {/* Description */}

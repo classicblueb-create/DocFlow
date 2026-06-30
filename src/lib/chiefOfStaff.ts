@@ -418,10 +418,24 @@ export function compileRevenueData(tasks: Task[]): RevenueSnapshot {
  let outstandingInvoices = 0;
  let overdueInvoices = 0;
 
- tasks.forEach(t => {
- const taskPrice = Number(t.price || 0);
- const myIncome = Number(t.myIncome != null ? t.myIncome : (t.price || 0) - (t.devCost || 0));
- const incomeValue = myIncome > 0 ? myIncome : taskPrice;
+  tasks.forEach(t => {
+    let taskPrice = Number(t.price || 0);
+    let myIncome = Number(t.myIncome != null ? t.myIncome : (t.price || 0) - (t.devCost || 0));
+
+    // If task has phases, override the base taskPrice and myIncome with the sum of phases
+    let parsedPhases: any[] = [];
+    if (t.paymentPhases) {
+      try {
+        parsedPhases = JSON.parse(t.paymentPhases);
+      } catch (e) {}
+    }
+
+    if (parsedPhases.length > 0) {
+      taskPrice = parsedPhases.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      myIncome = Number(t.myIncome != null ? t.myIncome : taskPrice - (t.devCost || 0));
+    }
+
+    const incomeValue = myIncome > 0 ? myIncome : taskPrice;
 
  // Completed checks
  const isDone = t.status === 'Done' || t.status === 'เสร็จสิ้น';

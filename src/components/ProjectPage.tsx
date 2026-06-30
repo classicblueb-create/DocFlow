@@ -122,10 +122,14 @@ export function ProjectPage({
  const [newPhaseLabel, setNewPhaseLabel] = useState('');
  const [newPhaseAmount, setNewPhaseAmount] = useState('');
 
- const commitPhases = (next: PaymentPhase[]) => {
- setPhases(next);
- saveTask({ paymentPhases: JSON.stringify(next) });
- };
+  const commitPhases = (next: PaymentPhase[]) => {
+    setPhases(next);
+    const nextPrice = next.length > 0 ? next.reduce((sum, p) => sum + Number(p.amount || 0), 0) : (task.price || 0);
+    saveTask({
+      paymentPhases: JSON.stringify(next),
+      price: nextPrice
+    });
+  };
 
  const addPhase = () => {
  const label = newPhaseLabel.trim();
@@ -242,6 +246,18 @@ export function ProjectPage({
  }
  };
 
+  // computed payment stats
+  const hasPhases = phases.length > 0;
+  const phasesTotal = phases.reduce((s, p) => s + p.amount, 0);
+  const totalPrice = hasPhases ? phasesTotal : (task.price || 0);
+  const totalPaid = hasPhases
+    ? phases.reduce((s, p) => s + (p.paid ? p.amount : 0), 0)
+    : (task.status === 'Done' || task.status === 'เสร็จสิ้น' ? totalPrice : 0);
+  const totalPending = hasPhases
+    ? phases.reduce((s, p) => s + (!p.paid ? p.amount : 0), 0)
+    : (task.status === 'Done' || task.status === 'เสร็จสิ้น' ? 0 : totalPrice);
+  const paidPct = totalPrice > 0 ? Math.round((totalPaid / totalPrice) * 100) : 0;
+
  const INV_STATUS: Record<InvoiceStatus, { label: string; color: string; bg: string }> = {
  draft: { label: 'ร่าง', color: 'text-slate-500', bg: 'bg-slate-100' },
  sent: { label: 'ส่งแล้ว', color: 'text-blue-600', bg: 'bg-blue-100' },
@@ -249,13 +265,6 @@ export function ProjectPage({
  paid: { label: 'รับเงินแล้ว', color: 'text-emerald-600', bg: 'bg-emerald-100' },
  overdue: { label: 'เกินกำหนด', color: 'text-rose-600', bg: 'bg-rose-100' },
  };
-
- // computed payment stats
- const totalPrice = task.price || 0;
- const totalPaid = phases.reduce((s, p) => s + (p.paid ? p.amount : 0), 0);
- const totalPending = phases.reduce((s, p) => s + (!p.paid ? p.amount : 0), 0);
- const phasesTotal = phases.reduce((s, p) => s + p.amount, 0);
- const paidPct = phasesTotal > 0 ? Math.round((totalPaid / phasesTotal) * 100) : 0;
 
  // Sync back to parent whenever subtasks/comments/attachments change
  const saveTask = (patch: Partial<Task>) => {

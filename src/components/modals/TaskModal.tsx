@@ -239,7 +239,7 @@ export function TaskModal({ isOpen, onClose, onSave, initialTask, categories = [
  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 outline-none bg-white text-slate-800 cursor-pointer focus:border-indigo-400">
  <option value="">ไม่ระบุโปรเจค</option>
  {categories.map(c => (
- <option key={c.id} value={c.id}>{c.icon ? `${c.icon} ` : ''}{c.name}</option>
+ <option key={c.id} value={c.id}>{c.name}</option>
  ))}
  </select>
  </div>

@@ -402,6 +402,7 @@ export default function App() {
  return (
  <BriefingView
  tasks={filteredTasks} clients={clients} ideas={ideas}
+ categories={categories}
  onTaskClick={handleTaskClick}
  onUpdateTask={handleUpdateTask}
  onSaveTask={handleSaveTask}
@@ -439,7 +440,7 @@ export default function App() {
  case 'calendar': return <CalendarView tasks={filteredTasks} />;
 
  case 'dashboard':
- return <DashboardView tasks={filteredTasks} />;
+ return <DashboardView tasks={filteredTasks} categories={categories} />;
 
  case 'pipeline':
  return (

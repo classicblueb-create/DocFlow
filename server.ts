@@ -200,7 +200,7 @@ async function startServer() {
 
   // AI Chat API
   app.post("/api/ai/chat", async (req, res) => {
-    const { messages, agentTitle, agentInstructions } = req.body;
+    const { messages, agentTitle, agentInstructions, contextData } = req.body;
     
     if (!messages || !Array.isArray(messages)) {
       return res.status(400).json({ error: "Invalid chat history" });
@@ -210,7 +210,80 @@ async function startServer() {
       return res.status(500).json({ error: "AI API key is not configured" });
     }
 
-    const systemInstruction = `You are a professional AI Assistant specializing as a ${agentTitle || 'assistant'}. ${agentInstructions || ''}. Always reply politely in Thai. Use HTML tags for formatting if needed (like <br/>, <b>, etc.) to make the text structured and easy to read.`;
+    let contextSection = "";
+    if (contextData) {
+      const tasks = contextData.tasks ?? [];
+      const clients = contextData.clients ?? [];
+      const ideas = contextData.ideas ?? [];
+      const categories = contextData.categories ?? [];
+      const today = new Date().toISOString().split("T")[0];
+
+      const overdueTasks = tasks.filter((t: any) => t.endDate && t.endDate < today && t.status !== "Done" && t.status !== "เสร็จสิ้น");
+      const inProgress = tasks.filter((t: any) => t.status === "In Progress" || t.status === "กำลังทำ" || t.status === "กำลังดำเนินการ");
+      
+      // Calculate revenue taking phases into account
+      let totalRevenue = 0;
+      let myIncome = 0;
+      tasks.forEach((t: any) => {
+        let price = Number(t.price || 0);
+        let devCost = Number(t.devCost || 0);
+        if (t.paymentPhases) {
+          try {
+            const phases = JSON.parse(t.paymentPhases);
+            if (Array.isArray(phases) && phases.length > 0) {
+              price = phases.reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+            }
+          } catch (e) {}
+        }
+        totalRevenue += price;
+        const profit = t.myIncome !== undefined ? Number(t.myIncome) : price - devCost;
+        myIncome += profit;
+      });
+
+      // Categories and task counts
+      const categoryCounts = categories.map((cat: any) => {
+        const count = tasks.filter((t: any) => t.categoryId === cat.id).length;
+        return `- ${cat.name} (ไอคอน: ${cat.icon || "-"}): ${count} งาน`;
+      }).join("\n");
+
+      contextSection = `
+=== ข้อมูลจริงจากระบบ (Real-time Data) ===
+วันนี้: ${today}
+งานทั้งหมด: ${tasks.length} รายการ
+งานที่เกินกำหนด: ${overdueTasks.length} รายการ
+งานที่กำลังทำ: ${inProgress.length} รายการ
+ลูกค้าทั้งหมด: ${clients.length} ราย
+ยอดรายได้รวม (อ้างอิงเฟสถ้ามี): ฿${totalRevenue.toLocaleString()}
+รายได้สุทธิ (อ้างอิงเฟสถ้ามี): ฿${myIncome.toLocaleString()}
+
+จำนวนงานแยกตามหมวดหมู่ (Categories):
+${categoryCounts || "- ไม่มีข้อมูลหมวดหมู่ -"}
+
+รายการงาน (Tasks - สูงสุด 20 รายการ):
+${tasks.slice(0, 20).map((t: any) => {
+  let price = Number(t.price || 0);
+  if (t.paymentPhases) {
+    try {
+      const phases = JSON.parse(t.paymentPhases);
+      if (Array.isArray(phases) && phases.length > 0) {
+        price = phases.reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+      }
+    } catch (e) {}
+  }
+  return `- [${t.status}] ${t.name} | ลูกค้า: ${t.customer || "-"} | ยอด: ฿${price} | ครบกำหนด: ${t.endDate || "-"}`;
+}).join("\n")}
+
+งานเกินกำหนด: ${overdueTasks.map((t: any) => t.name).join(", ") || "ไม่มี"}
+
+ลูกค้า: ${clients.map((c: any) => c.name).join(", ") || "ยังไม่มีลูกค้า"}
+
+รายการไอเดีย (Ideas/Notes):
+${ideas.slice(0, 15).map((i: any) => `- [${i.status}] ${i.title} (หมวด: ${i.category || "-"}) | ลำดับความสำคัญ: ${i.priority || "-"}`).join("\n")}
+=== สิ้นสุดข้อมูล ===`;
+    }
+
+    const systemInstruction = `You are a professional AI Assistant specializing as a ${agentTitle || 'assistant'}. ${agentInstructions || ''}. Always reply politely in Thai. Use HTML tags for formatting if needed (like <br/>, <b>, etc.) to make the text structured and easy to read.
+${contextSection}`;
     
     const openAiMessages = messages.map((m: any) => ({
       role: m.role === 'agent' ? 'assistant' : 'user',

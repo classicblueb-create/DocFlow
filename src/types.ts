@@ -125,6 +125,9 @@ export interface ContentPlan {
   createdAt: string;
   notionPageId?: string;
   notionUrl?: string;
+  engagementRating?: 'B+' | 'A+' | null;
+  viewCount?: number;
+  likeCount?: number;
 }
 
 export interface PaymentPhase {

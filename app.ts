@@ -370,13 +370,36 @@ OUTPUT: JSON object เท่านั้น ห้ามมี markdown หร�
       const tasks = contextData.tasks ?? [];
       const clients = contextData.clients ?? [];
       const ideas = contextData.ideas ?? [];
-      const templates = contextData.templates ?? [];
+      const categories = contextData.categories ?? [];
       const today = new Date().toISOString().split("T")[0];
 
       const overdueTasks = tasks.filter((t: any) => t.endDate && t.endDate < today && t.status !== "Done" && t.status !== "เสร็จสิ้น");
-      const inProgress = tasks.filter((t: any) => t.status === "In Progress" || t.status === "กำลังดำเนินการ");
-      const totalRevenue = tasks.reduce((s: number, t: any) => s + Number(t.price || 0), 0);
-      const myIncome = tasks.reduce((s: number, t: any) => s + Number(t.myIncome || (Number(t.price || 0) - Number(t.devCost || 0))), 0);
+      const inProgress = tasks.filter((t: any) => t.status === "In Progress" || t.status === "กำลังทำ" || t.status === "กำลังดำเนินการ");
+      
+      // Calculate revenue taking phases into account
+      let totalRevenue = 0;
+      let myIncome = 0;
+      tasks.forEach((t: any) => {
+        let price = Number(t.price || 0);
+        let devCost = Number(t.devCost || 0);
+        if (t.paymentPhases) {
+          try {
+            const phases = JSON.parse(t.paymentPhases);
+            if (Array.isArray(phases) && phases.length > 0) {
+              price = phases.reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+            }
+          } catch (e) {}
+        }
+        totalRevenue += price;
+        const profit = t.myIncome !== undefined ? Number(t.myIncome) : price - devCost;
+        myIncome += profit;
+      });
+
+      // Categories and task counts
+      const categoryCounts = categories.map((cat: any) => {
+        const count = tasks.filter((t: any) => t.categoryId === cat.id).length;
+        return `- ${cat.name} (ไอคอน: ${cat.icon || "-"}): ${count} งาน`;
+      }).join("\n");
 
       contextSection = `
 === ข้อมูลจริงจากระบบ (Real-time Data) ===
@@ -385,11 +408,25 @@ OUTPUT: JSON object เท่านั้น ห้ามมี markdown หร�
 งานที่เกินกำหนด: ${overdueTasks.length} รายการ
 งานที่กำลังทำ: ${inProgress.length} รายการ
 ลูกค้าทั้งหมด: ${clients.length} ราย
-ยอดรายได้รวม: ฿${totalRevenue.toLocaleString()}
-รายได้สุทธิ: ฿${myIncome.toLocaleString()}
+ยอดรายได้รวม (อ้างอิงเฟสถ้ามี): ฿${totalRevenue.toLocaleString()}
+รายได้สุทธิ (อ้างอิงเฟสถ้ามี): ฿${myIncome.toLocaleString()}
 
-รายการงาน (Tasks):
-${tasks.slice(0, 20).map((t: any) => `- [${t.status}] ${t.name} | ลูกค้า: ${t.customer || "-"} | ยอด: ฿${t.price || 0} | ครบกำหนด: ${t.endDate || "-"}`).join("\n")}
+จำนวนงานแยกตามหมวดหมู่ (Categories):
+${categoryCounts || "- ไม่มีข้อมูลหมวดหมู่ -"}
+
+รายการงาน (Tasks - สูงสุด 20 รายการ):
+${tasks.slice(0, 20).map((t: any) => {
+  let price = Number(t.price || 0);
+  if (t.paymentPhases) {
+    try {
+      const phases = JSON.parse(t.paymentPhases);
+      if (Array.isArray(phases) && phases.length > 0) {
+        price = phases.reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+      }
+    } catch (e) {}
+  }
+  return `- [${t.status}] ${t.name} | ลูกค้า: ${t.customer || "-"} | ยอด: ฿${price} | ครบกำหนด: ${t.endDate || "-"}`;
+}).join("\n")}
 
 งานเกินกำหนด: ${overdueTasks.map((t: any) => t.name).join(", ") || "ไม่มี"}
 
@@ -397,9 +434,6 @@ ${tasks.slice(0, 20).map((t: any) => `- [${t.status}] ${t.name} | ลูกค�
 
 รายการไอเดีย (Ideas/Notes):
 ${ideas.slice(0, 15).map((i: any) => `- [${i.status}] ${i.title} (หมวด: ${i.category || "-"}) | ลำดับความสำคัญ: ${i.priority || "-"}`).join("\n")}
-
-เทมเพลตที่มี (Templates):
-${templates.slice(0, 10).map((t: any) => `- ${t.name} (ราคาแนะนำ: ฿${t.price || 0})`).join("\n")}
 === สิ้นสุดข้อมูล ===`;
     }
 

@@ -6,7 +6,28 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export function getTaskPrice(task: Task): number {
+  if (task.paymentPhases) {
+    try {
+      const phases = JSON.parse(task.paymentPhases);
+      if (Array.isArray(phases) && phases.length > 0) {
+        return phases.reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+      }
+    } catch (e) {}
+  }
+  return Number(task.price || 0);
+}
+
+export function getTaskProfit(task: Task): number {
+  const price = getTaskPrice(task);
+  const devCost = Number(task.devCost || 0);
+  return task.myIncome !== undefined ? Number(task.myIncome) : price - devCost;
+}
+
 export function calculateHealthScore(task: Task): { score: number; status: 'Excellent' | 'Healthy' | 'Warning' | 'Critical'; reasons: string[] } {
+  if (task.status === 'Done' || task.status === 'เสร็จสิ้น') {
+    return { score: 100, status: 'Excellent', reasons: ['โครงการเสร็จสิ้นแล้ว'] };
+  }
   let score = 100;
   const reasons: string[] = [];
   const today = new Date().toISOString().split('T')[0];
@@ -30,7 +51,8 @@ export function calculateHealthScore(task: Task): { score: number; status: 'Exce
     reasons.push('รายละเอียดงานน้อย');
   }
 
-  if (!task.price || task.price === 0) {
+  const effectivePrice = getTaskPrice(task);
+  if (!effectivePrice || effectivePrice === 0) {
     score -= 5;
     reasons.push('ไม่มีการกำหนดราคา');
   }
@@ -52,6 +74,7 @@ export function calculateHealthScore(task: Task): { score: number; status: 'Exce
 export type DeadlineStatus = 'overdue' | 'urgent' | 'warning' | 'ok' | null;
 
 export function getDeadlineStatus(task: Task): DeadlineStatus {
+  if (task.status === 'Done' || task.status === 'เสร็จสิ้น') return null;
   if (!task.endDate) return null;
   const today = new Date().toISOString().split('T')[0];
   if (task.endDate < today) return 'overdue';

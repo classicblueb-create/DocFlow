@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Video, Sparkles, Loader2, Plus, X, Trash2, Calendar, Check, Copy, ChevronDown, ChevronUp, Clock, HelpCircle, Film, Radio, FileText, Send, Flame, ExternalLink } from 'lucide-react';
+import { Video, Sparkles, Loader2, Plus, X, Trash2, Calendar, Check, Copy, Clock, HelpCircle, Film, Radio, FileText, Flame, ExternalLink, Star, ChevronUp, ChevronDown } from 'lucide-react';
 import { ContentPlan } from '../../types';
 import { cn } from '../../lib/utils';
 
@@ -113,6 +113,9 @@ export function ContentPlanView({
  // Copied state mapping
  const [copiedKey, setCopiedKey] = useState<string | null>(null);
  const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
+
+ // Edit modal
+ const [editingPlan, setEditingPlan] = useState<ContentPlan | null>(null);
 
  const handleCopy = (text: string, key: string) => {
  navigator.clipboard.writeText(text);
@@ -568,14 +571,22 @@ export function ContentPlanView({
  {/* Summary Card Header */}
  <div
  className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 cursor-pointer select-none"
- onClick={() => setExpandedCardId(isExpanded ? null : plan.id)}
+ onClick={() => setEditingPlan(plan)}
  >
  <div className="flex items-center gap-3">
  <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-sm", theme.iconBg)}>
  <PlatformIcon className="w-[18px] h-[18px]" />
  </div>
  <div>
+ <div className="flex items-center gap-2">
  <h4 className="font-bold text-sm leading-snug">{plan.title}</h4>
+ {plan.engagementRating === 'B+' && (
+ <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">B+</span>
+ )}
+ {plan.engagementRating === 'A+' && (
+ <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200">A+</span>
+ )}
+ </div>
  <div className="flex items-center gap-2 mt-1">
  <span className={cn("text-[9px] font-bold px-2 py-0.5 rounded-full border", theme.bgBadge)}>
  {plan.platform}
@@ -591,6 +602,26 @@ export function ContentPlanView({
  </div>
 
  <div className="flex items-center justify-between md:justify-end gap-2" onClick={e => e.stopPropagation()}>
+ {/* Engagement rating buttons — published only */}
+ {plan.status === 'เผยแพร่แล้ว' && (
+ <>
+ <button
+ title="B+ (views 5000+, likes 100+)"
+ onClick={() => onUpdateContentPlan({ ...plan, engagementRating: plan.engagementRating === 'B+' ? null : 'B+' })}
+ className={cn("p-1.5 rounded-lg transition-colors cursor-pointer border", plan.engagementRating === 'B+' ? 'bg-amber-100 text-amber-700 border-amber-300' : 'hover:bg-amber-50 text-slate-400 border-transparent')}
+ >
+ <Star className="w-3.5 h-3.5" />
+ </button>
+ <button
+ title="A+ (views 10000+, likes 500+)"
+ onClick={() => onUpdateContentPlan({ ...plan, engagementRating: plan.engagementRating === 'A+' ? null : 'A+' })}
+ className={cn("p-1.5 rounded-lg transition-colors cursor-pointer border", plan.engagementRating === 'A+' ? 'bg-rose-100 text-rose-600 border-rose-300' : 'hover:bg-rose-50 text-slate-400 border-transparent')}
+ >
+ <Flame className="w-3.5 h-3.5" />
+ </button>
+ </>
+ )}
+
  {/* Status Selector */}
  <select
  value={plan.status}
@@ -630,7 +661,7 @@ export function ContentPlanView({
 
  {/* Toggle Expand Icon */}
  <button
- onClick={() => setExpandedCardId(isExpanded ? null : plan.id)}
+ onClick={e => { e.stopPropagation(); setExpandedCardId(isExpanded ? null : plan.id); }}
  className="p-1 hover:bg-slate-500/10 rounded-lg cursor-pointer text-current"
  >
  {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -795,6 +826,109 @@ export function ContentPlanView({
 
  </div>
 
+ {/* Full Edit Modal */}
+ {editingPlan && (
+ <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setEditingPlan(null)}>
+ <div className="bg-white rounded-[28px] shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+ <div className="sticky top-0 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between rounded-t-[28px]">
+ <h2 className="font-black text-sm text-slate-900">แก้ไขแผนคอนเทนต์</h2>
+ <button onClick={() => setEditingPlan(null)} className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 cursor-pointer"><X className="w-5 h-5" /></button>
+ </div>
+ <div className="p-6 space-y-4">
+ <div>
+ <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">หัวข้อ</label>
+ <input value={editingPlan.title} onChange={e => setEditingPlan({ ...editingPlan, title: e.target.value })}
+ className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-400" />
+ </div>
+ <div className="grid grid-cols-2 gap-3">
+ <div>
+ <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">แพลตฟอร์ม</label>
+ <select value={editingPlan.platform} onChange={e => setEditingPlan({ ...editingPlan, platform: e.target.value })}
+ className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-400 cursor-pointer">
+ {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
+ </select>
+ </div>
+ <div>
+ <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">สถานะ</label>
+ <select value={editingPlan.status} onChange={e => setEditingPlan({ ...editingPlan, status: e.target.value as ContentPlan['status'] })}
+ className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-400 cursor-pointer">
+ {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+ </select>
+ </div>
+ </div>
+ <div>
+ <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">คอนเซ็ปต์</label>
+ <textarea rows={3} value={editingPlan.concept} onChange={e => setEditingPlan({ ...editingPlan, concept: e.target.value })}
+ className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-400 resize-none" />
+ </div>
+ <div className="grid grid-cols-2 gap-3">
+ <div>
+ <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">โทนเสียง</label>
+ <input value={editingPlan.toneOfVoice || ''} onChange={e => setEditingPlan({ ...editingPlan, toneOfVoice: e.target.value })}
+ className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-400" />
+ </div>
+ <div>
+ <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">กลุ่มเป้าหมาย</label>
+ <input value={editingPlan.targetAudience || ''} onChange={e => setEditingPlan({ ...editingPlan, targetAudience: e.target.value })}
+ className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-400" />
+ </div>
+ </div>
+ <div>
+ <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">วันที่เผยแพร่</label>
+ <input type="date" value={editingPlan.publishDate || ''} onChange={e => setEditingPlan({ ...editingPlan, publishDate: e.target.value || undefined })}
+ className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-400" />
+ </div>
+ {editingPlan.aiHooks && editingPlan.aiHooks.length > 0 && (
+ <div>
+ <label className="block text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-1">Hooks (AI-generated)</label>
+ <div className="space-y-1">
+ {editingPlan.aiHooks.map((h, i) => (
+ <div key={i} className="text-xs bg-indigo-50 border border-indigo-100 px-3 py-2 rounded-xl text-slate-700">
+ <span className="text-indigo-400 font-bold mr-1">#{i+1}</span>{h}
+ </div>
+ ))}
+ </div>
+ </div>
+ )}
+ {editingPlan.aiOutline && (
+ <div>
+ <label className="block text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-1">Outline (AI-generated)</label>
+ <div className="text-xs bg-indigo-50 border border-indigo-100 px-3 py-2 rounded-xl text-slate-700 whitespace-pre-line font-mono">{editingPlan.aiOutline}</div>
+ </div>
+ )}
+ {editingPlan.aiScript && (
+ <div>
+ <label className="block text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-1">Script (AI-generated)</label>
+ <div className="text-xs bg-indigo-50 border border-indigo-100 px-3 py-2 rounded-xl text-slate-700 whitespace-pre-line max-h-40 overflow-y-auto">{editingPlan.aiScript}</div>
+ </div>
+ )}
+ {editingPlan.aiHashtags && (
+ <div>
+ <label className="block text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-1">Hashtags (AI-generated)</label>
+ <div className="text-xs bg-indigo-50 border border-indigo-100 px-3 py-2 rounded-xl text-indigo-600 font-mono font-bold">{editingPlan.aiHashtags}</div>
+ </div>
+ )}
+ {editingPlan.notionUrl && (
+ <div className="flex items-center gap-2 text-xs text-slate-500">
+ <ExternalLink className="w-3.5 h-3.5" />
+ <a href={editingPlan.notionUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-500 hover:underline">เปิดใน Notion</a>
+ </div>
+ )}
+ <div className="pt-2 flex gap-2">
+ <button
+ onClick={async () => { await onUpdateContentPlan(editingPlan); setEditingPlan(null); }}
+ className="flex-1 bg-[#0f172a] hover:bg-slate-800 text-white font-bold text-sm py-3 rounded-2xl transition cursor-pointer flex items-center justify-center gap-2"
+ >
+ <Check className="w-4 h-4 text-emerald-400" /> บันทึก &amp; ซิงค์ Notion
+ </button>
+ <button onClick={() => setEditingPlan(null)} className="px-5 py-3 border border-slate-200 text-slate-500 font-semibold text-sm rounded-2xl hover:bg-slate-50 cursor-pointer">
+ ปิด
+ </button>
+ </div>
+ </div>
+ </div>
+ </div>
+ )}
  </div>
  </div>
  );

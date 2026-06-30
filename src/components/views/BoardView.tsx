@@ -1,6 +1,6 @@
 import React from 'react';
 import { Task } from '../../types';
-import { cn } from '../../lib/utils';
+import { cn, getTaskPrice } from '../../lib/utils';
 
 interface BoardViewProps {
   tasks: Task[];
@@ -16,6 +16,7 @@ const COLUMNS = [
 ];
 
 function deadlineStyle(task: Task): React.CSSProperties {
+  if (task.status === 'Done' || task.status === 'เสร็จสิ้น') return { background: 'rgba(255, 255, 255, 0.45)', border: '1px solid rgba(255, 255, 255, 0.45)' };
   if (!task.endDate) return { background: 'rgba(255, 255, 255, 0.45)', border: '1px solid rgba(255, 255, 255, 0.45)' };
   const today = new Date().toISOString().split('T')[0];
   const daysLeft = Math.round((new Date(task.endDate).getTime() - new Date(today).getTime()) / 86400000);
@@ -109,8 +110,8 @@ export function BoardView({ tasks, onTaskDrop, onTaskClick }: BoardViewProps) {
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         <AssigneeBadge assignee={task.assignee} />
-                        {task.price ? (
-                          <span className="text-[10px] font-bold text-emerald-700">฿{Number(task.price).toLocaleString()}</span>
+                        {getTaskPrice(task) ? (
+                          <span className="text-[10px] font-bold text-emerald-700">฿{Number(getTaskPrice(task)).toLocaleString()}</span>
                         ) : null}
                       </div>
                     </div>

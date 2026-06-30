@@ -441,6 +441,9 @@ function mapContentPlan(r: any): ContentPlan {
     notionPageId: r.notionPageId || undefined,
     notionUrl: r.notionUrl || undefined,
     createdAt: r.createdAt || new Date().toISOString(),
+    engagementRating: r.engagementRating || null,
+    viewCount: r.viewCount ?? undefined,
+    likeCount: r.likeCount ?? undefined,
   };
 }
 
@@ -477,6 +480,9 @@ export async function saveContentPlan(plan: ContentPlan): Promise<void> {
     notionPageId: plan.notionPageId || null,
     notionUrl: plan.notionUrl || null,
     createdAt: plan.createdAt || new Date().toISOString(),
+    engagementRating: plan.engagementRating || null,
+    viewCount: plan.viewCount ?? null,
+    likeCount: plan.likeCount ?? null,
   });
   if (error) throw error;
 }
