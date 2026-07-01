@@ -1046,23 +1046,30 @@ ${ideasContext || 'ไม่มีข้อมูลไอเดีย'}
 
     try {
       const supabase = createClient(supabaseUrl, supabaseAnonKey);
-      const [tasksRes, clientsRes, ideasRes] = await Promise.all([
+      const [tasksRes, clientsRes, ideasRes, contentPlansRes] = await Promise.all([
         supabase.from('tasks').select('*'),
         supabase.from('clients').select('*'),
-        supabase.from('ideas').select('*')
+        supabase.from('ideas').select('*'),
+        supabase.from('content_plans').select('*')
       ]);
 
       const tasks = tasksRes.data || [];
       const clients = clientsRes.data || [];
       const ideas = ideasRes.data || [];
+      const contentPlans = contentPlansRes.data || [];
+
+      const highPerformers = contentPlans.filter((p: any) => p.engagementRating === 'A+' || p.engagementRating === 'B+');
+      const publishedPlans = contentPlans.filter((p: any) => p.status === 'เผยแพร่แล้ว');
 
       // Context construction
       const tasksContext = tasks.map(t => `- งาน: ${t.name} (ลูกค้า: ${t.customer || 'ไม่มี'}, ผู้รับผิดชอบ: ${t.assignee || 'ยังไม่มอบหมาย'}, สถานะ: ${t.status}, ราคา: ${t.price || 0} บาท, กำหนดส่ง: ${t.endDate || 'ไม่มี'})`).join('\n');
       const clientsContext = clients.map(c => `- ลูกค้า: ${c.name} (เป้าหมายงบประมาณ: ${c.targetBudget || 0} บาท, ข้อมูลติดต่อ: ${c.contactInfo || 'ไม่มี'})`).join('\n');
       const ideasContext = ideas.map(i => `- ไอเดีย: ${i.title} (แนวคิด: ${i.concept || 'ไม่มี'}, แพลตฟอร์ม: ${i.platform || 'ไม่มี'})`).join('\n');
+      const highPerformersContext = highPerformers.map((p: any) => `- "${p.title}" (แพลตฟอร์ม: ${p.platform}, ระดับ: ${p.engagementRating}, วิว: ${p.viewCount || 'ไม่ระบุ'}, ไลค์: ${p.likeCount || 'ไม่ระบุ'})`).join('\n');
+      const contentSummary = `คอนเทนต์ทั้งหมด: ${publishedPlans.length} ชิ้น | เอนเกจดีมาก (A+/B+): ${highPerformers.length} ชิ้น`;
 
       const systemInstruction = `คุณคือ "Modty" ผู้ช่วย AI และนักวิเคราะห์ธุรกิจส่วนตัวที่เก่งกาจและเป็นกันเอง
-หน้าที่ของคุณคือวิเคราะห์ภาพรวมธุรกิจประจำสัปดาห์ (Weekly Business Analysis / Analyse My Business) จากข้อมูลในระบบ DocFlow และส่งรายงานเป็นภาษาไทยให้เจ้าของธุรกิจอ่านเข้าใจง่าย ได้แรงบันดาลใจ และเห็นทิศทางชัดเจน`;
+หน้าที่ของคุณคือวิเคราะห์ภาพรวมธุรกิจประจำสัปดาห์ (Weekly Business Analysis / Analyse My Business) จากข้อมูลในระบบ ModtyTasks และส่งรายงานเป็นภาษาไทยให้เจ้าของธุรกิจอ่านเข้าใจง่าย ได้แรงบันดาลใจ และเห็นทิศทางชัดเจน`;
 
       const userPrompt = `นี่คือข้อมูลล่าสุดในระบบ:
 ---
@@ -1074,17 +1081,38 @@ ${clientsContext || 'ไม่มีรายชื่อลูกค้า'}
 
 [ไอเดียคอนเทนต์]
 ${ideasContext || 'ไม่มีไอเดียคอนเทนต์'}
+
+[สรุปคอนเทนต์]
+${contentSummary}
+
+[คอนเทนต์ที่เอนเกจดีมาก (B+/A+)]
+${highPerformersContext || 'ยังไม่มีคอนเทนต์ที่มีคะแนนเอนเกจสูง'}
 ---
 
 ช่วยทำการวิเคราะห์วิเคราะห์ธุรกิจประจำสัปดาห์เชิงลึก (Analyse My Business) โดยครอบคลุมหัวข้อต่อไปนี้:
 1. 📊 *ภาพรวมความคืบหน้า (Business Progress Overview):* สรุปสถานะโครงการ รายได้สะสมหรืองบประมาณรวม
 2. ⚠️ *คอขวดและจุดเสี่ยง (Bottlenecks & Risks):* ชี้จุดที่ค้างส่ง (Overdue) หรืองานที่ใช้เวลานานผิดปกติ
 3. 💡 *โอกาสและไอเดียธุรกิจใหม่ๆ (Ideas & Growth Opportunities):* เสนอแนะการนำไอเดียคอนเทนต์ที่มีอยู่ไปขยายผล หรือแนะนำแพลตฟอร์มที่ควรขยาย
-4. 🚀 *คำแนะนำและสิ่งแรกที่ต้องทำในสัปดาห์นี้ (Actionable Recommendations):* ลำดับความสำคัญสิ่งที่ควรทำทันที 3 ข้อแรก
+4. 🎬 *วิเคราะห์ทิศทางคอนเทนต์สัปดาห์นี้ (Content Direction):* จากคอนเทนต์ที่เอนเกจดี วิเคราะห์ว่าควรทำคอนเทนต์แนวไหนต่อ รูปแบบ/หัวข้อ/แพลตฟอร์มที่แนะนำ พร้อมไอเดียหัวข้อใหม่ 3 ข้อจากรูปแบบที่เคยได้ผล
+5. 🚀 *คำแนะนำและสิ่งแรกที่ต้องทำในสัปดาห์นี้ (Actionable Recommendations):* ลำดับความสำคัญสิ่งที่ควรทำทันที 3 ข้อแรก
 
 กรุณาตอบเป็นภาษาไทยจัดย่อหน้าและหัวข้อให้อ่านง่าย มีการใช้ตัวหนา/ตัวเอียง/อีโมจิ เพื่อให้อ่านง่าย สไตล์เพื่อนคุยธุรกิจอย่างเป็นกันเองและกระตือรือร้น`;
 
       const analysisText = await generateWithAI(systemInstruction, userPrompt);
+
+      // Save to Supabase tasks!
+      try {
+        await supabase.from('tasks').insert({
+          id: `cp-analysis-${Date.now()}`,
+          name: `📊 รายงานวิเคราะห์ประจำสัปดาห์ (${new Date().toLocaleDateString('th-TH')})`,
+          status: 'Done',
+          details: analysisText,
+          priority: 'สูง',
+          createdAt: new Date().toISOString()
+        });
+      } catch (dbErr) {
+        console.error("Failed to save weekly analysis to Supabase tasks", dbErr);
+      }
 
       const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: "POST",
@@ -1108,7 +1136,7 @@ ${ideasContext || 'ไม่มีไอเดียคอนเทนต์'}
         });
       }
 
-      return res.json({ ok: true, type: 'weekly-analysis', message: 'ส่งรายงานวิเคราะห์ประจำสัปดาห์สำเร็จ' });
+      return res.json({ ok: true, type: 'weekly-analysis', message: 'ส่งรายงานวิเคราะห์ประจำสัปดาห์สำเร็จและบันทึกรายงานลงระบบแล้ว' });
     } catch (e: any) {
       console.error("[Cron Weekly Analysis Error]", e);
       return res.status(500).json({ error: e.message });

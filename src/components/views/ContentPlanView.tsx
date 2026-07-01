@@ -84,27 +84,25 @@ export function ContentPlanView({
  onRefreshContentPlans,
  isRefreshingPlans = false,
 }: ContentPlanViewProps) {
-  // Drag and Drop Idea States
-  const [droppedIdea, setDroppedIdea] = useState<Idea | null>(null);
-  const [droppedTier, setDroppedTier] = useState<'A+' | 'B+' | null>(null);
-
-  const handleDropIdea = (e: React.DragEvent, tier: 'A+' | 'B+') => {
+  const handleDropIdea = async (e: React.DragEvent, tier: 'A+' | 'B+') => {
     e.preventDefault();
-    const ideaId = e.dataTransfer.getData('text/plain');
-    if (!ideaId || !ideas) return;
-    const idea = ideas.find(i => i.id === ideaId);
-    if (idea) {
-      setDroppedIdea(idea);
-      setDroppedTier(tier);
-      setConcept(idea.description || idea.title);
+    const dataStr = e.dataTransfer.getData('text/plain');
+    if (!dataStr) return;
+    try {
+      const data = JSON.parse(dataStr);
+      if (data.type === 'content_plan' && data.id) {
+        const plan = contentPlans.find(p => p.id === data.id);
+        if (plan) {
+          await onUpdateContentPlan({ ...plan, engagementRating: tier });
+        }
+      }
+    } catch (err) {
+      console.error("Drop failed:", err);
     }
   };
 
-  const handleClearDropped = () => {
-    setDroppedIdea(null);
-    setDroppedTier(null);
-    setConcept('');
-  };
+  const aPlusPlans = contentPlans.filter(p => p.engagementRating === 'A+');
+  const bPlusPlans = contentPlans.filter(p => p.engagementRating === 'B+');
 
  // AI Form States
  const [concept, setConcept] = useState('');
@@ -162,16 +160,8 @@ export function ContentPlanView({
     const systemPrompt = `คุณคือ AI Gemma ผู้เชี่ยวชาญด้านการวางแผนคอนเทนต์และคิดกลยุทธ์การตลาดออนไลน์ชั้นยอด (Content Creator Expert) สำหรับ ${platform}
 คุณเชี่ยวชาญการเขียน Hook สะกดสายตา โครงเรื่อง (Outline) สคริปต์แบบเต็ม (Full script / voiceover) และแฮชแท็กตอบโจทย์กลุ่มเป้าหมาย`;
 
-    const tierContext = droppedIdea && droppedTier
-      ? `\n- ระดับความเป้าหมายความสำเร็จของไอเดียนี้: ระดับ ${droppedTier} (${
-          droppedTier === 'A+' 
-            ? 'เน้นความปังระดับไวรัลแมส ผู้เข้าชม 10,000+ ไลก์ 500+ เน้น Hook และสคริปต์ที่กระตุ้นอารมณ์ ดึงดูดความสนใจขั้นสุดหยุดนิ้วโป้งคนดูภายใน 3 วินาทีแรก'
-            : 'เน้นความปังระดับคุณภาพสูงเจาะกลุ่มเป้าหมายคุณภาพ ผู้เข้าชม 5,000+ ไลก์ 100+ เน้นให้คนบันทึกเก็บไว้ดูซ้ำและส่งต่อ โครงสร้างข้อมูลละเอียดชัดเจน มีสาระครบถ้วน'
-        })`
-      : '';
-
     const userPrompt = `ระดมสมองคิดแผนคอนเทนต์อย่างละเอียดโดยมีข้อมูลดังนี้:
-- คอนเซ็ปต์หลัก: ${concept}${tierContext}
+- คอนเซ็ปต์หลัก: ${concept}
 - แพลตฟอร์ม: ${platform}
 - โทนเสียง (Tone of Voice): ${tone}
 - กลุ่มเป้าหมาย: ${audience || 'คนทั่วไป'}
@@ -353,77 +343,86 @@ export function ContentPlanView({
  <h3 className="font-black text-sm text-[#0f172a] uppercase tracking-wide">AI Content Assistant</h3>
  </div>
 
-  <form onSubmit={handleBrainstorm} className="space-y-4">
-    {/* Drag & Drop Target Slots */}
-    <div className="grid grid-cols-2 gap-3 mb-2">
-      {/* A+ Slot */}
-      <div
-        onDragOver={e => e.preventDefault()}
-        onDrop={e => handleDropIdea(e, 'A+')}
-        className={cn(
-          "border-2 border-dashed rounded-[22px] p-3 text-center transition-all duration-300 flex flex-col justify-center items-center gap-1 min-h-[90px] relative overflow-hidden",
-          droppedIdea && droppedTier === 'A+'
-            ? "border-rose-500 bg-rose-500/5 text-[#0f172a]"
-            : "border-slate-200 hover:border-rose-500/50 bg-slate-50/50 text-slate-400"
-        )}
-      >
-        {droppedIdea && droppedTier === 'A+' ? (
-          <>
-            <span className="absolute top-1 right-1 text-[8px] font-black px-1.5 py-0.5 rounded-full bg-rose-500 text-white shadow-sm">A+ (Viral)</span>
-            <Flame className="w-4 h-4 text-rose-500 mb-0.5 animate-pulse" />
-            <h4 className="text-[10px] font-bold truncate max-w-full px-2 text-slate-800">{droppedIdea.title}</h4>
-            <p className="text-[8px] text-slate-500 line-clamp-2 px-1 leading-snug">{droppedIdea.description}</p>
-            <button 
-              type="button" 
-              onClick={handleClearDropped} 
-              className="mt-1 text-[8px] text-rose-500 hover:text-rose-600 hover:underline font-bold cursor-pointer"
-            >
-              ล้างข้อมูล
-            </button>
-          </>
-        ) : (
-          <>
-            <Flame className="w-4 h-4 text-rose-500/40" />
-            <span className="text-[10px] font-bold text-slate-700">ลากไอเดียใส่ช่อง A+</span>
-            <span className="text-[8px] text-slate-400 font-semibold">ปังระดับแมส</span>
-          </>
-        )}
-      </div>
-
-      {/* B+ Slot */}
-      <div
-        onDragOver={e => e.preventDefault()}
-        onDrop={e => handleDropIdea(e, 'B+')}
-        className={cn(
-          "border-2 border-dashed rounded-[22px] p-3 text-center transition-all duration-300 flex flex-col justify-center items-center gap-1 min-h-[90px] relative overflow-hidden",
-          droppedIdea && droppedTier === 'B+'
-            ? "border-amber-500 bg-amber-500/5 text-[#0f172a]"
-            : "border-slate-200 hover:border-amber-500/50 bg-slate-50/50 text-slate-400"
-        )}
-      >
-        {droppedIdea && droppedTier === 'B+' ? (
-          <>
-            <span className="absolute top-1 right-1 text-[8px] font-black px-1.5 py-0.5 rounded-full bg-amber-500 text-white shadow-sm">B+ (Engage)</span>
-            <Star className="w-4 h-4 text-amber-500 mb-0.5 animate-pulse" />
-            <h4 className="text-[10px] font-bold truncate max-w-full px-2 text-slate-800">{droppedIdea.title}</h4>
-            <p className="text-[8px] text-slate-500 line-clamp-2 px-1 leading-snug">{droppedIdea.description}</p>
-            <button 
-              type="button" 
-              onClick={handleClearDropped} 
-              className="mt-1 text-[8px] text-amber-500 hover:text-amber-600 hover:underline font-bold cursor-pointer"
-            >
-              ล้างข้อมูล
-            </button>
-          </>
-        ) : (
-          <>
-            <Star className="w-4 h-4 text-amber-500/40" />
-            <span className="text-[10px] font-bold text-slate-700">ลากไอเดียใส่ช่อง B+</span>
-            <span className="text-[8px] text-slate-400 font-semibold">ปังระดับเจาะจง</span>
-          </>
-        )}
-      </div>
-    </div>
+  <form onSubmit={handleBrainstorm} className="space-y-4">     {/* Drag & Drop Target Slots */}
+     <div className="grid grid-cols-2 gap-3 mb-2">
+       {/* A+ Slot */}
+       <div
+         onDragOver={e => e.preventDefault()}
+         onDrop={e => handleDropIdea(e, 'A+')}
+         className={cn(
+           "border-2 border-dashed rounded-[22px] p-3 text-center transition-all duration-300 flex flex-col justify-center items-center gap-1 min-h-[90px] relative overflow-hidden",
+           aPlusPlans.length > 0
+             ? "border-rose-500 bg-rose-500/5 text-[#0f172a]"
+             : "border-slate-200 hover:border-rose-500/50 bg-slate-50/50 text-slate-400"
+         )}
+       >
+         {aPlusPlans.length > 0 ? (
+           <div className="w-full flex flex-col items-center gap-1">
+             <span className="text-[8px] font-black px-1.5 py-0.5 rounded-full bg-rose-500 text-white shadow-sm self-center">A+ (Viral)</span>
+             <div className="space-y-1 w-full max-h-[85px] overflow-y-auto pr-0.5 hide-scrollbar">
+               {aPlusPlans.map(p => (
+                 <div key={p.id} className="flex justify-between items-center bg-white/70 px-2 py-1 rounded-xl text-[9px] text-slate-800 border border-slate-200 shadow-sm">
+                   <span className="font-bold truncate max-w-[80%]">{p.title}</span>
+                   <button 
+                     type="button" 
+                     onClick={() => onUpdateContentPlan({ ...p, engagementRating: null })}
+                     className="text-rose-500 hover:text-rose-700 font-bold ml-1 cursor-pointer shrink-0"
+                     title="ล้างระดับปัง"
+                   >
+                     ✕
+                   </button>
+                 </div>
+               ))}
+             </div>
+           </div>
+         ) : (
+           <>
+             <Flame className="w-4 h-4 text-rose-500/40" />
+             <span className="text-[10px] font-bold text-slate-700">ลากแผนใส่ช่อง A+</span>
+             <span className="text-[8px] text-slate-400 font-semibold">ปังระดับแมส</span>
+           </>
+         )}
+       </div>
+ 
+       {/* B+ Slot */}
+       <div
+         onDragOver={e => e.preventDefault()}
+         onDrop={e => handleDropIdea(e, 'B+')}
+         className={cn(
+           "border-2 border-dashed rounded-[22px] p-3 text-center transition-all duration-300 flex flex-col justify-center items-center gap-1 min-h-[90px] relative overflow-hidden",
+           bPlusPlans.length > 0
+             ? "border-amber-500 bg-amber-500/5 text-[#0f172a]"
+             : "border-slate-200 hover:border-amber-500/50 bg-slate-50/50 text-slate-400"
+         )}
+       >
+         {bPlusPlans.length > 0 ? (
+           <div className="w-full flex flex-col items-center gap-1">
+             <span className="text-[8px] font-black px-1.5 py-0.5 rounded-full bg-amber-500 text-white shadow-sm self-center">B+ (Engage)</span>
+             <div className="space-y-1 w-full max-h-[85px] overflow-y-auto pr-0.5 hide-scrollbar">
+               {bPlusPlans.map(p => (
+                 <div key={p.id} className="flex justify-between items-center bg-white/70 px-2 py-1 rounded-xl text-[9px] text-slate-800 border border-slate-200 shadow-sm">
+                   <span className="font-bold truncate max-w-[80%]">{p.title}</span>
+                   <button 
+                     type="button" 
+                     onClick={() => onUpdateContentPlan({ ...p, engagementRating: null })}
+                     className="text-amber-500 hover:text-amber-700 font-bold ml-1 cursor-pointer shrink-0"
+                     title="ล้างระดับปัง"
+                   >
+                     ✕
+                   </button>
+                 </div>
+               ))}
+             </div>
+           </div>
+         ) : (
+           <>
+             <Star className="w-4 h-4 text-amber-500/40" />
+             <span className="text-[10px] font-bold text-slate-700">ลากแผนใส่ช่อง B+</span>
+             <span className="text-[8px] text-slate-400 font-semibold">ปังระดับเจาะจง</span>
+           </>
+         )}
+       </div>
+     </div>
 
   <div>
  <label className="block text-[10px] font-bold text-slate-450 uppercase tracking-wider mb-1.5">คอนเซ็ปต์เนื้อหา / ไอเดียดิบ</label>
@@ -736,8 +735,13 @@ export function ContentPlanView({
  return (
  <div
  key={plan.id}
+ draggable
+ onDragStart={(e) => {
+   e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'content_plan', id: plan.id }));
+   e.dataTransfer.effectAllowed = 'move';
+ }}
  className={cn(
- "rounded-[28px] border transition-all duration-300 hover:shadow-md overflow-hidden relative group",
+ "rounded-[28px] border transition-all duration-300 hover:shadow-md overflow-hidden relative group cursor-grab active:cursor-grabbing",
  theme.bg,
  theme.border,
  theme.text

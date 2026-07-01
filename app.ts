@@ -7,6 +7,7 @@ import helmet from "helmet";
 import { jsPDF } from "jspdf";
 import { createClient } from "@supabase/supabase-js";
 import { GoogleGenAI } from "@google/genai";
+import { createDAVClient } from "tsdav";
 
 dotenv.config();
 
@@ -1635,6 +1636,20 @@ ${highPerformersContext || 'ยังไม่มีคอนเทนต์ท�
 
       const analysisText = await generateWithAI(systemInstruction, userPrompt, 0.75);
 
+      // Save to Supabase tasks!
+      try {
+        await supabase.from('tasks').insert({
+          id: `cp-analysis-${Date.now()}`,
+          name: `📊 รายงานวิเคราะห์ประจำสัปดาห์ (${new Date().toLocaleDateString('th-TH')})`,
+          status: 'Done',
+          details: analysisText,
+          priority: 'สูง',
+          createdAt: new Date().toISOString()
+        });
+      } catch (dbErr) {
+        console.error("Failed to save weekly analysis to Supabase tasks", dbErr);
+      }
+
       const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1657,7 +1672,7 @@ ${highPerformersContext || 'ยังไม่มีคอนเทนต์ท�
         });
       }
 
-      return res.json({ ok: true, type: 'weekly-analysis', message: 'ส่งรายงานวิเคราะห์ประจำสัปดาห์สำเร็จ' });
+      return res.json({ ok: true, type: 'weekly-analysis', message: 'ส่งรายงานวิเคราะห์ประจำสัปดาห์สำเร็จและบันทึกรายงานลงระบบแล้ว' });
     } catch (e: any) {
       console.error("[Cron Weekly Analysis Error]", e);
       return res.status(500).json({ error: e.message });
@@ -1827,8 +1842,7 @@ ${highPerformersContext || 'ยังไม่มีคอนเทนต์ท�
   // -----------------------------------------------------------------
   // iCloud Reminders (CalDAV)
   // -----------------------------------------------------------------
-  const getCalDAVClient = async () => {
-    const { createDAVClient } = await import('tsdav');
+  const getCalDAVClient = () => {
     return createDAVClient({
       serverUrl: 'https://caldav.icloud.com',
       credentials: {
