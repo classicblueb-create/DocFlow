@@ -2038,17 +2038,13 @@ ${highPerformersContext || 'ยังไม่มีคอนเทนต์ท�
     }
     try {
       const calUrl = await discoverRemindersCalendar();
-      // REPORT to fetch VTODO objects
+      // REPORT to fetch all VTODO objects (no filter — simpler and more compatible)
       const report = `<?xml version="1.0"?>
 <C:calendar-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
   <D:prop><D:getetag/><C:calendar-data/></D:prop>
   <C:filter>
     <C:comp-filter name="VCALENDAR">
-      <C:comp-filter name="VTODO">
-        <C:prop-filter name="STATUS">
-          <C:text-match collation="i;ascii-casemap" negate-condition="yes">COMPLETED</C:text-match>
-        </C:prop-filter>
-      </C:comp-filter>
+      <C:comp-filter name="VTODO"/>
     </C:comp-filter>
   </C:filter>
 </C:calendar-query>`;
