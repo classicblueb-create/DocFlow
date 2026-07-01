@@ -204,6 +204,20 @@ ${categoriesListStr}
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks.length, categories.length]);
 
+  // ── Toggle subtask done from BriefingView ──
+  const toggleSubtaskDone = (parentId: string, subId: string) => {
+    const parentTask = tasks.find(t => String(t.id) === parentId);
+    if (!parentTask) return;
+    try {
+      const subs: Subtask[] = typeof parentTask.subtasks === 'string'
+        ? JSON.parse(parentTask.subtasks) : (parentTask.subtasks as any || []);
+      const updated = subs.map(s => s.id === subId
+        ? { ...s, status: (s.status === 'done' ? 'todo' : 'done') as Subtask['status'] }
+        : s);
+      onUpdateTask({ ...parentTask, subtasks: JSON.stringify(updated) });
+    } catch {}
+  };
+
   // ── Compile calculations ──
   const revenueData = useMemo(() => compileRevenueData(tasks), [tasks]);
   
@@ -879,14 +893,24 @@ ${categoriesListStr}
                       ))}
 
                       {/* Subtasks */}
-                      {fanSubtasks.map(({ sub, parentName }) => (
-                        <div key={String(sub.id)} className="flex items-center gap-2 pl-3 border-l-2 border-indigo-200">
-                          <span className="w-1 h-1 rounded-full shrink-0 bg-indigo-400" />
-                          <p className="text-[11px] text-white/70 truncate flex-1 font-medium">
-                            <span className="text-white/50 font-normal mr-1">[ซับ]</span>
-                            {sub.name} <span className="text-[9px] text-white/50 font-normal">({parentName})</span>
+                      {fanSubtasks.map(({ sub, parentName, parentId }) => (
+                        <div key={String(sub.id)} className="flex items-center gap-2 pl-2 border-l-2 border-indigo-400/30">
+                          <button
+                            onClick={() => toggleSubtaskDone(parentId, sub.id)}
+                            className={cn(
+                              'w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-all cursor-pointer',
+                              sub.status === 'done'
+                                ? 'bg-indigo-500 border-indigo-500'
+                                : 'border-white/30 hover:border-indigo-400'
+                            )}
+                          >
+                            {sub.status === 'done' && <svg viewBox="0 0 12 12" className="w-2.5 h-2.5 text-white fill-none stroke-current stroke-2"><polyline points="2,6 5,9 10,3"/></svg>}
+                          </button>
+                          <p className={cn('text-[11px] truncate flex-1 font-medium', sub.status === 'done' ? 'line-through text-white/30' : 'text-white/70')}>
+                            {sub.name}
+                            <span className="text-[9px] text-white/40 font-normal ml-1">({parentName})</span>
                           </p>
-                          <span className="text-[9px] text-white/50 shrink-0 font-bold uppercase tracking-wider">{sub.status}</span>
+                          {sub.dueDate && <span className="text-[9px] text-rose-400 shrink-0 font-semibold">{sub.dueDate}</span>}
                         </div>
                       ))}
                     </div>
@@ -940,14 +964,24 @@ ${categoriesListStr}
                       ))}
 
                       {/* Subtasks */}
-                      {modSubtasks.map(({ sub, parentName }) => (
-                        <div key={String(sub.id)} className="flex items-center gap-2 pl-3 border-l-2 border-emerald-100">
-                          <span className="w-1 h-1 rounded-full shrink-0 bg-emerald-400" />
-                          <p className="text-[11px] text-white/70 truncate flex-1 font-medium">
-                            <span className="text-white/50 font-normal mr-1">[ซับ]</span>
-                            {sub.name} <span className="text-[9px] text-white/50 font-normal">({parentName})</span>
+                      {modSubtasks.map(({ sub, parentName, parentId }) => (
+                        <div key={String(sub.id)} className="flex items-center gap-2 pl-2 border-l-2 border-emerald-400/30">
+                          <button
+                            onClick={() => toggleSubtaskDone(parentId, sub.id)}
+                            className={cn(
+                              'w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 transition-all cursor-pointer',
+                              sub.status === 'done'
+                                ? 'bg-emerald-500 border-emerald-500'
+                                : 'border-white/30 hover:border-emerald-400'
+                            )}
+                          >
+                            {sub.status === 'done' && <svg viewBox="0 0 12 12" className="w-2.5 h-2.5 text-white fill-none stroke-current stroke-2"><polyline points="2,6 5,9 10,3"/></svg>}
+                          </button>
+                          <p className={cn('text-[11px] truncate flex-1 font-medium', sub.status === 'done' ? 'line-through text-white/30' : 'text-white/70')}>
+                            {sub.name}
+                            <span className="text-[9px] text-white/40 font-normal ml-1">({parentName})</span>
                           </p>
-                          <span className="text-[9px] text-white/50 shrink-0 font-bold uppercase tracking-wider">{sub.status}</span>
+                          {sub.dueDate && <span className="text-[9px] text-rose-400 shrink-0 font-semibold">{sub.dueDate}</span>}
                         </div>
                       ))}
                     </div>
