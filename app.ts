@@ -1928,16 +1928,29 @@ ${highPerformersContext || 'ยังไม่มีคอนเทนต์ท�
       const calUrl = await discoverRemindersCalendar();
       const uid = `modtytasks-${Date.now()}`;
       const now = new Date().toISOString().replace(/[-:.]/g, '').slice(0, 15) + 'Z';
-      let dueLine = '';
-      if (dueDate) {
-        const d = new Date(dueDate);
-        const y = d.getFullYear();
-        const mo = String(d.getMonth() + 1).padStart(2, '0');
-        const dd = String(d.getDate()).padStart(2, '0');
-        dueLine = `\r\nDUE;VALUE=DATE:${y}${mo}${dd}`;
-      }
-      const descLine = notes ? `\r\nDESCRIPTION:${notes.replace(/\n/g, '\\n')}` : '';
-      const vtodo = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//ModtyTasks//EN\r\nBEGIN:VTODO\r\nUID:${uid}\r\nDTSTAMP:${now}\r\nSUMMARY:${title}${dueLine}${descLine}\r\nSTATUS:NEEDS-ACTION\r\nEND:VTODO\r\nEND:VCALENDAR`;
+      const vtodo = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'CALSCALE:GREGORIAN',
+        'PRODID:-//ModtyTasks//EN',
+        'BEGIN:VTODO',
+        `UID:${uid}`,
+        `DTSTAMP:${now}`,
+        `CREATED:${now}`,
+        `LAST-MODIFIED:${now}`,
+        `SUMMARY:${title}`,
+        ...(dueDate ? [(() => {
+          const d = new Date(dueDate);
+          const y = d.getFullYear();
+          const mo = String(d.getMonth() + 1).padStart(2, '0');
+          const dd2 = String(d.getDate()).padStart(2, '0');
+          return `DUE;VALUE=DATE:${y}${mo}${dd2}`;
+        })()] : []),
+        ...(notes ? [`DESCRIPTION:${notes.replace(/\n/g, '\\n')}`] : []),
+        'STATUS:NEEDS-ACTION',
+        'END:VTODO',
+        'END:VCALENDAR',
+      ].join('\r\n');
 
       const putUrl = calUrl.endsWith('/') ? `${calUrl}${uid}.ics` : `${calUrl}/${uid}.ics`;
       const putRes = await fetch(putUrl, {
@@ -1951,8 +1964,10 @@ ${highPerformersContext || 'ยังไม่มีคอนเทนต์ท�
       });
       if (!putRes.ok && putRes.status !== 201 && putRes.status !== 204) {
         const errBody = await putRes.text();
-        throw new Error(`PUT failed ${putRes.status}: ${errBody.slice(0, 200)}`);
+        console.error('[Reminders PUT]', putRes.status, putUrl, errBody.slice(0, 400));
+        throw new Error(`PUT failed ${putRes.status}: ${errBody.slice(0, 300)}`);
       }
+      console.log('[Reminders PUT ok]', putRes.status, putUrl);
       return res.json({ ok: true, uid, message: `เพิ่ม "${title}" ใน iPhone Reminders แล้ว` });
     } catch (e: any) {
       console.error('[Reminders Create Error]', e);
