@@ -2074,7 +2074,7 @@ ${highPerformersContext || 'ยังไม่มีคอนเทนต์ท�
           });
         }
       }
-      return res.json({ reminders });
+      return res.json({ reminders, _debug: { calUrl, status: r.status, rawXml: xml.slice(0, 1000) } });
     } catch (e: any) {
       return res.status(500).json({ error: e.message });
     }
