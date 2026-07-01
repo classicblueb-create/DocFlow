@@ -858,7 +858,7 @@ export function ContentPlanView({
  </div>
 
  {plan.toneOfVoice && (
- <div className="grid grid-cols-2 gap-2 text-[10px] font-semibold text-slate-450 bg-white/10 p-2 rounded-xl border border-white/10">
+ <div className="grid grid-cols-2 gap-2 text-[10px] font-semibold bg-white/10 p-2 rounded-xl border border-white/10">
  <div>โทนเสียง: <strong className="text-white">{plan.toneOfVoice}</strong></div>
  <div>กลุ่มเป้าหมาย: <strong className="text-white">{plan.targetAudience || "คนทั่วไป"}</strong></div>
  </div>
@@ -926,7 +926,32 @@ export function ContentPlanView({
  <div className="border-t border-slate-100 bg-slate-50/50 p-4 space-y-3.5 animate-in fade-in duration-200 text-slate-600">
  <div>
  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">ไอเดียดิบ / คอนเซ็ปต์</span>
- <p className="text-xs text-slate-700 font-medium leading-relaxed mt-0.5">{plan.concept}</p>
+ <div className="grid grid-cols-3 gap-3 mt-2">
+  <div>
+  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">แพลตฟอร์ม</label>
+  <select value={plan.platform} onChange={e => onUpdateContentPlan({ ...plan, platform: e.target.value })}
+  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-400 cursor-pointer">
+  {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
+  </select>
+  </div>
+  <div>
+  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">สถานะ</label>
+  <select value={plan.status} onChange={e => handleStatusChange(plan, e.target.value as any)}
+  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-400 cursor-pointer">
+  {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+  </select>
+  </div>
+  <div>
+  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">ระดับความปัง</label>
+  <select value={plan.engagementRating || ''} onChange={e => onUpdateContentPlan({ ...plan, engagementRating: (e.target.value || null) as any })}
+  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-400 cursor-pointer">
+  <option value="">ไม่มี (ปกติ)</option>
+  <option value="A+">A+ (ปังระดับแมส)</option>
+  <option value="B+">B+ (ปังระดับเจาะจง)</option>
+  </select>
+  </div>
+  </div>
+ <p className="text-xs text-slate-700 font-medium leading-relaxed mt-3">{plan.concept}</p>
  </div>
 
  {plan.toneOfVoice && (
@@ -1019,22 +1044,31 @@ export function ContentPlanView({
  <input value={editingPlan.title} onChange={e => setEditingPlan({ ...editingPlan, title: e.target.value })}
  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-400" />
  </div>
- <div className="grid grid-cols-2 gap-3">
- <div>
- <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">แพลตฟอร์ม</label>
- <select value={editingPlan.platform} onChange={e => setEditingPlan({ ...editingPlan, platform: e.target.value })}
- className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-400 cursor-pointer">
- {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
- </select>
- </div>
- <div>
- <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">สถานะ</label>
- <select value={editingPlan.status} onChange={e => setEditingPlan({ ...editingPlan, status: e.target.value as ContentPlan['status'] })}
- className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-400 cursor-pointer">
- {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
- </select>
- </div>
- </div>
+ <div className="grid grid-cols-3 gap-3">
+  <div>
+  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">แพลตฟอร์ม</label>
+  <select value={editingPlan.platform} onChange={e => setEditingPlan({ ...editingPlan, platform: e.target.value })}
+  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-400 cursor-pointer">
+  {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
+  </select>
+  </div>
+  <div>
+  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">สถานะ</label>
+  <select value={editingPlan.status} onChange={e => setEditingPlan({ ...editingPlan, status: e.target.value as ContentPlan['status'] })}
+  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-400 cursor-pointer">
+  {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+  </select>
+  </div>
+  <div>
+  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">ระดับความปัง</label>
+  <select value={editingPlan.engagementRating || ''} onChange={e => setEditingPlan({ ...editingPlan, engagementRating: (e.target.value || null) as ContentPlan['engagementRating'] })}
+  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-400 cursor-pointer">
+  <option value="">ไม่มี (ปกติ)</option>
+  <option value="A+">A+ (ปังระดับแมส)</option>
+  <option value="B+">B+ (ปังระดับเจาะจง)</option>
+  </select>
+  </div>
+  </div>
  <div>
  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">คอนเซ็ปต์</label>
  <textarea rows={3} value={editingPlan.concept} onChange={e => setEditingPlan({ ...editingPlan, concept: e.target.value })}

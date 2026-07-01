@@ -7,7 +7,6 @@ import helmet from "helmet";
 import { jsPDF } from "jspdf";
 import { createClient } from "@supabase/supabase-js";
 import { GoogleGenAI } from "@google/genai";
-import { createDAVClient } from "tsdav";
 
 dotenv.config();
 
@@ -1840,67 +1839,122 @@ ${highPerformersContext || 'ยังไม่มีคอนเทนต์ท�
   });
 
   // -----------------------------------------------------------------
-  // iCloud Reminders (CalDAV)
+  // iCloud Reminders (CalDAV - direct HTTP, no tsdav)
   // -----------------------------------------------------------------
-  const getCalDAVClient = () => {
-    return createDAVClient({
-      serverUrl: 'https://caldav.icloud.com',
-      credentials: {
-        username: process.env.APPLE_ID || '',
-        password: process.env.APPLE_APP_PASSWORD || '',
-      },
-      authMethod: 'Basic',
-      defaultAccountType: 'caldav',
+  const icloudAuth = () => {
+    const user = process.env.APPLE_ID || '';
+    const pass = process.env.APPLE_APP_PASSWORD || '';
+    return 'Basic ' + Buffer.from(`${user}:${pass}`).toString('base64');
+  };
+
+  // Discover the Reminders calendar home URL via PROPFIND
+  const discoverRemindersCalendar = async (): Promise<string> => {
+    // Step 1: find principal URL
+    const propfind1 = `<?xml version="1.0" encoding="UTF-8"?>
+<A:propfind xmlns:A="DAV:">
+  <A:prop><A:current-user-principal/></A:prop>
+</A:propfind>`;
+    const r1 = await fetch('https://caldav.icloud.com/', {
+      method: 'PROPFIND',
+      headers: { Authorization: icloudAuth(), Depth: '0', 'Content-Type': 'application/xml' },
+      body: propfind1,
     });
+    const t1 = await r1.text();
+    const principalMatch = t1.match(/<[^>]*href[^>]*>([^<]+caldav\.icloud\.com[^<]*)<\/[^>]*href>/i)
+      || t1.match(/<D:href>([^<]+)<\/D:href>/i);
+    if (!principalMatch) throw new Error('Cannot find principal URL from iCloud CalDAV');
+    let principalUrl = principalMatch[1].trim();
+    if (!principalUrl.startsWith('http')) principalUrl = `https://caldav.icloud.com${principalUrl}`;
+
+    // Step 2: find calendar-home-set
+    const propfind2 = `<?xml version="1.0" encoding="UTF-8"?>
+<A:propfind xmlns:A="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+  <A:prop><C:calendar-home-set/></A:prop>
+</A:propfind>`;
+    const r2 = await fetch(principalUrl, {
+      method: 'PROPFIND',
+      headers: { Authorization: icloudAuth(), Depth: '0', 'Content-Type': 'application/xml' },
+      body: propfind2,
+    });
+    const t2 = await r2.text();
+    const homeMatch = t2.match(/<[^>]*href[^>]*>([^<]+)<\/[^>]*href>/gi);
+    let homeUrl = '';
+    if (homeMatch) {
+      for (const m of homeMatch) {
+        const u = m.replace(/<[^>]+>/g, '').trim();
+        if (u.includes('/') && !u.includes('caldav.icloud.com')) {
+          homeUrl = `https://caldav.icloud.com${u}`;
+          break;
+        } else if (u.startsWith('https://')) {
+          homeUrl = u;
+          break;
+        }
+      }
+    }
+    if (!homeUrl) throw new Error('Cannot find calendar home set from iCloud');
+
+    // Step 3: list calendars and find first VTODO-capable one
+    const propfind3 = `<?xml version="1.0" encoding="UTF-8"?>
+<A:propfind xmlns:A="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+  <A:prop>
+    <A:displayname/>
+    <C:supported-calendar-component-set/>
+  </A:prop>
+</A:propfind>`;
+    const r3 = await fetch(homeUrl, {
+      method: 'PROPFIND',
+      headers: { Authorization: icloudAuth(), Depth: '1', 'Content-Type': 'application/xml' },
+      body: propfind3,
+    });
+    const t3 = await r3.text();
+
+    // Find a response that supports VTODO
+    const responseBlocks = t3.split(/<\/?[Dd]:?response>/i).filter(b => b.includes('VTODO') || b.includes('vtodo'));
+    if (responseBlocks.length === 0) throw new Error('No VTODO calendar found in iCloud');
+
+    const hrefMatch = responseBlocks[0].match(/<[Dd]:?href[^>]*>([^<]+)<\/[Dd]:?href>/i);
+    if (!hrefMatch) throw new Error('Cannot parse VTODO calendar href');
+    let calUrl = hrefMatch[1].trim();
+    if (!calUrl.startsWith('http')) calUrl = `https://caldav.icloud.com${calUrl}`;
+    return calUrl;
   };
 
   // Create a Reminder in iCloud
   app.post("/api/reminders/create", async (req: any, res: any) => {
-    const { title, dueDate, notes, listName } = req.body;
+    const { title, dueDate, notes } = req.body;
     if (!title) return res.status(400).json({ error: "title is required" });
     if (!process.env.APPLE_ID || !process.env.APPLE_APP_PASSWORD) {
       return res.status(503).json({ error: "Apple credentials not configured" });
     }
     try {
-      const client = await getCalDAVClient();
-      const account = await client.fetchCalendars();
-      const targetList = account.find((c: any) =>
-        listName ? c.displayName === listName : c.components?.includes('VTODO')
-      ) || account.find((c: any) => c.components?.includes('VTODO'));
-
-      if (!targetList) return res.status(404).json({ error: "No Reminders list found in iCloud" });
-
-      const uid = `modtytasks-${Date.now()}@modtytasks`;
+      const calUrl = await discoverRemindersCalendar();
+      const uid = `modtytasks-${Date.now()}`;
       const now = new Date().toISOString().replace(/[-:.]/g, '').slice(0, 15) + 'Z';
       let dueLine = '';
       if (dueDate) {
         const d = new Date(dueDate);
         const y = d.getFullYear();
-        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const mo = String(d.getMonth() + 1).padStart(2, '0');
         const dd = String(d.getDate()).padStart(2, '0');
-        dueLine = `DUE;VALUE=DATE:${y}${m}${dd}\r\n`;
+        dueLine = `\r\nDUE;VALUE=DATE:${y}${mo}${dd}`;
       }
-      const vtodo = [
-        'BEGIN:VCALENDAR',
-        'VERSION:2.0',
-        'PRODID:-//ModtyTasks//EN',
-        'BEGIN:VTODO',
-        `UID:${uid}`,
-        `DTSTAMP:${now}`,
-        `SUMMARY:${title}`,
-        dueLine.trim(),
-        notes ? `DESCRIPTION:${notes.replace(/\n/g, '\\n')}` : '',
-        'STATUS:NEEDS-ACTION',
-        'END:VTODO',
-        'END:VCALENDAR',
-      ].filter(Boolean).join('\r\n');
+      const descLine = notes ? `\r\nDESCRIPTION:${notes.replace(/\n/g, '\\n')}` : '';
+      const vtodo = `BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//ModtyTasks//EN\r\nBEGIN:VTODO\r\nUID:${uid}\r\nDTSTAMP:${now}\r\nSUMMARY:${title}${dueLine}${descLine}\r\nSTATUS:NEEDS-ACTION\r\nEND:VTODO\r\nEND:VCALENDAR`;
 
-      await client.createCalendarObject({
-        calendar: targetList,
-        filename: `${uid}.ics`,
-        iCalString: vtodo,
+      const putUrl = calUrl.endsWith('/') ? `${calUrl}${uid}.ics` : `${calUrl}/${uid}.ics`;
+      const putRes = await fetch(putUrl, {
+        method: 'PUT',
+        headers: {
+          Authorization: icloudAuth(),
+          'Content-Type': 'text/calendar; charset=utf-8',
+          'If-None-Match': '*',
+        },
+        body: vtodo,
       });
-
+      if (!putRes.ok && putRes.status !== 201 && putRes.status !== 204) {
+        const errBody = await putRes.text();
+        throw new Error(`PUT failed ${putRes.status}: ${errBody.slice(0, 200)}`);
+      }
       return res.json({ ok: true, uid, message: `เพิ่ม "${title}" ใน iPhone Reminders แล้ว` });
     } catch (e: any) {
       console.error('[Reminders Create Error]', e);
@@ -1908,18 +1962,14 @@ ${highPerformersContext || 'ยังไม่มีคอนเทนต์ท�
     }
   });
 
-  // List Reminder lists (to let user pick)
+  // List Reminder lists
   app.get("/api/reminders/lists", async (_req: any, res: any) => {
     if (!process.env.APPLE_ID || !process.env.APPLE_APP_PASSWORD) {
       return res.status(503).json({ error: "Apple credentials not configured" });
     }
     try {
-      const client = await getCalDAVClient();
-      const calendars = await client.fetchCalendars();
-      const lists = calendars
-        .filter((c: any) => c.components?.includes('VTODO'))
-        .map((c: any) => ({ name: c.displayName, url: c.url }));
-      return res.json({ lists });
+      const calUrl = await discoverRemindersCalendar();
+      return res.json({ lists: [{ name: 'Reminders', url: calUrl }] });
     } catch (e: any) {
       return res.status(500).json({ error: e.message });
     }
