@@ -1825,6 +1825,93 @@ ${highPerformersContext || 'ยังไม่มีคอนเทนต์ท�
   });
 
   // -----------------------------------------------------------------
+  // iCloud Reminders (CalDAV)
+  // -----------------------------------------------------------------
+  const getCalDAVClient = async () => {
+    const { createDAVClient } = await import('tsdav');
+    return createDAVClient({
+      serverUrl: 'https://caldav.icloud.com',
+      credentials: {
+        username: process.env.APPLE_ID || '',
+        password: process.env.APPLE_APP_PASSWORD || '',
+      },
+      authMethod: 'Basic',
+      defaultAccountType: 'caldav',
+    });
+  };
+
+  // Create a Reminder in iCloud
+  app.post("/api/reminders/create", async (req: any, res: any) => {
+    const { title, dueDate, notes, listName } = req.body;
+    if (!title) return res.status(400).json({ error: "title is required" });
+    if (!process.env.APPLE_ID || !process.env.APPLE_APP_PASSWORD) {
+      return res.status(503).json({ error: "Apple credentials not configured" });
+    }
+    try {
+      const client = await getCalDAVClient();
+      const account = await client.fetchCalendars();
+      const targetList = account.find((c: any) =>
+        listName ? c.displayName === listName : c.components?.includes('VTODO')
+      ) || account.find((c: any) => c.components?.includes('VTODO'));
+
+      if (!targetList) return res.status(404).json({ error: "No Reminders list found in iCloud" });
+
+      const uid = `modtytasks-${Date.now()}@modtytasks`;
+      const now = new Date().toISOString().replace(/[-:.]/g, '').slice(0, 15) + 'Z';
+      let dueLine = '';
+      if (dueDate) {
+        const d = new Date(dueDate);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        dueLine = `DUE;VALUE=DATE:${y}${m}${dd}\r\n`;
+      }
+      const vtodo = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//ModtyTasks//EN',
+        'BEGIN:VTODO',
+        `UID:${uid}`,
+        `DTSTAMP:${now}`,
+        `SUMMARY:${title}`,
+        dueLine.trim(),
+        notes ? `DESCRIPTION:${notes.replace(/\n/g, '\\n')}` : '',
+        'STATUS:NEEDS-ACTION',
+        'END:VTODO',
+        'END:VCALENDAR',
+      ].filter(Boolean).join('\r\n');
+
+      await client.createCalendarObject({
+        calendar: targetList,
+        filename: `${uid}.ics`,
+        iCalString: vtodo,
+      });
+
+      return res.json({ ok: true, uid, message: `เพิ่ม "${title}" ใน iPhone Reminders แล้ว` });
+    } catch (e: any) {
+      console.error('[Reminders Create Error]', e);
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
+  // List Reminder lists (to let user pick)
+  app.get("/api/reminders/lists", async (_req: any, res: any) => {
+    if (!process.env.APPLE_ID || !process.env.APPLE_APP_PASSWORD) {
+      return res.status(503).json({ error: "Apple credentials not configured" });
+    }
+    try {
+      const client = await getCalDAVClient();
+      const calendars = await client.fetchCalendars();
+      const lists = calendars
+        .filter((c: any) => c.components?.includes('VTODO'))
+        .map((c: any) => ({ name: c.displayName, url: c.url }));
+      return res.json({ lists });
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
+  // -----------------------------------------------------------------
   // Health check
   // -----------------------------------------------------------------
   app.get("/api/health", (req: any, res: any) => {

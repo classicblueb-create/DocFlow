@@ -446,8 +446,8 @@ ${categoriesListStr}
         <div className="absolute top-0 right-0 w-80 h-80 bg-violet-400/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
 
         <div className="space-y-2 relative z-10">
-          <div className="flex items-center gap-1.5 text-indigo-400 font-bold text-[10px] uppercase tracking-widest">
-            <Bot className="w-3.5 h-3.5 text-indigo-400" /> MODTY AI Chief of Staff
+          <div className="flex items-center gap-1.5 text-white/80 font-bold text-[10px] uppercase tracking-widest">
+            <Bot className="w-3.5 h-3.5 text-white" /> MODTY AI Chief of Staff
           </div>
           <h1 className="text-xl md:text-2xl font-black tracking-tight text-white">เฮ้! วันนี้จัดการอะไรดีก่อน?</h1>
           <p className="text-zinc-400 text-xs md:text-sm max-w-xl font-semibold">MODTY เช็กทุกอย่างให้แล้ว — งาน เงิน ดีล วิเคราะห์สิ่งสำคัญที่สุดเพื่อคุณวันนี้</p>
@@ -575,7 +575,7 @@ ${categoriesListStr}
         {/* Google Calendar block — always visible */}
         <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-[24px] p-5 flex flex-col gap-3">
           <div className="flex items-center gap-2">
-            <CalendarDays className="w-4 h-4 text-emerald-500" />
+            <CalendarDays className="w-4 h-4 text-white" />
             <h2 className="text-xs font-bold text-white uppercase tracking-widest">Google Calendar</h2>
             {gcalConnected && (
               <span className="ml-auto text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-2 py-0.5 rounded-full border border-emerald-500/30">
@@ -657,7 +657,7 @@ ${categoriesListStr}
         {/* Notion Content Plans — AI Priority */}
         <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-[24px] p-5 flex flex-col gap-3">
           <div className="flex items-center gap-2">
-            <Video className="w-4 h-4 text-indigo-500" />
+            <Video className="w-4 h-4 text-white" />
             <h2 className="text-xs font-bold text-white uppercase tracking-widest">Content Plan Priority</h2>
             <span className="ml-auto text-[10px] bg-indigo-50 text-indigo-600 font-bold px-2 py-0.5 rounded-full border border-indigo-100">
               {pendingContentPlans.length} รายการ
@@ -750,7 +750,7 @@ ${categoriesListStr}
           <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-[24px] p-6 flex flex-col gap-4">
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-2">
-                <ListTodo className="w-5 h-5 text-indigo-600" />
+                <ListTodo className="w-5 h-5 text-white" />
                 <h2 className="text-xs font-bold text-white uppercase tracking-widest">Today's Priorities</h2>
               </div>
               <button 
@@ -832,7 +832,7 @@ ${categoriesListStr}
           {/* Module 5: Team Task Summary */}
           <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-[24px] p-6 flex flex-col gap-4">
             <div className="flex items-center gap-2">
-              <UserCircle2 className="w-5 h-5 text-violet-500" />
+              <UserCircle2 className="w-5 h-5 text-white" />
               <h2 className="text-xs font-bold text-white uppercase tracking-widest">Team Overview</h2>
             </div>
 
@@ -965,7 +965,7 @@ ${categoriesListStr}
           <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-[24px] p-6 flex flex-col gap-5">
             <div className="flex justify-between items-center border-b border-white/20 pb-3">
               <div className="flex items-center gap-2">
-                <Wallet className="w-5 h-5 text-indigo-600" />
+                <Wallet className="w-5 h-5 text-white" />
                 <h2 className="text-xs font-bold text-white uppercase tracking-widest">Revenue Command Center</h2>
               </div>
             </div>
@@ -1059,7 +1059,7 @@ ${categoriesListStr}
               <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-[24px] p-6 flex flex-col gap-4">
                 <div className="flex items-center justify-between border-b border-white/20 pb-3">
                   <div className="flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-emerald-600" />
+                    <TrendingUp className="w-5 h-5 text-white" />
                     <h2 className="text-xs font-bold text-white uppercase tracking-widest">Sales Pipeline Health</h2>
                   </div>
                   <span className={`text-[10px] font-black px-2.5 py-1 rounded-full text-white ${healthColor}`}>{healthLabel}</span>
@@ -1091,7 +1091,7 @@ ${categoriesListStr}
           <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-[24px] p-6 flex flex-col gap-4 relative overflow-hidden">
             
             <div className="flex items-center gap-2">
-              <BrainCircuit className="w-5 h-5 text-indigo-600" />
+              <BrainCircuit className="w-5 h-5 text-white" />
               <h2 className="text-xs font-bold text-white uppercase tracking-widest">Brain Dump Inbox</h2>
             </div>
             
@@ -1149,7 +1149,7 @@ ${categoriesListStr}
           <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-[24px] p-6 flex flex-col gap-4">
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-2">
-                <ShieldAlert className="w-5 h-5 text-indigo-600" />
+                <ShieldAlert className="w-5 h-5 text-white" />
                 <h2 className="text-xs font-bold text-white uppercase tracking-widest">Project Health Status</h2>
               </div>
             </div>
@@ -1217,7 +1217,7 @@ ${categoriesListStr}
           {/* Recent Activities Feed */}
           <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-[24px] p-6 flex flex-col gap-4">
             <div className="flex items-center gap-2">
-              <CalendarDays className="w-5 h-5 text-indigo-600" />
+              <CalendarDays className="w-5 h-5 text-white" />
               <h2 className="text-xs font-bold text-white uppercase tracking-widest">Recent Activities</h2>
             </div>
 

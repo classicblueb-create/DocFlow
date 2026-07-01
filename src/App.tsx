@@ -191,15 +191,14 @@ export default function App() {
  }, []);
 
  // ── Task handlers ─────────────────────────────────────────────────────────
- const handleSaveTask = useCallback(async (taskData: Partial<Task>) => {
- const id = taskData.id || `task-${Date.now()}`;
- const task: Task = {
- id,
- name: taskData.name || 'งานใหม่',
- status: taskData.status || 'To Do',
- ...taskData,
- updatedAt: new Date().toISOString(),
- };
+  const handleSaveTask = useCallback(async (taskData: Partial<Task>) => {
+    const task: Task = {
+      name: 'งานใหม่',
+      status: 'To Do',
+      ...taskData,
+      id: taskData.id || `task-${Date.now()}`,
+      updatedAt: new Date().toISOString(),
+    };
  try {
  await saveTask(task);
  showNotification('บันทึกเรียบร้อย');
@@ -267,8 +266,12 @@ export default function App() {
  }, []);
 
  // ── Client handlers ───────────────────────────────────────────────────────
- const handleSaveClient = useCallback(async (clientData: Partial<Client>) => {
- const client: Client = { id: clientData.id || `C-${Date.now()}`, name: clientData.name || 'ลูกค้าใหม่', ...clientData };
+  const handleSaveClient = useCallback(async (clientData: Partial<Client>) => {
+    const client: Client = {
+      name: 'ลูกค้าใหม่',
+      ...clientData,
+      id: clientData.id || `C-${Date.now()}`,
+    };
  try { await saveClient(client); showNotification('บันทึกลูกค้าเรียบร้อย'); }
  catch (e: any) { showNotification(`บันทึกไม่สำเร็จ: ${e.message}`, true); }
  }, [showNotification]);
@@ -281,8 +284,12 @@ export default function App() {
  }, [showNotification]);
 
  // ── Template handlers ─────────────────────────────────────────────────────
- const handleSaveTemplate = useCallback(async (tmpl: Template) => {
- const template: Template = { id: tmpl.id || `T-${Date.now()}`, name: tmpl.name || 'เทมเพลตใหม่', ...tmpl };
+  const handleSaveTemplate = useCallback(async (tmpl: Template) => {
+    const template: Template = {
+      name: 'เทมเพลตใหม่',
+      ...tmpl,
+      id: tmpl.id || `T-${Date.now()}`,
+    };
  try { await saveTemplate(template); showNotification('บันทึกเทมเพลตเรียบร้อย'); }
  catch (e: any) { showNotification(`บันทึกไม่สำเร็จ: ${e.message}`, true); }
  }, [showNotification]);
@@ -512,6 +519,7 @@ export default function App() {
  case 'content_plan':
  return (
  <ContentPlanView
+ ideas={ideas}
  contentPlans={contentPlans}
  onSaveContentPlan={handleSaveContentPlan}
  onDeleteContentPlan={handleDeleteContentPlan}

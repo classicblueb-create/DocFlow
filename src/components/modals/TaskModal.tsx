@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Sparkles, Link, Send } from 'lucide-react';
+import { X, Sparkles, Link, Send, BellPlus } from 'lucide-react';
 import { Task, ProjectCategory } from '../../types';
 import { cn } from '../../lib/utils';
 
@@ -382,20 +382,41 @@ export function TaskModal({ isOpen, onClose, onSave, initialTask, categories = [
  </div>
  </div>
 
- <div className="p-4 bg-slate-50 flex items-center justify-end gap-3 rounded-b-2xl border-t border-slate-100 shrink-0">
- <button onClick={onClose} className="px-5 py-2.5 text-slate-600 hover:text-slate-900 font-medium text-sm transition-colors cursor-pointer">ยกเลิก</button>
- <button
- onClick={handleSave}
- disabled={isGenerating || !name.trim()}
- className={cn(
- 'px-6 py-2.5 bg-slate-900 hover:bg-black text-white rounded-xl font-bold text-sm flex items-center gap-2 shadow-sm transition-all cursor-pointer',
- (isGenerating || !name.trim()) ? 'opacity-60 cursor-not-allowed' : ''
- )}
- >
- {isGenerating ? (
- <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> กำลังประมวลผล...</>
- ) : 'บันทึก'}
- </button>
+ <div className="p-4 bg-slate-50 flex items-center justify-between gap-3 rounded-b-2xl border-t border-slate-100 shrink-0">
+   <button
+     onClick={async () => {
+       if (!name.trim()) return;
+       try {
+         const res = await fetch('/api/reminders/create', {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify({ title: name, dueDate: endDate || undefined, notes: details || undefined })
+         });
+         const data = await res.json();
+         alert(res.ok ? `✅ ${data.message}` : `❌ ${data.error}`);
+       } catch (e: any) { alert(`❌ ${e.message}`); }
+     }}
+     disabled={!name.trim()}
+     title="เพิ่มใน iPhone Reminders"
+     className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-500 hover:text-indigo-600 border border-slate-200 hover:border-indigo-200 rounded-xl transition-all cursor-pointer disabled:opacity-40"
+   >
+     <BellPlus className="w-3.5 h-3.5" /> Reminders
+   </button>
+   <div className="flex items-center gap-3">
+     <button onClick={onClose} className="px-5 py-2.5 text-slate-600 hover:text-slate-900 font-medium text-sm transition-colors cursor-pointer">ยกเลิก</button>
+     <button
+       onClick={handleSave}
+       disabled={isGenerating || !name.trim()}
+       className={cn(
+         'px-6 py-2.5 bg-slate-900 hover:bg-black text-white rounded-xl font-bold text-sm flex items-center gap-2 shadow-sm transition-all cursor-pointer',
+         (isGenerating || !name.trim()) ? 'opacity-60 cursor-not-allowed' : ''
+       )}
+     >
+       {isGenerating ? (
+         <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> กำลังประมวลผล...</>
+       ) : 'บันทึก'}
+     </button>
+   </div>
  </div>
  </div>
  </div>

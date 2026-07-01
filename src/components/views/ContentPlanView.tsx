@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Video, Sparkles, Loader2, Plus, X, Trash2, Calendar, Check, Copy, Clock, HelpCircle, Film, Radio, FileText, Flame, ExternalLink, Star, ChevronUp, ChevronDown, RefreshCw } from 'lucide-react';
-import { ContentPlan } from '../../types';
+import { Video, Sparkles, Loader2, Plus, X, Trash2, Calendar, Check, Copy, Clock, HelpCircle, Film, Radio, FileText, Flame, ExternalLink, Star, ChevronUp, ChevronDown, RefreshCw, Lightbulb } from 'lucide-react';
+import { ContentPlan, Idea } from '../../types';
 import { cn } from '../../lib/utils';
 
 interface ContentPlanViewProps {
+ ideas?: Idea[];
  contentPlans: ContentPlan[];
  onSaveContentPlan: (plan: ContentPlan) => Promise<void>;
  onDeleteContentPlan: (id: string) => Promise<void>;
@@ -75,6 +76,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export function ContentPlanView({
+ ideas = [],
  contentPlans,
  onSaveContentPlan,
  onDeleteContentPlan,
@@ -82,6 +84,28 @@ export function ContentPlanView({
  onRefreshContentPlans,
  isRefreshingPlans = false,
 }: ContentPlanViewProps) {
+  // Drag and Drop Idea States
+  const [droppedIdea, setDroppedIdea] = useState<Idea | null>(null);
+  const [droppedTier, setDroppedTier] = useState<'A+' | 'B+' | null>(null);
+
+  const handleDropIdea = (e: React.DragEvent, tier: 'A+' | 'B+') => {
+    e.preventDefault();
+    const ideaId = e.dataTransfer.getData('text/plain');
+    if (!ideaId || !ideas) return;
+    const idea = ideas.find(i => i.id === ideaId);
+    if (idea) {
+      setDroppedIdea(idea);
+      setDroppedTier(tier);
+      setConcept(idea.description || idea.title);
+    }
+  };
+
+  const handleClearDropped = () => {
+    setDroppedIdea(null);
+    setDroppedTier(null);
+    setConcept('');
+  };
+
  // AI Form States
  const [concept, setConcept] = useState('');
  const [platform, setPlatform] = useState<typeof PLATFORMS[number]>('TikTok');
@@ -102,71 +126,80 @@ export function ContentPlanView({
  const [filterStatus, setFilterStatus] = useState<string>('ทั้งหมด');
 
  // AI Brainstorm Result Panel (Temporary before save)
- const [tempResult, setTempResult] = useState<{
- title: string;
- concept: string;
- platform: typeof PLATFORMS[number];
- tone: string;
- audience: string;
- hooks: string[];
- outline: string;
- script: string;
- hashtags: string;
- } | null>(null);
+  const [tempResult, setTempResult] = useState<{
+    title: string;
+    concept: string;
+    platform: typeof PLATFORMS[number];
+    tone: string;
+    audience: string;
+    hooks: string[];
+    outline: string;
+    script: string;
+    hashtags: string;
+    engagementRating?: 'B+' | 'A+' | null;
+  } | null>(null);
 
- // Copied state mapping
- const [copiedKey, setCopiedKey] = useState<string | null>(null);
- const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
+  // Copied state mapping
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
 
- // Edit modal
- const [editingPlan, setEditingPlan] = useState<ContentPlan | null>(null);
+  // Edit modal
+  const [editingPlan, setEditingPlan] = useState<ContentPlan | null>(null);
 
- const handleCopy = (text: string, key: string) => {
- navigator.clipboard.writeText(text);
- setCopiedKey(key);
- setTimeout(() => setCopiedKey(null), 2000);
- };
+  const handleCopy = (text: string, key: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 2000);
+  };
 
- const handleBrainstorm = async (e: React.FormEvent) => {
- e.preventDefault();
- if (!concept.trim()) return;
+  const handleBrainstorm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!concept.trim()) return;
 
- setIsBrainstorming(true);
- setTempResult(null);
+    setIsBrainstorming(true);
+    setTempResult(null);
 
- const systemPrompt = `คุณคือ AI Gemma ผู้เชี่ยวชาญด้านการวางแผนคอนเทนต์และคิดกลยุทธ์การตลาดออนไลน์ชั้นยอด (Content Creator Expert) สำหรับ ${platform}
+    const systemPrompt = `คุณคือ AI Gemma ผู้เชี่ยวชาญด้านการวางแผนคอนเทนต์และคิดกลยุทธ์การตลาดออนไลน์ชั้นยอด (Content Creator Expert) สำหรับ ${platform}
 คุณเชี่ยวชาญการเขียน Hook สะกดสายตา โครงเรื่อง (Outline) สคริปต์แบบเต็ม (Full script / voiceover) และแฮชแท็กตอบโจทย์กลุ่มเป้าหมาย`;
 
- const userPrompt = `ระดมสมองคิดแผนคอนเทนต์อย่างละเอียดโดยมีข้อมูลดังนี้:
-- คอนเซ็ปต์หลัก: ${concept}
+    const tierContext = droppedIdea && droppedTier
+      ? `\n- ระดับความเป้าหมายความสำเร็จของไอเดียนี้: ระดับ ${droppedTier} (${
+          droppedTier === 'A+' 
+            ? 'เน้นความปังระดับไวรัลแมส ผู้เข้าชม 10,000+ ไลก์ 500+ เน้น Hook และสคริปต์ที่กระตุ้นอารมณ์ ดึงดูดความสนใจขั้นสุดหยุดนิ้วโป้งคนดูภายใน 3 วินาทีแรก'
+            : 'เน้นความปังระดับคุณภาพสูงเจาะกลุ่มเป้าหมายคุณภาพ ผู้เข้าชม 5,000+ ไลก์ 100+ เน้นให้คนบันทึกเก็บไว้ดูซ้ำและส่งต่อ โครงสร้างข้อมูลละเอียดชัดเจน มีสาระครบถ้วน'
+        })`
+      : '';
+
+    const userPrompt = `ระดมสมองคิดแผนคอนเทนต์อย่างละเอียดโดยมีข้อมูลดังนี้:
+- คอนเซ็ปต์หลัก: ${concept}${tierContext}
 - แพลตฟอร์ม: ${platform}
 - โทนเสียง (Tone of Voice): ${tone}
 - กลุ่มเป้าหมาย: ${audience || 'คนทั่วไป'}
 
 ตอบกลับในรูปแบบ JSON บริสุทธิ์เท่านั้น (ห้ามมีอักขระอื่นนอกเหนือจาก JSON หรือสัญลักษณ์ markdown เช่น \`\`\`json หรือ \`\`\`) มีโครงสร้างดังนี้:
 {
- "title": "ชื่อหัวข้อคลิป/บทความสั้นและดึงดูดใจ (ยาวไม่เกิน 60 ตัวอักษร)",
- "hooks": [
- "Hook แบบที่ 1 (แนวหยุดนิ้วโป้ง)",
- "Hook แบบที่ 2 (แนวตั้งคำถามเปิดประเด็น)",
- "Hook แบบที่ 3 (แนวสัจธรรม/ขยี้ปมความสงสัย)"
- ],
- "outline": "โครงสร้างการเล่าเรื่องแยกเป็นลำดับชัดเจน (เช่น 1. เปิดคลิป 2. จุดขยี้ 3. นำเสนอคำตอบ 4. ปิดคลิป/Call to Action)",
- "script": "สคริปต์คำพูดจริง/บทบรรยายโดยละเอียดสำหรับพูดในคลิปหรือโพสต์ (Full script / voiceover) เพื่อให้ผู้ใช้นำไปใช้อัดคลิปหรือลงงานได้ทันที",
- "hashtags": "แฮชแท็กฮิตที่เกี่ยวข้องคั่นด้วยเว้นวรรค เช่น #React #Coding"
+  "title": "ชื่อหัวข้อคลิป/บทความสั้นและดึงดูดใจ (ยาวไม่เกิน 60 ตัวอักษร)",
+  "hooks": [
+    "Hook แบบที่ 1 (แนวหยุดนิ้วโป้ง)",
+    "Hook แบบที่ 2 (แนวตั้งคำถามเปิดประเด็น)",
+    "Hook แบบที่ 3 (แนวสัจธรรม/ขยี้ปมความสงสัย)"
+  ],
+  "outline": "โครงสร้างการเล่าเรื่องแยกเป็นลำดับชัดเจน (เช่น 1. เปิดคลิป 2. จุดขยี้ 3. นำเสนอคำตอบ 4. ปิดคลิป/Call to Action)",
+  "script": "สคริปต์คำพูดจริง/บทบรรยายโดยละเอียดสำหรับพูดในคลิปหรือโพสต์ (Full script / voiceover) เพื่อให้ผู้ใช้นำไปใช้อัดคลิปหรือลงงานได้ทันที",
+  "hashtags": "แฮชแท็กฮิตที่เกี่ยวข้องคั่นด้วยเว้นวรรค เช่น #React #Coding"
 }`;
 
- try {
- const response = await fetch('/api/ai/chat', {
- method: 'POST',
- headers: { 'Content-Type': 'application/json' },
- body: JSON.stringify({
- messages: [{ role: 'user', text: userPrompt }],
- agentTitle: 'เอไอช่วยระดมสมองคอนเทนต์',
- agentInstructions: systemPrompt,
- contextData: {},
- }),
- });
+  try {
+    const response = await fetch('/api/ai/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: [{ role: 'user', text: userPrompt }],
+        agentTitle: 'เอไอช่วยระดมสมองคอนเทนต์',
+        agentInstructions: systemPrompt,
+        contextData: {},
+      }),
+    });
 
  const data = await response.json();
  if (!response.ok) throw new Error(data.error || 'AI ไม่ตอบสนอง');
@@ -320,8 +353,79 @@ export function ContentPlanView({
  <h3 className="font-black text-sm text-[#0f172a] uppercase tracking-wide">AI Content Assistant</h3>
  </div>
 
- <form onSubmit={handleBrainstorm} className="space-y-4">
- <div>
+  <form onSubmit={handleBrainstorm} className="space-y-4">
+    {/* Drag & Drop Target Slots */}
+    <div className="grid grid-cols-2 gap-3 mb-2">
+      {/* A+ Slot */}
+      <div
+        onDragOver={e => e.preventDefault()}
+        onDrop={e => handleDropIdea(e, 'A+')}
+        className={cn(
+          "border-2 border-dashed rounded-[22px] p-3 text-center transition-all duration-300 flex flex-col justify-center items-center gap-1 min-h-[90px] relative overflow-hidden",
+          droppedIdea && droppedTier === 'A+'
+            ? "border-rose-500 bg-rose-500/5 text-[#0f172a]"
+            : "border-slate-200 hover:border-rose-500/50 bg-slate-50/50 text-slate-400"
+        )}
+      >
+        {droppedIdea && droppedTier === 'A+' ? (
+          <>
+            <span className="absolute top-1 right-1 text-[8px] font-black px-1.5 py-0.5 rounded-full bg-rose-500 text-white shadow-sm">A+ (Viral)</span>
+            <Flame className="w-4 h-4 text-rose-500 mb-0.5 animate-pulse" />
+            <h4 className="text-[10px] font-bold truncate max-w-full px-2 text-slate-800">{droppedIdea.title}</h4>
+            <p className="text-[8px] text-slate-500 line-clamp-2 px-1 leading-snug">{droppedIdea.description}</p>
+            <button 
+              type="button" 
+              onClick={handleClearDropped} 
+              className="mt-1 text-[8px] text-rose-500 hover:text-rose-600 hover:underline font-bold cursor-pointer"
+            >
+              ล้างข้อมูล
+            </button>
+          </>
+        ) : (
+          <>
+            <Flame className="w-4 h-4 text-rose-500/40" />
+            <span className="text-[10px] font-bold text-slate-700">ลากไอเดียใส่ช่อง A+</span>
+            <span className="text-[8px] text-slate-400 font-semibold">ปังระดับแมส</span>
+          </>
+        )}
+      </div>
+
+      {/* B+ Slot */}
+      <div
+        onDragOver={e => e.preventDefault()}
+        onDrop={e => handleDropIdea(e, 'B+')}
+        className={cn(
+          "border-2 border-dashed rounded-[22px] p-3 text-center transition-all duration-300 flex flex-col justify-center items-center gap-1 min-h-[90px] relative overflow-hidden",
+          droppedIdea && droppedTier === 'B+'
+            ? "border-amber-500 bg-amber-500/5 text-[#0f172a]"
+            : "border-slate-200 hover:border-amber-500/50 bg-slate-50/50 text-slate-400"
+        )}
+      >
+        {droppedIdea && droppedTier === 'B+' ? (
+          <>
+            <span className="absolute top-1 right-1 text-[8px] font-black px-1.5 py-0.5 rounded-full bg-amber-500 text-white shadow-sm">B+ (Engage)</span>
+            <Star className="w-4 h-4 text-amber-500 mb-0.5 animate-pulse" />
+            <h4 className="text-[10px] font-bold truncate max-w-full px-2 text-slate-800">{droppedIdea.title}</h4>
+            <p className="text-[8px] text-slate-500 line-clamp-2 px-1 leading-snug">{droppedIdea.description}</p>
+            <button 
+              type="button" 
+              onClick={handleClearDropped} 
+              className="mt-1 text-[8px] text-amber-500 hover:text-amber-600 hover:underline font-bold cursor-pointer"
+            >
+              ล้างข้อมูล
+            </button>
+          </>
+        ) : (
+          <>
+            <Star className="w-4 h-4 text-amber-500/40" />
+            <span className="text-[10px] font-bold text-slate-700">ลากไอเดียใส่ช่อง B+</span>
+            <span className="text-[8px] text-slate-400 font-semibold">ปังระดับเจาะจง</span>
+          </>
+        )}
+      </div>
+    </div>
+
+  <div>
  <label className="block text-[10px] font-bold text-slate-450 uppercase tracking-wider mb-1.5">คอนเซ็ปต์เนื้อหา / ไอเดียดิบ</label>
  <textarea
  required
@@ -386,6 +490,55 @@ export function ContentPlanView({
  </button>
  </form>
  </div>
+
+ {/* Drag Source: Ideas Repository */}
+  <div className="glass-card rounded-[28px] p-6 space-y-4">
+    <div className="flex items-center gap-2">
+      <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+        <Lightbulb className="w-4.5 h-4.5 text-amber-550" />
+      </div>
+      <div>
+        <h3 className="font-black text-sm text-[#0f172a] uppercase tracking-wide">คลังไอเดียสะสม</h3>
+        <p className="text-[9px] text-slate-400 mt-0.5 font-bold">ลากไอเดียไปวางในช่อง A+ หรือ B+ เพื่อเขียนแผน</p>
+      </div>
+    </div>
+    
+    <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1 hide-scrollbar">
+      {(!ideas || ideas.length === 0) ? (
+        <div className="text-center py-6 text-xs text-slate-400 font-semibold border border-dashed border-slate-200 rounded-2xl bg-slate-50/30">
+          ไม่มีไอเดียในคลังขณะนี้
+        </div>
+      ) : (
+        ideas.map(idea => (
+          <div
+            key={idea.id}
+            draggable
+            onDragStart={(e) => {
+              e.dataTransfer.setData('text/plain', idea.id);
+              e.dataTransfer.effectAllowed = 'copyMove';
+            }}
+            className="bg-white/50 border border-slate-150 hover:border-indigo-400/50 p-3.5 rounded-2xl cursor-grab active:cursor-grabbing transition-all duration-200 select-none relative group shadow-sm hover:shadow"
+          >
+            <div className="flex justify-between items-start gap-2">
+              <span className="text-[9px] bg-amber-500/10 text-amber-700 font-bold px-2 py-0.5 rounded-full border border-amber-500/20">{idea.category || 'ทั่วไป'}</span>
+              {idea.priority && (
+                <span className={cn(
+                  "text-[9px] font-bold px-2 py-0.5 rounded-full",
+                  idea.priority === 'สูง' ? "bg-rose-500/10 text-rose-700 border border-rose-200" :
+                  idea.priority === 'กลาง' ? "bg-amber-500/10 text-amber-700 border border-amber-250" :
+                                             "bg-blue-500/10 text-blue-700 border border-blue-200"
+                )}>
+                  {idea.priority}
+                </span>
+              )}
+            </div>
+            <h4 className="text-xs font-bold text-slate-800 mt-2 line-clamp-1">{idea.title}</h4>
+            <p className="text-[10px] text-slate-500 mt-1 line-clamp-2 leading-relaxed font-semibold">{idea.description}</p>
+          </div>
+        ))
+      )}
+    </div>
+  </div>
 
  {/* Temporary AI Result Panel */}
  {tempResult && (
