@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Video, Sparkles, Loader2, Plus, X, Trash2, Calendar, Check, Copy, Clock, HelpCircle, Film, Radio, FileText, Flame, ExternalLink, Star, ChevronUp, ChevronDown, RefreshCw, Lightbulb } from 'lucide-react';
+import { Video, Sparkles, Loader2, Plus, X, Trash2, Calendar, Check, Copy, Clock, HelpCircle, Film, Radio, FileText, Flame, ExternalLink, Star, ChevronUp, ChevronDown, RefreshCw } from 'lucide-react';
 import { ContentPlan, Idea } from '../../types';
 import { cn } from '../../lib/utils';
 
@@ -490,54 +490,6 @@ export function ContentPlanView({
  </form>
  </div>
 
- {/* Drag Source: Ideas Repository */}
-  <div className="glass-card rounded-[28px] p-6 space-y-4">
-    <div className="flex items-center gap-2">
-      <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-        <Lightbulb className="w-4.5 h-4.5 text-amber-550" />
-      </div>
-      <div>
-        <h3 className="font-black text-sm text-[#0f172a] uppercase tracking-wide">คลังไอเดียสะสม</h3>
-        <p className="text-[9px] text-slate-400 mt-0.5 font-bold">ลากไอเดียไปวางในช่อง A+ หรือ B+ เพื่อเขียนแผน</p>
-      </div>
-    </div>
-    
-    <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1 hide-scrollbar">
-      {(!ideas || ideas.length === 0) ? (
-        <div className="text-center py-6 text-xs text-slate-400 font-semibold border border-dashed border-slate-200 rounded-2xl bg-slate-50/30">
-          ไม่มีไอเดียในคลังขณะนี้
-        </div>
-      ) : (
-        ideas.map(idea => (
-          <div
-            key={idea.id}
-            draggable
-            onDragStart={(e) => {
-              e.dataTransfer.setData('text/plain', idea.id);
-              e.dataTransfer.effectAllowed = 'copyMove';
-            }}
-            className="bg-white/50 border border-slate-150 hover:border-indigo-400/50 p-3.5 rounded-2xl cursor-grab active:cursor-grabbing transition-all duration-200 select-none relative group shadow-sm hover:shadow"
-          >
-            <div className="flex justify-between items-start gap-2">
-              <span className="text-[9px] bg-amber-500/10 text-amber-700 font-bold px-2 py-0.5 rounded-full border border-amber-500/20">{idea.category || 'ทั่วไป'}</span>
-              {idea.priority && (
-                <span className={cn(
-                  "text-[9px] font-bold px-2 py-0.5 rounded-full",
-                  idea.priority === 'สูง' ? "bg-rose-500/10 text-rose-700 border border-rose-200" :
-                  idea.priority === 'กลาง' ? "bg-amber-500/10 text-amber-700 border border-amber-250" :
-                                             "bg-blue-500/10 text-blue-700 border border-blue-200"
-                )}>
-                  {idea.priority}
-                </span>
-              )}
-            </div>
-            <h4 className="text-xs font-bold text-slate-800 mt-2 line-clamp-1">{idea.title}</h4>
-            <p className="text-[10px] text-slate-500 mt-1 line-clamp-2 leading-relaxed font-semibold">{idea.description}</p>
-          </div>
-        ))
-      )}
-    </div>
-  </div>
 
  {/* Temporary AI Result Panel */}
  {tempResult && (

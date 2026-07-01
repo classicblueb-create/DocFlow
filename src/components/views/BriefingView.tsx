@@ -5,7 +5,7 @@ import {
   TrendingUp, Users, CheckCircle, FileText, AlertCircle, Sparkles, Loader2,
   DollarSign, Wallet, Hourglass, CalendarDays, ChevronRight, CheckSquare,
   ListTodo, Plus, Target, ShieldAlert, Sparkle, BrainCircuit, RefreshCw, Send, Bot, ClipboardCheck, UserCircle2,
-  Video, Radio, Flame, HelpCircle, ExternalLink
+  Video, Radio, Flame, HelpCircle, ExternalLink, Bell
 } from 'lucide-react';
 import { Task, Client, Idea, Subtask, ProjectCategory, ContentPlan } from '../../types';
 import { cn, getTaskPrice } from '../../lib/utils';
@@ -76,6 +76,21 @@ export function BriefingView({
     const d = (e.start || '').slice(0, 10);
     return d > todayStr && d <= weekEnd;
   }).slice(0, 5);
+
+  // ── iCloud Reminders ──
+  const [reminders, setReminders] = useState<{ title: string; due: string | null; uid: string }[]>([]);
+  const [remindersLoading, setRemindersLoading] = useState(false);
+
+  const fetchReminders = () => {
+    setRemindersLoading(true);
+    fetch('/api/reminders')
+      .then(r => r.json())
+      .then(data => { if (data.reminders) setReminders(data.reminders); })
+      .catch(() => {})
+      .finally(() => setRemindersLoading(false));
+  };
+
+  useEffect(() => { fetchReminders(); }, []);
 
   // ── Notion Content Plan AI Priority state ──
   const [contentPriority, setContentPriority] = useState<{ summary: string; priorities: { title: string; reason: string; platform: string; status: string }[]; nextAction: string } | null>(null);
@@ -752,6 +767,44 @@ ${categoriesListStr}
           )}
         </div>
 
+      </div>
+
+      {/* ── iCloud Reminders ──────────────────────────────────────────────── */}
+      <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-[24px] p-5 flex flex-col gap-3 shrink-0">
+        <div className="flex items-center gap-2">
+          <Bell className="w-4 h-4 text-white" />
+          <h2 className="text-xs font-bold text-white uppercase tracking-widest">iPhone Reminders</h2>
+          <span className="ml-auto text-[10px] bg-white/10 text-white/60 font-bold px-2 py-0.5 rounded-full border border-white/20">
+            {reminders.length} รายการ
+          </span>
+          <button onClick={fetchReminders} className="w-6 h-6 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center text-white/50 hover:text-white transition-colors cursor-pointer">
+            <RefreshCw className={`w-3 h-3 ${remindersLoading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+        {remindersLoading ? (
+          <div className="flex items-center gap-2 py-4 justify-center text-white/50">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span className="text-xs font-semibold">กำลังโหลด Reminders...</span>
+          </div>
+        ) : reminders.length === 0 ? (
+          <div className="py-4 text-center text-xs text-white/50 font-semibold">ไม่มี Reminder ที่ยังค้างอยู่ 🎉</div>
+        ) : (
+          <div className="flex flex-col gap-1.5 max-h-[200px] overflow-y-auto hide-scrollbar">
+            {reminders.map((r, i) => (
+              <div key={r.uid || i} className="flex items-center gap-3 p-2.5 rounded-xl bg-white/5 border border-white/15">
+                <div className="w-3.5 h-3.5 rounded-full border-2 border-white/30 shrink-0" />
+                <p className="text-xs font-semibold text-white/80 flex-1 truncate">{r.title}</p>
+                {r.due && (
+                  <span className="text-[10px] font-bold text-amber-300 shrink-0">
+                    {r.due.length === 8
+                      ? `${r.due.slice(0,4)}-${r.due.slice(4,6)}-${r.due.slice(6,8)}`
+                      : new Date(r.due).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Main Layout Area */}

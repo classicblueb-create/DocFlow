@@ -1958,7 +1958,6 @@ ${highPerformersContext || 'ยังไม่มีคอนเทนต์ท�
         headers: {
           Authorization: icloudAuth(),
           'Content-Type': 'text/calendar; charset=utf-8',
-          'If-None-Match': '*',
         },
         body: vtodo,
       });
@@ -1971,6 +1970,102 @@ ${highPerformersContext || 'ยังไม่มีคอนเทนต์ท�
       return res.json({ ok: true, uid, message: `เพิ่ม "${title}" ใน iPhone Reminders แล้ว` });
     } catch (e: any) {
       console.error('[Reminders Create Error]', e);
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Debug: show discovered URL + raw XML from iCloud
+  app.get("/api/reminders/debug", async (_req: any, res: any) => {
+    if (!process.env.APPLE_ID || !process.env.APPLE_APP_PASSWORD) {
+      return res.status(503).json({ error: "Apple credentials not configured" });
+    }
+    try {
+      // Step 1
+      const r1 = await fetch('https://caldav.icloud.com/.well-known/caldav', {
+        method: 'PROPFIND',
+        headers: { Authorization: icloudAuth(), Depth: '0', 'Content-Type': 'application/xml' },
+        body: `<?xml version="1.0"?><D:propfind xmlns:D="DAV:"><D:prop><D:current-user-principal/></D:prop></D:propfind>`,
+        redirect: 'follow',
+      });
+      const t1 = await r1.text();
+      const principalHref = extractHrefAfter(t1, 'current-user-principal');
+      const principalUrl = principalHref ? toAbsoluteUrl(principalHref) : null;
+
+      // Step 2
+      let t2 = '', homeUrl = '';
+      if (principalUrl) {
+        const r2 = await fetch(principalUrl, {
+          method: 'PROPFIND',
+          headers: { Authorization: icloudAuth(), Depth: '0', 'Content-Type': 'application/xml' },
+          body: `<?xml version="1.0"?><D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav"><D:prop><C:calendar-home-set/></D:prop></D:propfind>`,
+        });
+        t2 = await r2.text();
+        const homeHref = extractHrefAfter(t2, 'calendar-home-set');
+        if (homeHref) homeUrl = toAbsoluteUrl(homeHref);
+      }
+
+      // Step 3
+      let t3 = '';
+      if (homeUrl) {
+        const r3 = await fetch(homeUrl, {
+          method: 'PROPFIND',
+          headers: { Authorization: icloudAuth(), Depth: '1', 'Content-Type': 'application/xml' },
+          body: `<?xml version="1.0"?><D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav"><D:prop><D:displayname/><C:supported-calendar-component-set/></D:prop></D:propfind>`,
+        });
+        t3 = await r3.text();
+      }
+
+      return res.json({ step1: t1, principalHref, principalUrl, step2: t2, homeUrl, step3: t3 });
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Get reminders from iCloud to show on web
+  app.get("/api/reminders", async (_req: any, res: any) => {
+    if (!process.env.APPLE_ID || !process.env.APPLE_APP_PASSWORD) {
+      return res.status(503).json({ error: "Apple credentials not configured" });
+    }
+    try {
+      const calUrl = await discoverRemindersCalendar();
+      // REPORT to fetch VTODO objects
+      const report = `<?xml version="1.0"?>
+<C:calendar-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
+  <D:prop><D:getetag/><C:calendar-data/></D:prop>
+  <C:filter>
+    <C:comp-filter name="VCALENDAR">
+      <C:comp-filter name="VTODO">
+        <C:prop-filter name="STATUS">
+          <C:text-match collation="i;ascii-casemap" negate-condition="yes">COMPLETED</C:text-match>
+        </C:prop-filter>
+      </C:comp-filter>
+    </C:comp-filter>
+  </C:filter>
+</C:calendar-query>`;
+      const r = await fetch(calUrl, {
+        method: 'REPORT',
+        headers: { Authorization: icloudAuth(), Depth: '1', 'Content-Type': 'application/xml' },
+        body: report,
+      });
+      const xml = await r.text();
+      // Parse SUMMARY and DUE from each VTODO
+      const reminders: { title: string; due: string | null; uid: string }[] = [];
+      const dataBlocks = xml.match(/<[^>]*calendar-data[^>]*>([\s\S]*?)<\/[^>]*calendar-data>/gi) || [];
+      for (const block of dataBlocks) {
+        const content = block.replace(/<[^>]+>/g, '');
+        const summaryM = content.match(/SUMMARY:([^\r\n]+)/);
+        const dueM = content.match(/DUE[^:]*:([^\r\n]+)/);
+        const uidM = content.match(/UID:([^\r\n]+)/);
+        if (summaryM) {
+          reminders.push({
+            title: summaryM[1].trim(),
+            due: dueM ? dueM[1].trim() : null,
+            uid: uidM ? uidM[1].trim() : '',
+          });
+        }
+      }
+      return res.json({ reminders });
+    } catch (e: any) {
       return res.status(500).json({ error: e.message });
     }
   });
