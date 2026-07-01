@@ -1847,7 +1847,7 @@ ${highPerformersContext || 'ยังไม่มีคอนเทนต์ท�
     return 'Basic ' + Buffer.from(`${user}:${pass}`).toString('base64');
   };
 
-  // Extract first <D:href> content from inside a specific XML tag block
+  // Extract first href content from inside a specific XML tag block
   const extractHrefAfter = (xml: string, afterTag: string): string | null => {
     const idx = xml.toLowerCase().indexOf(afterTag.toLowerCase());
     if (idx === -1) return null;
@@ -1856,65 +1856,75 @@ ${highPerformersContext || 'ยังไม่มีคอนเทนต์ท�
     return m ? m[1].trim() : null;
   };
 
-  const toAbsoluteUrl = (href: string) =>
-    href.startsWith('http') ? href : `https://caldav.icloud.com${href}`;
+  const toAbsoluteUrl = (href: string, base?: string) => {
+    if (href.startsWith('http')) return href;
+    if (base) {
+      const u = new URL(base);
+      return `${u.protocol}//${u.host}${href}`;
+    }
+    return `https://caldav.icloud.com${href}`;
+  };
 
-  // Discover the Reminders calendar URL via CalDAV well-known + PROPFIND
+  // Discover the Reminders-only calendar URL
   const discoverRemindersCalendar = async (): Promise<string> => {
-    // Step 1: resolve well-known to get actual CalDAV root (follows redirects)
-    const wellKnown = await fetch('https://caldav.icloud.com/.well-known/caldav', {
+    // Step 1: get principal URL
+    const r1 = await fetch('https://caldav.icloud.com/.well-known/caldav', {
       method: 'PROPFIND',
       headers: { Authorization: icloudAuth(), Depth: '0', 'Content-Type': 'application/xml' },
       body: `<?xml version="1.0"?><D:propfind xmlns:D="DAV:"><D:prop><D:current-user-principal/></D:prop></D:propfind>`,
       redirect: 'follow',
     });
-    const t1 = await wellKnown.text();
-    console.log('[iCloud Step1 status]', wellKnown.status, wellKnown.url);
-    console.log('[iCloud Step1 xml]', t1.slice(0, 500));
-
+    const t1 = await r1.text();
     let principalHref = extractHrefAfter(t1, 'current-user-principal');
     if (!principalHref) {
-      // Fallback: grab all hrefs and pick the one that looks like a principal path
-      const allHrefs = [...t1.matchAll(/<[^>]*:?href[^>]*>([^<]+)<\/[^>]*:?href>/gi)].map(m => m[1].trim());
-      principalHref = allHrefs.find(h => h.match(/\/\d+\/principal/)) || allHrefs.find(h => h !== '/') || null;
+      const all = [...t1.matchAll(/<[^>]*:?href[^>]*>([^<]+)<\/[^>]*:?href>/gi)].map(m => m[1].trim());
+      principalHref = all.find(h => /\/\d+\/principal/.test(h)) || all.find(h => h !== '/') || null;
     }
-    if (!principalHref) throw new Error(`Cannot find principal URL. iCloud response: ${t1.slice(0, 300)}`);
+    if (!principalHref) throw new Error(`Cannot find principal URL`);
     const principalUrl = toAbsoluteUrl(principalHref);
 
-    // Step 2: find calendar-home-set from principal
+    // Step 2: get calendar-home-set (may be on a different iCloud CDN host like p113-caldav.icloud.com)
     const r2 = await fetch(principalUrl, {
       method: 'PROPFIND',
       headers: { Authorization: icloudAuth(), Depth: '0', 'Content-Type': 'application/xml' },
       body: `<?xml version="1.0"?><D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav"><D:prop><C:calendar-home-set/></D:prop></D:propfind>`,
     });
     const t2 = await r2.text();
-    console.log('[iCloud Step2 xml]', t2.slice(0, 500));
-
     let homeHref = extractHrefAfter(t2, 'calendar-home-set');
-    if (!homeHref) {
-      const allHrefs = [...t2.matchAll(/<[^>]*:?href[^>]*>([^<]+)<\/[^>]*:?href>/gi)].map(m => m[1].trim());
-      homeHref = allHrefs.find(h => h.match(/\/\d+\/?$/) && h !== principalHref) || allHrefs.find(h => h !== principalHref && h !== '/') || null;
-    }
-    if (!homeHref) throw new Error(`Cannot find calendar-home-set. iCloud response: ${t2.slice(0, 300)}`);
-    const homeUrl = toAbsoluteUrl(homeHref);
+    if (!homeHref) throw new Error(`Cannot find calendar-home-set`);
+    // homeHref may be absolute (https://p113-caldav.icloud.com/...) — preserve it
+    const homeUrl = homeHref.startsWith('http') ? homeHref : toAbsoluteUrl(homeHref);
 
-    // Step 3: find VTODO calendar
+    // Step 3: list all calendars under home set, using homeUrl's host for relative hrefs
     const r3 = await fetch(homeUrl, {
       method: 'PROPFIND',
       headers: { Authorization: icloudAuth(), Depth: '1', 'Content-Type': 'application/xml' },
       body: `<?xml version="1.0"?><D:propfind xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav"><D:prop><D:displayname/><C:supported-calendar-component-set/></D:prop></D:propfind>`,
     });
     const t3 = await r3.text();
-    console.log('[iCloud Step3 xml]', t3.slice(0, 800));
 
-    // Split into per-response blocks and find one containing VTODO
+    // Find calendar that supports VTODO but NOT VEVENT (that's the pure Reminders list)
+    // Split on <response> tags
     const blocks = t3.split(/<\/?(?:[A-Za-z]+:)?response>/i);
+    // Prefer VTODO-only, fallback to any VTODO
+    let vtodoOnlyHref: string | null = null;
+    let vtodoAnyHref: string | null = null;
     for (const block of blocks) {
       if (!block.match(/vtodo/i)) continue;
       const hrefMatch = block.match(/<[^>]*:?href[^>]*>([^<]+)<\/[^>]*:?href>/i);
-      if (hrefMatch) return toAbsoluteUrl(hrefMatch[1].trim());
+      if (!hrefMatch) continue;
+      const h = hrefMatch[1].trim();
+      if (!block.match(/vevent/i)) {
+        vtodoOnlyHref = h; // VTODO-only = Reminders list
+        break;
+      } else if (!vtodoAnyHref) {
+        vtodoAnyHref = h;
+      }
     }
-    throw new Error(`No VTODO calendar found. Calendar list: ${t3.slice(0, 400)}`);
+    const calHref = vtodoOnlyHref || vtodoAnyHref;
+    if (!calHref) throw new Error(`No VTODO calendar found`);
+    // Use homeUrl as base to resolve relative paths (preserves p113-caldav.icloud.com host)
+    return calHref.startsWith('http') ? calHref : toAbsoluteUrl(calHref, homeUrl);
   };
 
   // Create a Reminder in iCloud
