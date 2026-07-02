@@ -2070,7 +2070,7 @@ ${highPerformersContext || 'ยังไม่มีคอนเทนต์ท�
           });
         }
       }
-      return res.json({ reminders, _debug: { calUrl, status: r.status, rawXml: xml.slice(0, 1000) } });
+      return res.json({ reminders, _debug: { calUrl, status: r.status, rawXml: xml.slice(0, 3000), dataBlocksFound: dataBlocks.length } });
     } catch (e: any) {
       return res.status(500).json({ error: e.message });
     }
