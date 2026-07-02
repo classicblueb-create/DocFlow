@@ -1977,7 +1977,7 @@ ${highPerformersContext || 'ยังไม่มีคอนเทนต์ท�
         throw new Error(`PUT failed ${putRes.status}: ${errBody.slice(0, 300)}`);
       }
       console.log('[Reminders PUT ok]', putRes.status, putUrl);
-      return res.json({ ok: true, uid, message: `เพิ่ม "${title}" ใน iPhone Reminders แล้ว` });
+      return res.json({ ok: true, uid, putStatus: putRes.status, putUrl, message: `เพิ่ม "${title}" ใน iPhone Reminders แล้ว` });
     } catch (e: any) {
       console.error('[Reminders Create Error]', e);
       return res.status(500).json({ error: e.message });

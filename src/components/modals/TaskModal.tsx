@@ -393,7 +393,7 @@ export function TaskModal({ isOpen, onClose, onSave, initialTask, categories = [
            body: JSON.stringify({ title: name, dueDate: endDate || undefined, notes: details || undefined })
          });
          const data = await res.json();
-         alert(res.ok ? `✅ ${data.message}` : `❌ ${data.error}`);
+         alert(res.ok ? `✅ ${data.message}\nPUT ${data.putStatus} → ${data.putUrl}` : `❌ ${data.error}`);
        } catch (e: any) { alert(`❌ ${e.message}`); }
      }}
      disabled={!name.trim()}
