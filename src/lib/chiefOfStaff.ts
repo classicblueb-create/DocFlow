@@ -32,6 +32,8 @@ export interface RevenueSnapshot {
  paidInvoices: number;
  outstandingInvoices: number;
  overdueInvoices: number;
+ closedWon: number;
+ closedWonCount: number;
 }
 
 /**
@@ -413,6 +415,8 @@ export function compileRevenueData(tasks: Task[]): RevenueSnapshot {
  let pipelinePotential = 0;
  let openQuotations = 0;
  let pendingDeals = 0;
+ let closedWon = 0;
+ let closedWonCount = 0;
 
  let paidInvoices = 0;
  let outstandingInvoices = 0;
@@ -462,6 +466,10 @@ export function compileRevenueData(tasks: Task[]): RevenueSnapshot {
  }
  if (t.pipelineStage === 'proposal') {
  openQuotations += 1;
+ }
+ if (t.pipelineStage === 'won') {
+ closedWon += dealVal;
+ closedWonCount += 1;
  }
  }
 
@@ -521,6 +529,8 @@ export function compileRevenueData(tasks: Task[]): RevenueSnapshot {
  pendingDeals,
  paidInvoices,
  outstandingInvoices,
- overdueInvoices
+ overdueInvoices,
+ closedWon,
+ closedWonCount,
  };
 }

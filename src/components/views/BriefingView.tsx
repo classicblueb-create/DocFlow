@@ -567,10 +567,11 @@ ${categoriesListStr}
       )}
 
       {/* Module 1: MODTY Daily Briefing / Business Snapshot */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 shrink-0">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3 shrink-0">
         {[
           { label: 'Revenue (เดือนนี้)', val: `฿${revenueData.monthly.toLocaleString()}`, color: 'indigo', icon: DollarSign, sub: 'งานเสร็จแล้วประจำเดือน' },
-          { label: 'Pipeline Potential', val: `฿${revenueData.pipelinePotential.toLocaleString()}`, color: 'emerald', icon: TrendingUp, sub: `${revenueData.pendingDeals} ดีลรอการปิด` },
+          { label: 'Closed Won', val: `฿${revenueData.closedWon.toLocaleString()}`, color: 'emerald', icon: CheckCircle, sub: `ปิดดีลแล้ว ${revenueData.closedWonCount} ดีล` },
+          { label: 'Pipeline Potential', val: `฿${revenueData.pipelinePotential.toLocaleString()}`, color: 'teal', icon: TrendingUp, sub: `${revenueData.pendingDeals} ดีลรอการปิด` },
           { label: 'Open Projects', val: `${openProjectsCount} โครงการ`, color: 'orange', icon: FileText, sub: 'งานกำลังดำเนินอยู่' },
           { label: 'Overdue Tasks', val: `${overdueCount} งานด่วน`, color: 'rose', icon: AlertCircle, sub: 'เกินกำหนดส่งแล้ว' },
           { label: 'ค้างรับเงิน (Invoices)', val: `฿${revenueData.outstandingInvoices.toLocaleString()}`, color: 'amber', icon: Hourglass, sub: `เกินกำหนด ฿${revenueData.overdueInvoices.toLocaleString()}` }

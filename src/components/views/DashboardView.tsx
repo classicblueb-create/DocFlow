@@ -87,6 +87,14 @@ export function DashboardView({ tasks, categories }: DashboardViewProps) {
   const inProgressCount = tasks.filter(t => t.status === 'In Progress' || t.status === 'กำลังทำ').length;
   const doneCount       = tasks.filter(t => t.status === 'Done' || t.status === 'เสร็จสิ้น').length;
 
+  const { closedWon, closedWonCount } = useMemo(() => {
+    const wonTasks = tasks.filter(t => t.pipelineStage === 'won');
+    return {
+      closedWon: wonTasks.reduce((s, t) => s + Number(t.dealValue || t.price || 0), 0),
+      closedWonCount: wonTasks.length,
+    };
+  }, [tasks]);
+
   const { totalRevenue, earnedRevenue, pendingRevenue, totalProfit } = useMemo(() => {
     let tr = 0;
     let er = 0;
@@ -274,7 +282,8 @@ export function DashboardView({ tasks, categories }: DashboardViewProps) {
         </div>
 
         {/* KPI chips */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <KpiChip label="Closed Won"   value={`฿${closedWon.toLocaleString()}`}      sub={`ปิดดีลแล้ว ${closedWonCount} ดีล`} accent="border-emerald-500" />
           <KpiChip label="รับแล้ว"      value={`฿${earnedRevenue.toLocaleString()}`}  sub="งานเสร็จสิ้น"            accent="border-emerald-400" />
           <KpiChip label="ค้างรับ"      value={`฿${pendingRevenue.toLocaleString()}`} sub="ยังไม่เสร็จ"              accent="border-amber-400" />
           <KpiChip label="ต้นทุน Dev"   value={`฿${totalDevCost.toLocaleString()}`}   sub="ค่าจ้าง Dev รวม"          accent="border-rose-400" />
