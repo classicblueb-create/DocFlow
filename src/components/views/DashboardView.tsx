@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import {
   BarChart, Bar, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart as RechartsPie, Pie, Cell, Area, AreaChart,
+  PieChart as RechartsPie, Pie, Cell, Area, AreaChart, RadialBarChart, RadialBar,
 } from 'recharts';
 import { Task, ProjectCategory } from '../../types';
 import { TrendingUp, CheckCircle, Clock } from 'lucide-react';
@@ -247,6 +247,62 @@ export function DashboardView({ tasks, categories }: DashboardViewProps) {
     }).sort((a, b) => b.value - a.value);
   }, [tasks, categories]);
 
+  // ── Pipeline sales data ────────────────────────────────────────────────────
+  const { momData, forecastData, closedBusinessData } = useMemo(() => {
+    const MONTH_NAMES = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    const now = new Date();
+    const keys: string[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      keys.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+    }
+    // Month over Month: gross revenue change %
+    const monthly: Record<string,number> = {};
+    keys.forEach(k => { monthly[k] = 0; });
+    tasks.forEach(t => {
+      const key = (t.endDate || t.startDate || '').slice(0,7);
+      if (monthly.hasOwnProperty(key)) monthly[key] += getTaskPrice(t);
+    });
+    const momArr = keys.map((k, i) => {
+      const val = monthly[k];
+      const prev = i > 0 ? monthly[keys[i-1]] : val;
+      const change = prev > 0 ? ((val - prev) / prev) * 100 : 0;
+      const [, m] = k.split('-');
+      return { month: MONTH_NAMES[parseInt(m,10)-1], value: val, change: Math.round(change * 10) / 10 };
+    });
+
+    // Forecast by Month: pipeline tasks grouped by close month (endDate)
+    const forecastMap: Record<string,{ pipeline:number; won:number }> = {};
+    const fKeys: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+      const k = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      fKeys.push(k);
+      forecastMap[k] = { pipeline: 0, won: 0 };
+    }
+    tasks.filter(t => t.pipelineStage && t.endDate).forEach(t => {
+      const k = t.endDate!.slice(0,7);
+      if (!forecastMap[k]) return;
+      const val = Number(t.dealValue || t.price || 0);
+      if (t.pipelineStage === 'won') forecastMap[k].won += val;
+      else if (t.pipelineStage !== 'lost') forecastMap[k].pipeline += val;
+    });
+    const forecastArr = fKeys.map(k => {
+      const [, m] = k.split('-');
+      return { month: MONTH_NAMES[parseInt(m,10)-1], ...forecastMap[k] };
+    });
+
+    // Closed Business gauge data
+    const wonTot = tasks.filter(t => t.pipelineStage === 'won').reduce((s,t) => s + Number(t.dealValue || t.price || 0), 0);
+    const target = Math.max(wonTot * 1.25, 100000); // 25% above current as target
+    const pct = Math.min(Math.round((wonTot / target) * 100), 100);
+    const gaugeData = [
+      { name: 'Closed', value: pct, fill: '#34d399' },
+      { name: 'Target', value: 100 - pct, fill: '#e2e8f0' },
+    ];
+    return { momData: momArr, forecastData: forecastArr, closedBusinessData: { won: wonTot, target, pct, gaugeData } };
+  }, [tasks]);
+
   const thb = (v: number) => `฿${v.toLocaleString()}`;
 
   return (
@@ -367,6 +423,109 @@ export function DashboardView({ tasks, categories }: DashboardViewProps) {
                   ) : (
                     <div className="h-[180px] flex items-center justify-center text-xs text-slate-400 font-semibold">ยังไม่มีมูลค่าดีลในระบบ</div>
                   )}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ── Closed Business + MoM + Forecast ── */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+
+          {/* Closed Business Gauge */}
+          <div className="glass-card rounded-2xl p-5 flex flex-col items-center">
+            <h3 className="font-bold text-sm text-slate-700 mb-1 self-start">Closed Business</h3>
+            <p className="text-[10px] text-slate-400 font-semibold self-start mb-3">ยอดปิดดีลเทียบเป้าหมาย</p>
+            <div className="relative w-40 h-24">
+              <ResponsiveContainer width="100%" height="100%">
+                <RechartsPie>
+                  <Pie
+                    data={closedBusinessData.gaugeData}
+                    cx="50%" cy="100%"
+                    startAngle={180} endAngle={0}
+                    innerRadius={50} outerRadius={70}
+                    dataKey="value" strokeWidth={0}
+                  >
+                    {closedBusinessData.gaugeData.map((d, i) => <Cell key={i} fill={d.fill} />)}
+                  </Pie>
+                </RechartsPie>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex flex-col items-center justify-end pb-1">
+                <p className="text-xl font-black text-emerald-600">{closedBusinessData.pct}%</p>
+              </div>
+            </div>
+            <p className="text-base font-black text-slate-800 mt-1">{thb(closedBusinessData.won)}</p>
+            <p className="text-[10px] text-slate-400 font-semibold">เป้า {thb(Math.round(closedBusinessData.target))}</p>
+          </div>
+
+          {/* Month Over Month Growth */}
+          <div className="glass-card rounded-2xl p-5">
+            <h3 className="font-bold text-sm text-slate-700 mb-1">Month Over Month</h3>
+            <p className="text-[10px] text-slate-400 font-semibold mb-3">รายรับเปลี่ยนแปลง % ต่อเดือน</p>
+            <ResponsiveContainer width="100%" height={130}>
+              <LineChart data={momData} margin={{ left: 4, right: 4, top: 4, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} tickFormatter={v => `${v}%`} />
+                <Tooltip formatter={(v: any) => [`${v}%`, 'เปลี่ยนแปลง']} cursor={{ stroke: '#e2e8f0' }} />
+                <Line dataKey="change" name="MoM %" stroke="#6366f1" strokeWidth={2} dot={{ r: 3, fill: '#6366f1' }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Forecast by Month */}
+          <div className="glass-card rounded-2xl p-5">
+            <h3 className="font-bold text-sm text-slate-700 mb-1">Forecast by Month</h3>
+            <p className="text-[10px] text-slate-400 font-semibold mb-3">Pipeline vs Closed Won ตาม Close Date</p>
+            <ResponsiveContainer width="100%" height={130}>
+              <BarChart data={forecastData} margin={{ left: 4, right: 4, top: 4, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} tickFormatter={v => v >= 1000 ? `฿${(v/1000).toFixed(0)}k` : `฿${v}`} />
+                <Tooltip formatter={(v: any, name: string) => [thb(Number(v)), name === 'pipeline' ? 'Pipeline' : 'Won']} cursor={{ fill: 'rgba(99,102,241,0.06)' }} />
+                <Bar dataKey="pipeline" name="pipeline" fill="#818cf8" radius={[4,4,0,0]} maxBarSize={24} stackId="a" />
+                <Bar dataKey="won" name="won" fill="#34d399" radius={[4,4,0,0]} maxBarSize={24} stackId="a" />
+              </BarChart>
+            </ResponsiveContainer>
+            <div className="flex gap-4 justify-center mt-2">
+              <span className="flex items-center gap-1 text-[10px] font-semibold text-slate-500"><span className="w-2 h-2 rounded-sm bg-indigo-400 inline-block"/>Pipeline</span>
+              <span className="flex items-center gap-1 text-[10px] font-semibold text-slate-500"><span className="w-2 h-2 rounded-sm bg-emerald-400 inline-block"/>Won</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Stage radial bars */}
+        {(() => {
+          const STAGE_COLORS: Record<string,string> = { lead:'#94a3b8', opportunity:'#818cf8', proposal:'#60a5fa', negotiation:'#fbbf24', won:'#34d399', lost:'#fb7185' };
+          const STAGE_LABELS: Record<string,string> = { lead:'Lead', opportunity:'Opportunity', proposal:'Proposal', negotiation:'Negotiation', won:'Won', lost:'Lost' };
+          const stages = ['lead','opportunity','proposal','negotiation','won','lost'] as const;
+          const pipelineTasks = tasks.filter(t => t.pipelineStage);
+          const maxCount = Math.max(...stages.map(s => pipelineTasks.filter(t => t.pipelineStage === s).length), 1);
+          const radialData = stages.map(s => {
+            const count = pipelineTasks.filter(t => t.pipelineStage === s).length;
+            const val = pipelineTasks.filter(t => t.pipelineStage === s).reduce((sum,t) => sum + Number(t.dealValue || t.price || 0), 0);
+            return { name: STAGE_LABELS[s], count, value: Math.round((count / maxCount) * 100), fill: STAGE_COLORS[s], dealValue: val };
+          }).filter(d => d.count > 0);
+          if (radialData.length === 0) return null;
+          return (
+            <div className="glass-card rounded-2xl p-5">
+              <h3 className="font-bold text-sm text-slate-700 mb-4">Sales Activity by Stage</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                <ResponsiveContainer width="100%" height={200}>
+                  <RadialBarChart cx="50%" cy="50%" innerRadius={20} outerRadius={90} data={radialData} startAngle={90} endAngle={-270}>
+                    <RadialBar dataKey="value" cornerRadius={6} background={{ fill: '#f1f5f9' }} />
+                    <Tooltip formatter={(_: any, __: any, props: any) => [`${props.payload.count} ดีล · ${thb(props.payload.dealValue)}`, props.payload.name]} />
+                  </RadialBarChart>
+                </ResponsiveContainer>
+                <div className="flex flex-col gap-2">
+                  {radialData.map(d => (
+                    <div key={d.name} className="flex items-center gap-3">
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: d.fill }} />
+                      <span className="text-xs font-semibold text-slate-600 flex-1">{d.name}</span>
+                      <span className="text-xs font-black text-slate-800">{d.count} ดีล</span>
+                      <span className="text-[10px] font-semibold text-slate-400">{thb(d.dealValue)}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>

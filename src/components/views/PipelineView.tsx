@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Task, Client } from '../../types';
 import { Plus, DollarSign, Calendar, User, ChevronRight } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
 type PipelineStage = 'lead' | 'opportunity' | 'proposal' | 'negotiation' | 'won' | 'lost';
 
@@ -132,6 +133,113 @@ export function PipelineView({ tasks, clients, onTaskClick, onUpdateTask, onNewT
  >
  <Plus className="w-4 h-4" /> เพิ่ม Lead
  </button>
+ </div>
+
+ {/* ── Seller Home Summary ── */}
+ <div className="shrink-0 px-6 py-4 border-b border-white/20">
+   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+     {/* Total Pipeline Donut */}
+     {(() => {
+       const stageColors: Record<string,string> = { lead:'#94a3b8', opportunity:'#818cf8', proposal:'#60a5fa', negotiation:'#fbbf24', won:'#34d399', lost:'#fb7185' };
+       const donutData = STAGES.map(s => ({ name: s.label, value: Math.max(stageTotal(s.id), 0), color: stageColors[s.id] })).filter(d => d.value > 0);
+       const hasData = donutData.length > 0;
+       return (
+         <div className="glass-card rounded-2xl p-4 flex items-center gap-4">
+           <div className="w-20 h-20 shrink-0">
+             <ResponsiveContainer width="100%" height="100%">
+               <PieChart>
+                 <Pie data={hasData ? donutData : [{ name:'ว่าง', value:1, color:'#e2e8f0' }]} cx="50%" cy="50%" innerRadius={22} outerRadius={36} dataKey="value" strokeWidth={0}>
+                   {(hasData ? donutData : [{ color:'#e2e8f0' }]).map((d,i) => <Cell key={i} fill={d.color} />)}
+                 </Pie>
+                 {hasData && <Tooltip formatter={(v:any) => fmtMoney(Number(v))} />}
+               </PieChart>
+             </ResponsiveContainer>
+           </div>
+           <div>
+             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Pipeline</p>
+             <p className="text-lg font-black text-slate-800 leading-tight">{fmtMoney(forecastTotal)}</p>
+             <p className="text-[10px] text-slate-400 font-semibold mt-0.5">{pipelineTasks.filter(t => t.pipelineStage !== 'lost').length} active deals</p>
+           </div>
+         </div>
+       );
+     })()}
+
+     {/* Closed Won */}
+     {(() => {
+       const wonDeals = pipelineTasks.filter(t => t.pipelineStage === 'won');
+       const wonVal = wonDeals.reduce((s,t) => s + (t.dealValue ?? t.price ?? 0), 0);
+       const lostDeals = pipelineTasks.filter(t => t.pipelineStage === 'lost').length;
+       const total = wonDeals.length + lostDeals;
+       const winRate = total > 0 ? Math.round((wonDeals.length / total) * 100) : 0;
+       const winData = [{ value: winRate, color: '#34d399' }, { value: 100 - winRate, color: '#e2e8f0' }];
+       return (
+         <div className="glass-card rounded-2xl p-4 flex items-center gap-4">
+           <div className="w-20 h-20 shrink-0">
+             <ResponsiveContainer width="100%" height="100%">
+               <PieChart>
+                 <Pie data={winData} cx="50%" cy="50%" startAngle={90} endAngle={-270} innerRadius={22} outerRadius={36} dataKey="value" strokeWidth={0}>
+                   {winData.map((d,i) => <Cell key={i} fill={d.color} />)}
+                 </Pie>
+               </PieChart>
+             </ResponsiveContainer>
+           </div>
+           <div>
+             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Closed Won</p>
+             <p className="text-lg font-black text-emerald-600 leading-tight">{fmtMoney(wonVal)}</p>
+             <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Win Rate {winRate}% · {wonDeals.length} ดีล</p>
+           </div>
+         </div>
+       );
+     })()}
+
+     {/* Stage breakdown */}
+     {(() => {
+       const active = STAGES.filter(s => s.id !== 'won' && s.id !== 'lost');
+       return (
+         <div className="glass-card rounded-2xl p-4 flex flex-col justify-between">
+           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Stage Breakdown</p>
+           <div className="flex flex-col gap-1">
+             {active.map(s => {
+               const count = pipelineTasks.filter(t => t.pipelineStage === s.id).length;
+               const maxCount = Math.max(...active.map(a => pipelineTasks.filter(t => t.pipelineStage === a.id).length), 1);
+               return (
+                 <div key={s.id} className="flex items-center gap-2">
+                   <span className="text-[9px] text-slate-400 font-semibold w-16 shrink-0">{s.label.split(' ')[0]}</span>
+                   <div className="flex-1 bg-slate-100 rounded-full h-1.5">
+                     <div className={cn('h-1.5 rounded-full', s.dot)} style={{ width: `${(count / maxCount) * 100}%`, backgroundColor: undefined }} />
+                   </div>
+                   <span className="text-[10px] font-bold text-slate-500 w-4 text-right">{count}</span>
+                 </div>
+               );
+             })}
+           </div>
+         </div>
+       );
+     })()}
+
+     {/* Recent Won */}
+     {(() => {
+       const recentWon = [...pipelineTasks.filter(t => t.pipelineStage === 'won')].reverse().slice(0, 3);
+       return (
+         <div className="glass-card rounded-2xl p-4 flex flex-col">
+           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Recent Won 🏆</p>
+           {recentWon.length === 0 ? (
+             <p className="text-xs text-slate-300 font-semibold flex-1 flex items-center">ยังไม่มีดีลที่ปิดได้</p>
+           ) : (
+             <div className="flex flex-col gap-1.5">
+               {recentWon.map(t => (
+                 <div key={t.id} className="flex items-center gap-2">
+                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                   <span className="text-xs font-semibold text-slate-700 truncate flex-1">{t.name}</span>
+                   <span className="text-[10px] font-bold text-emerald-600 shrink-0">{fmtMoney(t.dealValue ?? t.price ?? 0)}</span>
+                 </div>
+               ))}
+             </div>
+           )}
+         </div>
+       );
+     })()}
+   </div>
  </div>
 
  {/* Conversion path indicator */}
