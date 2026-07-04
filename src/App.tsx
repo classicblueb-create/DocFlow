@@ -23,6 +23,7 @@ import { AgentModal } from './components/modals/AgentModal';
 import { StandupModal } from './components/modals/StandupModal';
 import { DocSettingsModal } from './components/modals/DocSettingsModal';
 import { ThemeSettingsModal } from './components/modals/ThemeSettingsModal';
+import { GlobalSearch } from './components/GlobalSearch';
 
 import { ViewType, Task, Client, Template, Idea, ContentPlan, ProjectCategory } from './types';
 import {
@@ -79,6 +80,7 @@ export default function App() {
  const [isDocSettingsOpen, setIsDocSettingsOpen] = useState(false);
  const [isThemeOpen, setIsThemeOpen] = useState(false);
  const [newTaskPipelineStage, setNewTaskPipelineStage] = useState<string | undefined>();
+ const [isSearchOpen, setIsSearchOpen] = useState(false);
 
  // ── Data ──────────────────────────────────────────────────────────────────
  const [tasks, setTasks] = useState<Task[]>(() => lsGet(LS_TASKS, []));
@@ -91,6 +93,18 @@ export default function App() {
 
  // ── Apply theme on mount ──────────────────────────────────────────────────
  useEffect(() => { applyTheme(); }, []);
+
+ // ── Global Search shortcut (Cmd+K / Ctrl+K) ───────────────────────────────
+ useEffect(() => {
+   const onKey = (e: KeyboardEvent) => {
+     if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+       e.preventDefault();
+       setIsSearchOpen(s => !s);
+     }
+   };
+   window.addEventListener('keydown', onKey);
+   return () => window.removeEventListener('keydown', onKey);
+ }, []);
 
  // ── Auth bootstrap ────────────────────────────────────────────────────────
  useEffect(() => {
@@ -448,8 +462,8 @@ export default function App() {
  />
  );
 
- case 'gantt': return <GanttView tasks={filteredTasks} />;
- case 'calendar': return <CalendarView tasks={filteredTasks} />;
+ case 'gantt': return <GanttView tasks={filteredTasks} onTaskClick={handleTaskClick} />;
+ case 'calendar': return <CalendarView tasks={filteredTasks} onTaskClick={handleTaskClick} />;
 
  case 'dashboard':
  return <DashboardView tasks={filteredTasks} categories={categories} />;
@@ -584,6 +598,7 @@ export default function App() {
  onNewTaskClick={() => { setEditingTask(null); setIsTaskModalOpen(true); }}
  onMenuClick={() => setIsMobileOpen(true)}
  onSearchChange={setSearchQuery}
+ onGlobalSearch={() => setIsSearchOpen(true)}
  categoryName={activeCategoryName}
  onBgUpload={handleBgUpload}
  onBgRemove={handleBgRemove}
@@ -645,6 +660,19 @@ export default function App() {
 
  {/* Theme settings modal */}
  {isThemeOpen && <ThemeSettingsModal onClose={() => { setIsThemeOpen(false); applyTheme(); }} />}
+
+ {/* Global Search */}
+ {isSearchOpen && (
+   <GlobalSearch
+     tasks={tasks}
+     clients={clients}
+     ideas={ideas}
+     contentPlans={contentPlans}
+     onTaskClick={(task) => { handleTaskClick(task); setIsSearchOpen(false); }}
+     onViewChange={(view) => { setCurrentView(view as any); setIsSearchOpen(false); }}
+     onClose={() => setIsSearchOpen(false)}
+   />
+ )}
  </div>
  );
 }
