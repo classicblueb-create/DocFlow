@@ -1389,61 +1389,106 @@ ${ideasContext || 'ยังไม่มีไอเดีย'}
       if (error) throw error;
 
       const today = new Date();
-      // Set to start of today local time
-      today.setHours(0,0,0,0);
+      today.setHours(0, 0, 0, 0);
       const fiveDaysLater = new Date();
       fiveDaysLater.setDate(today.getDate() + 5);
-      fiveDaysLater.setHours(23,59,59,999);
+      fiveDaysLater.setHours(23, 59, 59, 999);
+      const yesterday = new Date(today);
+      yesterday.setDate(today.getDate() - 1);
 
-      const dueSoonTasks = (tasks || []).filter((task: any) => {
-        if (!task.endDate) return false;
-        if (task.status === 'เสร็จสิ้น' || task.status === 'Done') return false;
-        const dueDate = new Date(task.endDate);
-        return dueDate >= today && dueDate <= fiveDaysLater;
+      const isDone = (status: string) => status === 'เสร็จสิ้น' || status === 'Done';
+
+      // Main tasks: overdue + due soon
+      const overdueTasks = (tasks || []).filter((t: any) => {
+        if (!t.endDate || isDone(t.status)) return false;
+        return new Date(t.endDate) < today;
+      });
+      const dueSoonTasks = (tasks || []).filter((t: any) => {
+        if (!t.endDate || isDone(t.status)) return false;
+        const d = new Date(t.endDate);
+        return d >= today && d <= fiveDaysLater;
       });
 
-      // Collect due-soon subtasks
-      interface DueSubtask { name: string; parentName: string; assignee: string; dueDate: string; }
+      // Subtasks: overdue + due soon
+      interface DueSubtask { name: string; parentName: string; assignee: string; dueDate: string; overdue: boolean; }
+      const overdueSubtasks: DueSubtask[] = [];
       const dueSoonSubtasks: DueSubtask[] = [];
       (tasks || []).forEach((task: any) => {
-        if (!task.subtasks) return;
+        if (!task.subtasks || isDone(task.status)) return;
         try {
           const subs = JSON.parse(task.subtasks);
           if (!Array.isArray(subs)) return;
           subs.forEach((sub: any) => {
-            if (sub.status === 'done') return;
-            if (!sub.dueDate) return;
+            if (sub.status === 'done' || !sub.dueDate) return;
             const d = new Date(sub.dueDate);
-            if (d >= today && d <= fiveDaysLater) {
-              dueSoonSubtasks.push({ name: sub.name, parentName: task.name, assignee: sub.assignee || task.assignee || 'ไม่มี', dueDate: sub.dueDate });
+            const entry: DueSubtask = { name: sub.name, parentName: task.name, assignee: sub.assignee || task.assignee || 'ไม่มี', dueDate: sub.dueDate, overdue: false };
+            if (d < today) {
+              overdueSubtasks.push({ ...entry, overdue: true });
+            } else if (d <= fiveDaysLater) {
+              dueSoonSubtasks.push(entry);
             }
           });
         } catch {}
       });
 
-      if (dueSoonTasks.length === 0 && dueSoonSubtasks.length === 0) {
-        return res.json({ ok: true, message: "ไม่มีงานที่ใกล้ครบกำหนดใน 5 วัน" });
+      const totalItems = overdueTasks.length + dueSoonTasks.length + overdueSubtasks.length + dueSoonSubtasks.length;
+      if (totalItems === 0) {
+        return res.json({ ok: true, message: "ไม่มีงานที่เลยกำหนดหรือใกล้ครบกำหนด" });
       }
 
-      let message = `⚠️ *แจ้งเตือนงานใกล้ครบกำหนด (ใน 5 วัน)*\n`;
-      message += `━━━━━━━━━━━━━━━\n`;
-      dueSoonTasks.forEach((task: any) => {
-        message += `✅ งาน: ${task.name}\n`;
-        message += `👤 มอบหมาย: ${task.assignee || 'ไม่มี'}\n`;
-        message += `📅 กำหนดส่ง: ${task.endDate}\n`;
-        message += `🏢 ลูกค้า: ${task.customer || '-'}\n`;
-        message += `━━━━━━━━━━━━━━━\n`;
-      });
-      if (dueSoonSubtasks.length > 0) {
-        message += `\n📋 *งานย่อยใกล้ครบกำหนด*\n━━━━━━━━━━━━━━━\n`;
-        dueSoonSubtasks.forEach((sub) => {
-          message += `↳ ${sub.name}\n`;
-          message += `   งานหลัก: ${sub.parentName}\n`;
-          message += `   มอบหมาย: ${sub.assignee}  |  กำหนด: ${sub.dueDate}\n`;
+      let message = '';
+
+      // Section 1: overdue tasks
+      if (overdueTasks.length > 0) {
+        message += `🚨 *งานเลยกำหนดแล้ว (${overdueTasks.length} งาน)*\n━━━━━━━━━━━━━━━\n`;
+        overdueTasks.forEach((task: any) => {
+          const diffDays = Math.floor((today.getTime() - new Date(task.endDate).getTime()) / 86400000);
+          message += `🔴 ${task.name}\n`;
+          message += `   👤 ${task.assignee || 'ไม่มี'}  |  📅 ${task.endDate} (เลยมา ${diffDays} วัน)\n`;
+          if (task.customer) message += `   🏢 ${task.customer}\n`;
           message += `━━━━━━━━━━━━━━━\n`;
         });
       }
-      message += `ส่งจาก ModtyTasks`;
+
+      // Section 2: overdue subtasks
+      if (overdueSubtasks.length > 0) {
+        message += `\n🚨 *งานย่อยเลยกำหนดแล้ว (${overdueSubtasks.length} รายการ)*\n━━━━━━━━━━━━━━━\n`;
+        overdueSubtasks.forEach((sub) => {
+          const diffDays = Math.floor((today.getTime() - new Date(sub.dueDate).getTime()) / 86400000);
+          message += `🔴 ${sub.name}\n`;
+          message += `   📁 ${sub.parentName}  |  👤 ${sub.assignee}\n`;
+          message += `   📅 ${sub.dueDate} (เลยมา ${diffDays} วัน)\n`;
+          message += `━━━━━━━━━━━━━━━\n`;
+        });
+      }
+
+      // Section 3: due soon tasks
+      if (dueSoonTasks.length > 0) {
+        message += `\n⚠️ *งานใกล้ครบกำหนด ใน 5 วัน (${dueSoonTasks.length} งาน)*\n━━━━━━━━━━━━━━━\n`;
+        dueSoonTasks.forEach((task: any) => {
+          const diffDays = Math.floor((new Date(task.endDate).getTime() - today.getTime()) / 86400000);
+          const label = diffDays === 0 ? '🔔 วันนี้!' : `อีก ${diffDays} วัน`;
+          message += `⏰ ${task.name}\n`;
+          message += `   👤 ${task.assignee || 'ไม่มี'}  |  📅 ${task.endDate} (${label})\n`;
+          if (task.customer) message += `   🏢 ${task.customer}\n`;
+          message += `━━━━━━━━━━━━━━━\n`;
+        });
+      }
+
+      // Section 4: due soon subtasks
+      if (dueSoonSubtasks.length > 0) {
+        message += `\n⚠️ *งานย่อยใกล้ครบกำหนด ใน 5 วัน (${dueSoonSubtasks.length} รายการ)*\n━━━━━━━━━━━━━━━\n`;
+        dueSoonSubtasks.forEach((sub) => {
+          const diffDays = Math.floor((new Date(sub.dueDate).getTime() - today.getTime()) / 86400000);
+          const label = diffDays === 0 ? '🔔 วันนี้!' : `อีก ${diffDays} วัน`;
+          message += `⏰ ${sub.name}\n`;
+          message += `   📁 ${sub.parentName}  |  👤 ${sub.assignee}\n`;
+          message += `   📅 ${sub.dueDate} (${label})\n`;
+          message += `━━━━━━━━━━━━━━━\n`;
+        });
+      }
+
+      message += `\n🤖 ส่งจาก ModtyTasks`;
 
       const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: "POST",
