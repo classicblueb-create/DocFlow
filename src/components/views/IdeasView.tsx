@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Lightbulb, Plus, X, Sparkles, Loader2, ChevronDown, ChevronUp, Trash2, Tag, Clock, Zap, TrendingUp, Pencil, Check } from 'lucide-react';
-import { Idea } from '../../types';
+import { Lightbulb, Plus, X, Sparkles, Loader2, ChevronDown, ChevronUp, Trash2, Tag, Clock, Zap, TrendingUp, Pencil, Check, ArrowRight } from 'lucide-react';
+import { Idea, Task } from '../../types';
 import { cn } from '../../lib/utils';
 
 interface IdeasViewProps {
@@ -8,6 +8,7 @@ interface IdeasViewProps {
  onSaveIdea: (idea: Idea) => void;
  onDeleteIdea: (id: string) => void;
  onUpdateIdea: (idea: Idea) => void;
+ onCreateTask?: (task: Partial<Task>) => void;
 }
 
 const CATEGORIES = ['ธุรกิจ', 'Product', 'Marketing', 'เทคนิค', 'ออกแบบ', 'การเงิน', 'อื่นๆ'];
@@ -34,7 +35,7 @@ const EFFORT_COLORS: Record<string, string> = {
  'ยาก': 'bg-rose-500/10 text-rose-750 border-rose-500/20',
 };
 
-function IdeaCard({ idea, onDelete, onUpdate }: { key?: React.Key; idea: Idea; onDelete: (id: string) => void; onUpdate: (idea: Idea) => void }) {
+function IdeaCard({ idea, onDelete, onUpdate, onConvertToTask }: { key?: React.Key; idea: Idea; onDelete: (id: string) => void; onUpdate: (idea: Idea) => void; onConvertToTask?: (idea: Idea) => void }) {
  const [isAnalyzing, setIsAnalyzing] = useState(false);
  const [showAnalysis, setShowAnalysis] = useState(!!idea.aiAnalysis);
  const [isEditing, setIsEditing] = useState(false);
@@ -220,6 +221,16 @@ function IdeaCard({ idea, onDelete, onUpdate }: { key?: React.Key; idea: Idea; o
  {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
  </select>
 
+ <div className="flex items-center gap-1.5">
+ {onConvertToTask && (
+   <button
+     onClick={() => onConvertToTask(idea)}
+     className="flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all cursor-pointer"
+     title="สร้างเป็นงาน"
+   >
+     <ArrowRight className="w-3 h-3" /> สร้างงาน
+   </button>
+ )}
  <button
  onClick={handleAnalyze}
  disabled={isAnalyzing}
@@ -273,10 +284,11 @@ function IdeaCard({ idea, onDelete, onUpdate }: { key?: React.Key; idea: Idea; o
  {new Date(idea.createdAt).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' })}
  </div>
  </div>
+ </div>
  );
 }
 
-export function IdeasView({ ideas, onSaveIdea, onDeleteIdea, onUpdateIdea }: IdeasViewProps) {
+export function IdeasView({ ideas, onSaveIdea, onDeleteIdea, onUpdateIdea, onCreateTask }: IdeasViewProps) {
  const [isAdding, setIsAdding] = useState(false);
  const [title, setTitle] = useState('');
  const [description, setDescription] = useState('');
@@ -471,7 +483,9 @@ export function IdeasView({ ideas, onSaveIdea, onDeleteIdea, onUpdateIdea }: Ide
  ) : (
  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
  {filtered.map(idea => (
- <IdeaCard key={idea.id} idea={idea} onDelete={handleDelete} onUpdate={onUpdateIdea} />
+ <IdeaCard key={idea.id} idea={idea} onDelete={handleDelete} onUpdate={onUpdateIdea}
+   onConvertToTask={onCreateTask ? (idea) => onCreateTask({ name: idea.title, details: idea.description, status: 'To Do', tags: idea.tags || undefined }) : undefined}
+ />
  ))}
  </div>
  )}

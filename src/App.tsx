@@ -527,6 +527,7 @@ export default function App() {
  onSaveIdea={handleSaveIdea}
  onDeleteIdea={handleDeleteIdea}
  onUpdateIdea={handleUpdateIdea}
+ onCreateTask={handleSaveTask}
  />
  );
 

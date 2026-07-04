@@ -9,6 +9,7 @@ interface HeaderProps {
  onNewTaskClick: () => void;
  onMenuClick: () => void;
  onSearchChange: (q: string) => void;
+ onGlobalSearch?: () => void;
  categoryName?: string;
  onBgUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
  onBgRemove: () => void;
@@ -38,6 +39,7 @@ export function Header({
  onNewTaskClick,
  onMenuClick,
  onSearchChange,
+ onGlobalSearch,
  categoryName,
  onBgUpload,
  onBgRemove,
@@ -86,6 +88,16 @@ export function Header({
  className="glass-input pl-9 pr-3 py-1.5 text-xs w-36 transition-all focus:w-52 focus:bg-white/70 text-slate-850 placeholder-slate-450"
  />
  </div>
+ {onGlobalSearch && (
+   <button
+     onClick={onGlobalSearch}
+     title="ค้นหาทุกอย่าง (⌘K)"
+     className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl glass-input text-xs font-bold text-slate-500 hover:text-indigo-600 hover:border-indigo-200 transition-all cursor-pointer"
+   >
+     <Search className="w-3.5 h-3.5" />
+     <kbd className="hidden md:inline text-[10px] text-slate-400 font-bold">⌘K</kbd>
+   </button>
+ )}
 
  {/* Background image picker */}
  <input ref={bgFileRef} type="file" accept="image/*" className="hidden" onChange={handleUpload} />
