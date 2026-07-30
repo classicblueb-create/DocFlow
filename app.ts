@@ -7,6 +7,9 @@ import helmet from "helmet";
 import { jsPDF } from "jspdf";
 import { createClient } from "@supabase/supabase-js";
 import { GoogleGenAI } from "@google/genai";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import { z } from "zod";
 
 dotenv.config();
 
@@ -21,7 +24,7 @@ function getApiKey(): string {
   return "";
 }
 
-const MODEL_PRIMARY  = "google/gemma-4-26b-a4b-it";
+const MODEL_PRIMARY = "google/gemma-4-26b-a4b-it";
 const MODEL_FALLBACK = "google/gemma-4-26b-a4b-it";
 
 async function callOpenRouter(
@@ -86,7 +89,7 @@ async function generateWithAI(
         }
       }
     });
-    
+
     const response = await ai.models.generateContent({
       model: "gemini-2.0-flash",
       contents: userPrompt,
@@ -375,7 +378,7 @@ OUTPUT: JSON object เท่านั้น ห้ามมี markdown หร�
 
       const overdueTasks = tasks.filter((t: any) => t.endDate && t.endDate < today && t.status !== "Done" && t.status !== "เสร็จสิ้น");
       const inProgress = tasks.filter((t: any) => t.status === "In Progress" || t.status === "กำลังทำ" || t.status === "กำลังดำเนินการ");
-      
+
       // Calculate revenue taking phases into account
       let totalRevenue = 0;
       let myIncome = 0;
@@ -388,7 +391,7 @@ OUTPUT: JSON object เท่านั้น ห้ามมี markdown หร�
             if (Array.isArray(phases) && phases.length > 0) {
               price = phases.reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
             }
-          } catch (e) {}
+          } catch (e) { }
         }
         totalRevenue += price;
         const profit = t.myIncome !== undefined ? Number(t.myIncome) : price - devCost;
@@ -416,17 +419,17 @@ ${categoryCounts || "- ไม่มีข้อมูลหมวดหมู่
 
 รายการงาน (Tasks - สูงสุด 20 รายการ):
 ${tasks.slice(0, 20).map((t: any) => {
-  let price = Number(t.price || 0);
-  if (t.paymentPhases) {
-    try {
-      const phases = JSON.parse(t.paymentPhases);
-      if (Array.isArray(phases) && phases.length > 0) {
-        price = phases.reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
-      }
-    } catch (e) {}
-  }
-  return `- [${t.status}] ${t.name} | ลูกค้า: ${t.customer || "-"} | ยอด: ฿${price} | ครบกำหนด: ${t.endDate || "-"}`;
-}).join("\n")}
+        let price = Number(t.price || 0);
+        if (t.paymentPhases) {
+          try {
+            const phases = JSON.parse(t.paymentPhases);
+            if (Array.isArray(phases) && phases.length > 0) {
+              price = phases.reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+            }
+          } catch (e) { }
+        }
+        return `- [${t.status}] ${t.name} | ลูกค้า: ${t.customer || "-"} | ยอด: ฿${price} | ครบกำหนด: ${t.endDate || "-"}`;
+      }).join("\n")}
 
 งานเกินกำหนด: ${overdueTasks.map((t: any) => t.name).join(", ") || "ไม่มี"}
 
@@ -591,8 +594,8 @@ ${contextSection}
   // -----------------------------------------------------------------
   // Notion Content Plan API proxy
   // -----------------------------------------------------------------
-  const NOTION_TOKEN   = process.env.NOTION_TOKEN || "";
-  const NOTION_DB_ID   = process.env.NOTION_CONTENT_DB_ID || "";
+  const NOTION_TOKEN = process.env.NOTION_TOKEN || "";
+  const NOTION_DB_ID = process.env.NOTION_CONTENT_DB_ID || "";
   const NOTION_VERSION = "2022-06-28";
 
   function notionHeaders() {
@@ -1018,7 +1021,7 @@ ${ideasContext || 'ยังไม่มีไอเดีย'}
             console.error("[Telegram Assistant] Supabase PDF upload error:", uploadError);
           }
 
-          const invoiceNo = `INV-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Math.floor(100+Math.random()*900)}`;
+          const invoiceNo = `INV-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`;
           const newInvoice = { id: `inv-${Date.now()}`, invoiceNo, issueDate: new Date().toISOString().slice(0, 10), status: 'draft', phaseIds: [], totalAmount: price, notes: details };
           const { error: taskError } = await supabase.from('tasks').insert({ id: taskId, name: taskName, status: 'ไอเดีย/ร่าง', price, customer: customerName, clientId, details, invoices: JSON.stringify([newInvoice]), attachments: newAttachments.length > 0 ? JSON.stringify(newAttachments) : null });
           if (!taskError) dbSaved = true;
@@ -1038,7 +1041,7 @@ ${ideasContext || 'ยังไม่มีไอเดีย'}
           await sendTelegramMessage(chatId, messageText);
         }
 
-      // ── Action: create_task ────────────────────────────────────────────
+        // ── Action: create_task ────────────────────────────────────────────
       } else if (parsed.action === 'create_task') {
         const { taskName, customerName, assignee, dueDate, endDate, details, status } = parsed;
         const taskId = `task-tg-${Date.now()}`;
@@ -1071,7 +1074,7 @@ ${ideasContext || 'ยังไม่มีไอเดีย'}
           : `⚠️ ไม่สามารถสร้างงาน "${taskName}" ได้ กรุณาลองใหม่`;
         await sendTelegramMessage(chatId, msg);
 
-      // ── Action: reply (general Q&A / summarize) ───────────────────────
+        // ── Action: reply (general Q&A / summarize) ───────────────────────
       } else if (parsed.action === 'reply' || parsed.action === 'other') {
         const replyText = parsed.replyText || parsed.reply || 'ขอโทษค่ะ ไม่สามารถตอบได้ในขณะนี้';
         await sendTelegramMessage(chatId, replyText);
@@ -1183,7 +1186,7 @@ ${ideasContext || 'ยังไม่มีไอเดีย'}
           });
 
           const buf = Buffer.from(doc.output('arraybuffer'));
-          const filename = `tasks_report_${new Date().toISOString().slice(0,10)}.pdf`;
+          const filename = `tasks_report_${new Date().toISOString().slice(0, 10)}.pdf`;
           await sendTelegramFile(chatId, buf, filename, `📄 รายงานงานทั้งหมด (${filteredTasks.length} รายการ)`);
         } else {
           await sendTelegramMessage(chatId, '⚠️ ไม่สามารถสร้างรายงานได้ เนื่องจากไม่ได้ตั้งค่า Supabase');
@@ -1195,14 +1198,14 @@ ${ideasContext || 'ยังไม่มีไอเดีย'}
         if (supabaseUrl && supabaseAnonKey) {
           const supabase = createClient(supabaseUrl, supabaseAnonKey);
           const { data: tasks } = await supabase.from('tasks').select('*');
-          const headers = ['ชื่องาน','ลูกค้า','สถานะ','ผู้รับผิดชอบ','ราคา','กำหนดส่ง','รายละเอียด'];
+          const headers = ['ชื่องาน', 'ลูกค้า', 'สถานะ', 'ผู้รับผิดชอบ', 'ราคา', 'กำหนดส่ง', 'รายละเอียด'];
           const rows = (tasks || []).map((t: any) => [
             t.name || '', t.customer || '', t.status || '', t.assignee || '',
             t.price || 0, t.endDate || '', (t.details || '').replace(/[,"\n]/g, ' ')
           ].map((v: any) => `"${v}"`).join(','));
           const csv = '\uFEFF' + headers.join(',') + '\n' + rows.join('\n');
           const buf = Buffer.from(csv, 'utf-8');
-          const filename = `tasks_${new Date().toISOString().slice(0,10)}.csv`;
+          const filename = `tasks_${new Date().toISOString().slice(0, 10)}.csv`;
           await sendTelegramFile(chatId, buf, filename, `📊 เอกสารงานทั้งหมด ${(tasks || []).length} รายการ (เปิดใน Excel ได้)`);
         } else {
           await sendTelegramMessage(chatId, '⚠️ ไม่สามารถ export ได้');
@@ -1214,13 +1217,13 @@ ${ideasContext || 'ยังไม่มีไอเดีย'}
         if (supabaseUrl && supabaseAnonKey) {
           const supabase = createClient(supabaseUrl, supabaseAnonKey);
           const { data: clients } = await supabase.from('clients').select('*');
-          const headers = ['ชื่อลูกค้า','ติดต่อ','งบประมาณ'];
+          const headers = ['ชื่อลูกค้า', 'ติดต่อ', 'งบประมาณ'];
           const rows = (clients || []).map((c: any) => [
             c.name || '', (c.contactInfo || '').replace(/[,"\n]/g, ' '), c.targetBudget || 0
           ].map((v: any) => `"${v}"`).join(','));
           const csv = '\uFEFF' + headers.join(',') + '\n' + rows.join('\n');
           const buf = Buffer.from(csv, 'utf-8');
-          const filename = `clients_${new Date().toISOString().slice(0,10)}.csv`;
+          const filename = `clients_${new Date().toISOString().slice(0, 10)}.csv`;
           await sendTelegramFile(chatId, buf, filename, `🏢 ลูกค้าทั้งหมด ${(clients || []).length} ราย`);
         } else {
           await sendTelegramMessage(chatId, '⚠️ ไม่สามารถ export ได้');
@@ -1333,10 +1336,10 @@ ${ideasContext || 'ยังไม่มีไอเดีย'}
       '━━━━━━━━━━━━━━━',
       `✅ งาน: ${taskName}`,
       `👤 มอบให้: ${assignee}`,
-      customer   ? `🏢 ลูกค้า: ${customer}` : '',
-      dueDate    ? `📅 กำหนดส่ง: ${dueDate}` : '',
-      details    ? `📝 ${details.slice(0, 120)}${details.length > 120 ? '...' : ''}` : '',
-      fileUrl    ? `🔗 ${fileUrl}` : '',
+      customer ? `🏢 ลูกค้า: ${customer}` : '',
+      dueDate ? `📅 กำหนดส่ง: ${dueDate}` : '',
+      details ? `📝 ${details.slice(0, 120)}${details.length > 120 ? '...' : ''}` : '',
+      fileUrl ? `🔗 ${fileUrl}` : '',
       '━━━━━━━━━━━━━━━',
       'ส่งจาก ModtyTasks 🚀',
     ].filter(Boolean).join('\n');
@@ -1428,7 +1431,7 @@ ${ideasContext || 'ยังไม่มีไอเดีย'}
               dueSoonSubtasks.push(entry);
             }
           });
-        } catch {}
+        } catch { }
       });
 
       const totalItems = overdueTasks.length + dueSoonTasks.length + overdueSubtasks.length + dueSoonSubtasks.length;
@@ -1546,7 +1549,7 @@ ${ideasContext || 'ยังไม่มีไอเดีย'}
 
       // Filter tasks due today & overdue
       const localTodayStr = new Date().toLocaleDateString('en-CA'); // Local date YYYY-MM-DD
-      
+
       const overdueTasks = tasks.filter(t => {
         if (!t.dueDate) return false;
         if (t.status === 'เสร็จสิ้น' || t.status === 'Done') return false;
@@ -1963,11 +1966,11 @@ ${highPerformersContext || 'ยังไม่มีคอนเทนต์ท�
       if (hasMainDate) {
         const start = task.startDate || task.endDate;
         const end = task.endDate || task.startDate;
-        
+
         // Formulate status prefix
         const isDone = task.status && (task.status.toLowerCase().includes('done') || task.status.includes('เสร็จ'));
         const prefix = isDone ? '✅ [เสร็จแล้ว] ' : '📅 ';
-        
+
         const eventBody = {
           id: mainEventId,
           summary: `${prefix}${task.name}`,
@@ -2031,10 +2034,10 @@ ${highPerformersContext || 'ยังไม่มีคอนเทนต์ท�
 
           const start = sub.startDate || sub.dueDate;
           const end = sub.dueDate || sub.startDate;
-          
+
           const isSubDone = sub.status === 'done';
           const prefix = isSubDone ? '✅ [เสร็จแล้ว] ' : '🔧 ';
-          
+
           const eventBody = {
             id: subEventId,
             summary: `${prefix}${task.name} - ${sub.name}`,
@@ -2344,6 +2347,364 @@ ${highPerformersContext || 'ยังไม่มีคอนเทนต์ท�
     } catch (e: any) {
       return res.status(500).json({ error: e.message });
     }
+  });
+
+  // -----------------------------------------------------------------
+  // Model Context Protocol (MCP) Server setup & SSE Transport
+  // -----------------------------------------------------------------
+  const mcpServer = new McpServer({
+    name: "ModtyTasks",
+    version: "1.0.0"
+  });
+
+  // GET /api/chatgpt/tasks - List all tasks
+  mcpServer.tool(
+    "list_tasks",
+    "List all tasks in the workspace",
+    {},
+    async () => {
+      const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+      const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+      const supabase = createClient(supabaseUrl, supabaseAnonKey);
+      
+      const { data, error } = await supabase.from('tasks').select('*').order('name');
+      if (error) {
+        return {
+          isError: true,
+          content: [{ type: "text", text: `Error fetching tasks: ${error.message}` }]
+        };
+      }
+      return {
+        content: [{ type: "text", text: JSON.stringify(data) }]
+      };
+    }
+  );
+
+  // POST /api/chatgpt/tasks - Create a task
+  mcpServer.tool(
+    "create_task",
+    "Create a new task in the workspace",
+    {
+      name: z.string().describe("The name/title of the task"),
+      status: z.string().optional().describe("Current status (e.g. 'Todo', 'In Progress', 'Done')"),
+      priority: z.string().optional().describe("Priority level ('ต่ำ (Low)', 'ปานกลาง (Medium)', 'สูง (High)', 'ด่วน (Urgent)')"),
+      details: z.string().optional().describe("Detailed description of the task"),
+      startDate: z.string().optional().describe("Start date (YYYY-MM-DD)"),
+      endDate: z.string().optional().describe("Due date (YYYY-MM-DD)"),
+      customer: z.string().optional().describe("Client/Customer name"),
+      price: z.number().optional().describe("Total price or budget of the project"),
+      tags: z.string().optional().describe("Comma-separated list of tags")
+    },
+    async ({ name, status, priority, details, startDate, endDate, customer, price, tags }, extra) => {
+      const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+      const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+      const supabase = createClient(supabaseUrl, supabaseAnonKey);
+      
+      const id = String(Date.now());
+      try {
+        const { data, error } = await supabase.from('tasks').upsert({
+          id,
+          name,
+          status: status || 'Todo',
+          priority: priority || 'ปานกลาง (Medium)',
+          details: details || null,
+          startDate: startDate || null,
+          endDate: endDate || null,
+          customer: customer || null,
+          price: price ?? 0,
+          tags: tags || null,
+          updatedAt: new Date().toISOString()
+        }).select();
+
+        if (error) throw error;
+
+        // Try to trigger GCal sync in the background
+        const host = (extra as any)?.req?.headers?.['x-forwarded-host'] || (extra as any)?.req?.headers?.host || 'localhost:3000';
+        const proto = (extra as any)?.req?.headers?.['x-forwarded-proto'] || (extra as any)?.req?.protocol || 'http';
+        fetch(`${proto}://${host}/api/google/sync-task`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ taskId: id })
+        }).catch(err => console.error('[MCP create_task GCal Sync] failed:', err));
+
+        return {
+          content: [{ type: "text", text: `Task created successfully: ${JSON.stringify(data?.[0])}` }]
+        };
+      } catch (e: any) {
+        return {
+          isError: true,
+          content: [{ type: "text", text: `Failed to create task: ${e.message}` }]
+        };
+      }
+    }
+  );
+
+  // PATCH /api/chatgpt/tasks/:id - Update a task
+  mcpServer.tool(
+    "update_task",
+    "Update an existing task in the workspace",
+    {
+      id: z.string().describe("The unique ID of the task to update"),
+      name: z.string().optional().describe("Updated name/title"),
+      status: z.string().optional().describe("Updated status (e.g. 'Todo', 'In Progress', 'Done')"),
+      priority: z.string().optional().describe("Updated priority level"),
+      details: z.string().optional().describe("Updated detailed description"),
+      startDate: z.string().optional().describe("Updated start date (YYYY-MM-DD)"),
+      endDate: z.string().optional().describe("Updated due date (YYYY-MM-DD)"),
+      customer: z.string().optional().describe("Updated client/customer name"),
+      price: z.number().optional().describe("Updated price/budget"),
+      tags: z.string().optional().describe("Updated tags (comma-separated)")
+    },
+    async ({ id, ...patch }, extra) => {
+      const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+      const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+      const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+      try {
+        const { data: existing, error: getError } = await supabase.from('tasks').select('*').eq('id', id).single();
+        if (getError || !existing) {
+          return { isError: true, content: [{ type: "text", text: "Task not found" }] };
+        }
+
+        const updatedPayload = {
+          ...existing,
+          ...patch,
+          id,
+          updatedAt: new Date().toISOString()
+        };
+
+        const { data, error } = await supabase.from('tasks').upsert(updatedPayload).select();
+        if (error) throw error;
+
+        const host = (extra as any)?.req?.headers?.['x-forwarded-host'] || (extra as any)?.req?.headers?.host || 'localhost:3000';
+        const proto = (extra as any)?.req?.headers?.['x-forwarded-proto'] || (extra as any)?.req?.protocol || 'http';
+        fetch(`${proto}://${host}/api/google/sync-task`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ taskId: id })
+        }).catch(err => console.error('[MCP update_task GCal Sync] failed:', err));
+
+        return {
+          content: [{ type: "text", text: `Task updated successfully: ${JSON.stringify(data?.[0])}` }]
+        };
+      } catch (e: any) {
+        return {
+          isError: true,
+          content: [{ type: "text", text: `Failed to update task: ${e.message}` }]
+        };
+      }
+    }
+  );
+
+  // DELETE /api/chatgpt/tasks/:id - Delete a task
+  mcpServer.tool(
+    "delete_task",
+    "Delete a task from the workspace",
+    {
+      id: z.string().describe("The unique ID of the task to delete")
+    },
+    async ({ id }, extra) => {
+      const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+      const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+      const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+      try {
+        const host = (extra as any)?.req?.headers?.['x-forwarded-host'] || (extra as any)?.req?.headers?.host || 'localhost:3000';
+        const proto = (extra as any)?.req?.headers?.['x-forwarded-proto'] || (extra as any)?.req?.protocol || 'http';
+        await fetch(`${proto}://${host}/api/google/sync-task`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ taskId: String(id), isDeleted: true })
+        }).catch(err => console.error('[MCP delete_task GCal Sync] failed:', err));
+
+        const { error } = await supabase.from('tasks').delete().eq('id', id);
+        if (error) throw error;
+
+        return {
+          content: [{ type: "text", text: `Task ${id} deleted successfully` }]
+        };
+      } catch (e: any) {
+        return {
+          isError: true,
+          content: [{ type: "text", text: `Failed to delete task: ${e.message}` }]
+        };
+      }
+    }
+  );
+
+  // ChatGPT Actions Endpoints & API Key Middleware
+  // -----------------------------------------------------------------
+  const requireApiKey = (req: any, res: any, next: any) => {
+    const authHeader = req.headers.authorization;
+    const apiKey = process.env.API_KEY || "default_dev_key";
+    if (!authHeader || authHeader !== `Bearer ${apiKey}`) {
+      return res.status(401).json({ error: "Unauthorized: Invalid API Key" });
+    }
+    next();
+  };
+
+  // GET /api/chatgpt/tasks - List all tasks (legacy REST for Actions)
+  app.get("/api/chatgpt/tasks", requireApiKey, async (req: any, res: any) => {
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+    try {
+      const { data, error } = await supabase.from('tasks').select('*').order('name');
+      if (error) throw error;
+      return res.json({ tasks: data });
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
+  // POST /api/chatgpt/tasks - Create a task (legacy REST for Actions)
+  app.post("/api/chatgpt/tasks", requireApiKey, async (req: any, res: any) => {
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+    const task = req.body;
+    if (!task.name) return res.status(400).json({ error: "task name is required" });
+
+    const id = task.id ? String(task.id) : String(Date.now());
+
+    try {
+      const { data, error } = await supabase.from('tasks').upsert({
+        id,
+        name: task.name,
+        status: task.status || 'Todo',
+        price: task.price ?? 0,
+        devCost: task.devCost ?? 0,
+        myIncome: task.myIncome ?? 0,
+        clientId: task.clientId || null,
+        customer: task.customer || null,
+        startDate: task.startDate || null,
+        endDate: task.endDate || null,
+        tags: task.tags || null,
+        details: task.details || null,
+        subtasks: task.subtasks ? (typeof task.subtasks === 'string' ? task.subtasks : JSON.stringify(task.subtasks)) : null,
+        aiAnalysis: task.aiAnalysis || null,
+        aiEmail: task.aiEmail || null,
+        aiCourse: task.aiCourse || null,
+        priority: task.priority || null,
+        aiChatHistory: task.aiChatHistory || null,
+        paymentPhases: task.paymentPhases || null,
+        invoices: task.invoices || null,
+        pipelineStage: task.pipelineStage || null,
+        dealValue: task.dealValue ?? null,
+        attachments: task.attachments || null,
+        comments: task.comments || null,
+        dependencies: task.dependencies || null,
+        categoryId: task.categoryId || null,
+        updatedAt: new Date().toISOString(),
+      }).select();
+
+      if (error) throw error;
+
+      const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost:3000';
+      const proto = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+      fetch(`${proto}://${host}/api/google/sync-task`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId: id })
+      }).catch(err => console.error('[GCal Sync via ChatGPT POST] failed:', err));
+
+      return res.json({ success: true, task: data?.[0] || task });
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
+  // PATCH /api/chatgpt/tasks/:id - Update a task (legacy REST for Actions)
+  app.patch("/api/chatgpt/tasks/:id", requireApiKey, async (req: any, res: any) => {
+    const { id } = req.params;
+    const patch = req.body;
+
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+    try {
+      const { data: existing, error: getError } = await supabase.from('tasks').select('*').eq('id', id).single();
+      if (getError || !existing) return res.status(404).json({ error: "Task not found" });
+
+      const updatedPayload = {
+        ...existing,
+        ...patch,
+        id,
+        subtasks: patch.subtasks ? (typeof patch.subtasks === 'string' ? patch.subtasks : JSON.stringify(patch.subtasks)) : existing.subtasks,
+        updatedAt: new Date().toISOString()
+      };
+
+      const { data, error } = await supabase.from('tasks').upsert(updatedPayload).select();
+      if (error) throw error;
+
+      const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost:3000';
+      const proto = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+      fetch(`${proto}://${host}/api/google/sync-task`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId: id })
+      }).catch(err => console.error('[GCal Sync via ChatGPT PATCH] failed:', err));
+
+      return res.json({ success: true, task: data?.[0] || updatedPayload });
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
+  // DELETE /api/chatgpt/tasks/:id - Delete a task (legacy REST for Actions)
+  app.delete("/api/chatgpt/tasks/:id", requireApiKey, async (req: any, res: any) => {
+    const { id } = req.params;
+
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+    try {
+      const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost:3000';
+      const proto = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+      await fetch(`${proto}://${host}/api/google/sync-task`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId: String(id), isDeleted: true })
+      }).catch(err => console.error('[GCal Sync via ChatGPT DELETE] failed:', err));
+
+      const { error } = await supabase.from('tasks').delete().eq('id', id);
+      if (error) throw error;
+
+      return res.json({ success: true, message: `Task ${id} deleted successfully` });
+    } catch (e: any) {
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
+  // MCP SSE Session Map
+  const sseSessions = new Map<string, SSEServerTransport>();
+
+  // GET /api/sse - Establish MCP SSE Connection
+  app.get("/api/sse", requireApiKey, async (req: any, res: any) => {
+    const transport = new SSEServerTransport("/api/messages", res);
+    await mcpServer.connect(transport);
+
+    const sessionId = transport.sessionId;
+    sseSessions.set(sessionId, transport);
+
+    req.on("close", () => {
+      sseSessions.delete(sessionId);
+      transport.close().catch(err => console.error("Error closing transport:", err));
+    });
+  });
+
+  // POST /api/messages - Route JSON-RPC messages to appropriate session
+  app.post("/api/messages", requireApiKey, async (req: any, res: any) => {
+    const sessionId = req.query.sessionId as string;
+    const transport = sseSessions.get(sessionId);
+    if (!transport) {
+      return res.status(404).send("Session not found");
+    }
+    await transport.handlePostMessage(req, res, { req, res });
   });
 
   // -----------------------------------------------------------------
