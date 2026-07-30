@@ -131,11 +131,25 @@ export async function saveTask(task: Task): Promise<void> {
   });
   if (error) throw error;
 
+  // Sync to Google Calendar (best effort)
+  fetch('/api/google/sync-task', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ taskId: id })
+  }).catch(err => console.error('[GCal Sync] saveTask sync failed:', err));
+
   // Shadow write to Google Sheets
   saveTaskToSheet(task).catch(err => console.error('[Sheets Sync] saveTaskToSheet failed:', err));
 }
 
 export async function deleteTask(id: string | number): Promise<void> {
+  // Sync delete to Google Calendar (best effort)
+  fetch('/api/google/sync-task', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ taskId: String(id), isDeleted: true })
+  }).catch(err => console.error('[GCal Sync] deleteTask sync failed:', err));
+
   const { error } = await supabase.from('tasks').delete().eq('id', String(id));
   if (error) throw error;
 

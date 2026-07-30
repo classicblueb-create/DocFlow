@@ -1747,7 +1747,7 @@ ${highPerformersContext || 'ยังไม่มีคอนเทนต์ท�
       client_id: clientId,
       redirect_uri: redirectUri,
       response_type: 'code',
-      scope: 'https://www.googleapis.com/auth/calendar.readonly',
+      scope: 'https://www.googleapis.com/auth/calendar',
       access_type: 'offline',
       prompt: 'consent'
     });
@@ -1881,6 +1881,218 @@ ${highPerformersContext || 'ยังไม่มีคอนเทนต์ท�
       updated_at: new Date().toISOString()
     }).select();
     return res.json({ data, error });
+  });
+
+  // Sync tasks & subtasks to Google Calendar
+  app.post("/api/google/sync-task", async (req: any, res: any) => {
+    const { taskId, isDeleted } = req.body;
+    if (!taskId) return res.status(400).json({ error: "Missing taskId" });
+
+    const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+    const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+    const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    if (!clientId || !clientSecret) {
+      return res.status(503).json({ error: "Google OAuth env vars missing" });
+    }
+
+    try {
+      // 1. Get Google tokens
+      const { data: tokenRow } = await supabase.from('google_tokens').select('*').eq('id', 'default').single();
+      if (!tokenRow) return res.json({ success: false, message: "Google Calendar not connected" });
+
+      let accessToken = tokenRow.access_token;
+
+      // Refresh token if expired
+      if (tokenRow.expiry_date && Date.now() > tokenRow.expiry_date - 60000) {
+        const refreshRes = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ client_id: clientId, client_secret: clientSecret, refresh_token: tokenRow.refresh_token, grant_type: 'refresh_token' })
+        });
+        const refreshed = await refreshRes.json() as any;
+        if (refreshed.access_token) {
+          accessToken = refreshed.access_token;
+          await supabase.from('google_tokens').update({
+            access_token: refreshed.access_token,
+            expiry_date: refreshed.expires_in ? Date.now() + refreshed.expires_in * 1000 : tokenRow.expiry_date,
+            updated_at: new Date().toISOString()
+          }).eq('id', 'default');
+        }
+      }
+
+      // Helper function to sanitize Google Calendar Event ID (only lowercase a-v and 0-9 allowed)
+      const sanitizeGcalEventId = (id: string | number) => {
+        let hex = Buffer.from(String(id)).toString('hex').toLowerCase();
+        while (hex.length < 5) {
+          hex += '0';
+        }
+        return 'df' + hex.replace(/[^a-v0-9]/g, '');
+      };
+
+      // 2. Handle Deletion
+      if (isDeleted) {
+        // Query Google Calendar to find all events with privateExtendedProperty taskId = taskId
+        const listUrl = `https://www.googleapis.com/calendar/v3/calendars/primary/events?privateExtendedProperty=taskId=${taskId}`;
+        const listRes = await fetch(listUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+        if (listRes.ok) {
+          const listData = await listRes.json() as any;
+          const events = listData.items || [];
+          for (const ev of events) {
+            await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${ev.id}`, {
+              method: 'DELETE',
+              headers: { Authorization: `Bearer ${accessToken}` }
+            });
+          }
+        }
+        return res.json({ success: true, message: "Deleted calendar events for task " + taskId });
+      }
+
+      // 3. Fetch Task from Supabase
+      const { data: task, error: taskErr } = await supabase.from('tasks').select('*').eq('id', String(taskId)).single();
+      if (taskErr || !task) {
+        return res.status(404).json({ error: "Task not found" });
+      }
+
+      // 4. Sync main task if it has a date
+      const hasMainDate = task.startDate || task.endDate;
+      const mainEventId = sanitizeGcalEventId(task.id);
+
+      if (hasMainDate) {
+        const start = task.startDate || task.endDate;
+        const end = task.endDate || task.startDate;
+        
+        // Formulate status prefix
+        const isDone = task.status && (task.status.toLowerCase().includes('done') || task.status.includes('เสร็จ'));
+        const prefix = isDone ? '✅ [เสร็จแล้ว] ' : '📅 ';
+        
+        const eventBody = {
+          id: mainEventId,
+          summary: `${prefix}${task.name}`,
+          description: task.details || '',
+          start: { date: start },
+          end: { date: end },
+          extendedProperties: {
+            private: {
+              taskId: String(task.id),
+              type: 'task'
+            }
+          }
+        };
+
+        // Try updating the event. If it fails (e.g. 404), insert it.
+        const updateRes = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${mainEventId}`, {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(eventBody)
+        });
+
+        if (!updateRes.ok) {
+          // If not found, insert
+          await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(eventBody)
+          });
+        }
+      } else {
+        // If main task has no date, check if it was previously synced and delete it
+        await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${mainEventId}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+      }
+
+      // 5. Sync subtasks
+      let subtasksList: any[] = [];
+      if (task.subtasks) {
+        try {
+          subtasksList = JSON.parse(task.subtasks) || [];
+        } catch (e) {
+          console.error("Failed to parse subtasks JSON:", e);
+        }
+      }
+
+      const activeSubtaskGcalIds = new Set<string>();
+
+      for (const sub of subtasksList) {
+        const hasSubDate = sub.startDate || sub.dueDate;
+        if (hasSubDate) {
+          const subEventId = sanitizeGcalEventId(`sub-${task.id}-${sub.id}`);
+          activeSubtaskGcalIds.add(subEventId);
+
+          const start = sub.startDate || sub.dueDate;
+          const end = sub.dueDate || sub.startDate;
+          
+          const isSubDone = sub.status === 'done';
+          const prefix = isSubDone ? '✅ [เสร็จแล้ว] ' : '🔧 ';
+          
+          const eventBody = {
+            id: subEventId,
+            summary: `${prefix}${task.name} - ${sub.name}`,
+            description: sub.notes || '',
+            start: { date: start },
+            end: { date: end },
+            extendedProperties: {
+              private: {
+                taskId: String(task.id),
+                subtaskId: String(sub.id),
+                type: 'subtask'
+              }
+            }
+          };
+
+          const updateRes = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${subEventId}`, {
+            method: 'PUT',
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(eventBody)
+          });
+
+          if (!updateRes.ok) {
+            await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events`, {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(eventBody)
+            });
+          }
+        }
+      }
+
+      // 6. Delete removed/expired subtasks
+      const listUrl = `https://www.googleapis.com/calendar/v3/calendars/primary/events?privateExtendedProperty=taskId=${task.id}`;
+      const listRes = await fetch(listUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+      if (listRes.ok) {
+        const listData = await listRes.json() as any;
+        const events = listData.items || [];
+        for (const ev of events) {
+          if (ev.extendedProperties?.private?.type === 'subtask' && !activeSubtaskGcalIds.has(ev.id)) {
+            await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${ev.id}`, {
+              method: 'DELETE',
+              headers: { Authorization: `Bearer ${accessToken}` }
+            });
+          }
+        }
+      }
+
+      return res.json({ success: true });
+    } catch (e: any) {
+      console.error("[Sync error]", e);
+      return res.status(500).json({ error: e.message });
+    }
   });
 
   // -----------------------------------------------------------------
