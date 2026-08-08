@@ -135,6 +135,7 @@ export interface PaymentPhase {
   label: string;
   amount: number;
   paid: boolean;
+  dueDate?: string;
   paidDate?: string;
   paidAt?: string;
 }
@@ -189,5 +190,34 @@ export interface Product {
   targetUnits: number;
   month?: string;
   monthlySales?: Record<string, number>; // key = 'YYYY-MM'
+  createdAt: string;
+}
+
+export interface IssuedDocumentItem {
+  desc: string;
+  qty: number;
+  price: number;
+}
+
+export interface IssuedDocument {
+  id: string;
+  docNo: string;
+  docType: 'quotation' | 'invoice' | 'receipt';
+  lang?: 'th' | 'en';
+  currency?: 'USD' | 'THB';
+  docDate: string;
+  customerName: string;
+  customerAddr?: string;
+  customerTaxId?: string;
+  customerContact?: string;
+  customerPhone?: string;
+  subtotal: number;
+  whtAmount: number;
+  whtPercent: number;
+  netTotal: number;
+  items: IssuedDocumentItem[];
+  issuerName?: string;
+  termsDesc?: string;
+  bankDesc?: string;
   createdAt: string;
 }

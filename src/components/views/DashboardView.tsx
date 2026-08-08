@@ -5,7 +5,7 @@ import {
   PieChart as RechartsPie, Pie, Cell, Area, AreaChart, RadialBarChart, RadialBar,
 } from 'recharts';
 import { Task, ProjectCategory } from '../../types';
-import { TrendingUp, CheckCircle, Clock } from 'lucide-react';
+import { TrendingUp, CheckCircle, Clock, CalendarDays } from 'lucide-react';
 import { cn, getTaskPrice, getTaskProfit } from '../../lib/utils';
 
 interface DashboardViewProps {
@@ -83,23 +83,69 @@ function KpiChip({ label, value, sub, accent }: { label: string; value: string; 
 }
 
 export function DashboardView({ tasks, categories }: DashboardViewProps) {
-  const todoCount       = tasks.filter(t => t.status === 'To Do' || t.status === 'รอดำเนินการ').length;
-  const inProgressCount = tasks.filter(t => t.status === 'In Progress' || t.status === 'กำลังทำ').length;
-  const doneCount       = tasks.filter(t => t.status === 'Done' || t.status === 'เสร็จสิ้น').length;
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+
+  const [selectedYear, setSelectedYear] = useState<string>('all');
+  const [selectedMonth, setSelectedMonth] = useState<string>('all');
+
+  const MONTH_NAMES = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+
+  const availableYears = useMemo(() => {
+    const years = new Set<string>([String(currentYear)]);
+    tasks.forEach(t => {
+      [t.startDate, t.endDate, t.updatedAt].forEach(d => {
+        if (d && d.length >= 4) years.add(d.slice(0, 4));
+      });
+      if (t.paymentPhases) {
+        try {
+          const phases = JSON.parse(t.paymentPhases);
+          if (Array.isArray(phases)) {
+            phases.forEach((p: any) => {
+              const pd = p.paidAt || p.paidDate || p.dueDate;
+              if (pd && pd.length >= 4) years.add(pd.slice(0, 4));
+            });
+          }
+        } catch (e) {}
+      }
+    });
+    return Array.from(years).sort((a, b) => b.localeCompare(a));
+  }, [tasks, currentYear]);
+
+  const inPeriod = (dateStr?: string) => {
+    if (!dateStr) return false;
+    const y = dateStr.slice(0, 4);
+    const m = String(parseInt(dateStr.slice(5, 7), 10));
+    if (selectedYear !== 'all' && y !== selectedYear) return false;
+    if (selectedMonth !== 'all' && m !== selectedMonth) return false;
+    return true;
+  };
+
+  const todoCount       = tasks.filter(t => (t.status === 'To Do' || t.status === 'รอดำเนินการ') && (selectedYear === 'all' && selectedMonth === 'all' ? true : inPeriod(t.startDate || t.endDate || t.updatedAt))).length;
+  const inProgressCount = tasks.filter(t => (t.status === 'In Progress' || t.status === 'กำลังทำ') && (selectedYear === 'all' && selectedMonth === 'all' ? true : inPeriod(t.startDate || t.endDate || t.updatedAt))).length;
+  const doneCount       = tasks.filter(t => (t.status === 'Done' || t.status === 'เสร็จสิ้น') && (selectedYear === 'all' && selectedMonth === 'all' ? true : inPeriod(t.startDate || t.endDate || t.updatedAt))).length;
 
   const { closedWon, closedWonCount } = useMemo(() => {
-    const wonTasks = tasks.filter(t => t.pipelineStage === 'won');
-    return {
-      closedWon: wonTasks.reduce((s, t) => s + Number(t.dealValue || t.price || 0), 0),
-      closedWonCount: wonTasks.length,
-    };
-  }, [tasks]);
+    let sum = 0;
+    let count = 0;
+    tasks.forEach(t => {
+      const isWon = t.pipelineStage === 'won' || t.status === 'Done' || t.status === 'เสร็จสิ้น';
+      const d = t.endDate || t.startDate || t.updatedAt;
+      if (isWon && (selectedYear === 'all' && selectedMonth === 'all' ? true : inPeriod(d))) {
+        sum += Number(t.dealValue || t.price || 0);
+        count += 1;
+      }
+    });
+    return { closedWon: sum, closedWonCount: count };
+  }, [tasks, selectedYear, selectedMonth]);
 
-  const { totalRevenue, earnedRevenue, pendingRevenue, totalProfit } = useMemo(() => {
+  const { totalRevenue, earnedRevenue, pendingRevenue, totalProfit, totalDevCost } = useMemo(() => {
     let tr = 0;
     let er = 0;
     let pr = 0;
     let tp = 0;
+    let tc = 0;
 
     tasks.forEach(t => {
       let price = Number(t.price || 0);
@@ -115,36 +161,46 @@ export function DashboardView({ tasks, categories }: DashboardViewProps) {
             price = phases.reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
             phases.forEach((p: any) => {
               const amt = Number(p.amount || 0);
+              const pd = p.paidAt || p.paidDate || p.dueDate || t.updatedAt || t.endDate || t.startDate;
               if (p.paid) {
-                phasePaidSum += amt;
+                if (selectedYear === 'all' && selectedMonth === 'all' ? true : inPeriod(pd)) {
+                  phasePaidSum += amt;
+                }
               } else {
-                phaseUnpaidSum += amt;
+                if (selectedYear === 'all' && selectedMonth === 'all' ? true : inPeriod(pd)) {
+                  phaseUnpaidSum += amt;
+                }
               }
             });
           }
         } catch (e) {}
       }
 
-      tr += price;
+      const taskDate = t.endDate || t.startDate || t.updatedAt;
+      const isTaskInPeriod = selectedYear === 'all' && selectedMonth === 'all' ? true : inPeriod(taskDate);
+
+      if (isTaskInPeriod) {
+        tr += price;
+        tp += getTaskProfit(t);
+        tc += Number(t.devCost || 0);
+      }
 
       if (hasPhases) {
         er += phasePaidSum;
         pr += phaseUnpaidSum;
       } else {
-        if (t.status === 'Done' || t.status === 'เสร็จสิ้น') {
-          er += price;
-        } else {
-          pr += price;
+        if (isTaskInPeriod) {
+          if (t.status === 'Done' || t.status === 'เสร็จสิ้น' || t.pipelineStage === 'won') {
+            er += price;
+          } else {
+            pr += price;
+          }
         }
       }
-
-      tp += getTaskProfit(t);
     });
 
-    return { totalRevenue: tr, earnedRevenue: er, pendingRevenue: pr, totalProfit: tp };
-  }, [tasks]);
-
-  const totalDevCost   = tasks.reduce((s, t) => s + Number(t.devCost || 0), 0);
+    return { totalRevenue: tr, earnedRevenue: er, pendingRevenue: pr, totalProfit: tp, totalDevCost: tc };
+  }, [tasks, selectedYear, selectedMonth]);
 
   // ── Build monthly time-series (last 12 months) ──────────────────────────────
   const { grossData, netData, customerData } = useMemo(() => {
@@ -308,6 +364,85 @@ export function DashboardView({ tasks, categories }: DashboardViewProps) {
   return (
     <div className="flex-1 overflow-y-auto hide-scrollbar p-4 md:p-6">
       <div className="max-w-6xl w-full mx-auto space-y-6">
+
+        {/* Period Filter Bar */}
+        <div className="glass-card rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 border border-white/60 shadow-sm">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-black">
+              <CalendarDays className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="font-bold text-slate-800 text-sm">สรุปรายได้ & สถิติผลงาน (Closed Won)</h2>
+              <p className="text-[10px] text-slate-400 font-medium">
+                {selectedYear === 'all' && selectedMonth === 'all'
+                  ? 'แสดงข้อมูลทั้งหมดทุกปี/ทุกเดือน'
+                  : `แสดงผล: ${selectedYear !== 'all' ? `ปี ${selectedYear}` : 'ทุกปี'} ${selectedMonth !== 'all' ? `เดือน ${MONTH_NAMES[parseInt(selectedMonth, 10) - 1]}` : 'ทุกเดือน'}`}
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold text-slate-500 hidden sm:inline">กรอง:</span>
+            
+            {/* Year Selector */}
+            <select
+              value={selectedYear}
+              onChange={e => setSelectedYear(e.target.value)}
+              className="border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-700 bg-white shadow-sm outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer"
+            >
+              <option value="all">ทุกปี (All Years)</option>
+              {availableYears.map(y => (
+                <option key={y} value={y}>ปี {y}</option>
+              ))}
+            </select>
+
+            {/* Month Selector */}
+            <select
+              value={selectedMonth}
+              onChange={e => setSelectedMonth(e.target.value)}
+              className="border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-700 bg-white shadow-sm outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer"
+            >
+              <option value="all">ทุกเดือน (All Months)</option>
+              {MONTH_NAMES.map((m, idx) => (
+                <option key={m} value={String(idx + 1)}>{m}</option>
+              ))}
+            </select>
+
+            {/* Quick Filters */}
+            <button
+              onClick={() => { setSelectedYear(String(currentYear)); setSelectedMonth(String(currentMonth)); }}
+              className={cn(
+                'px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border',
+                selectedYear === String(currentYear) && selectedMonth === String(currentMonth)
+                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                  : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
+              )}
+            >
+              เดือนนี้
+            </button>
+            <button
+              onClick={() => { setSelectedYear(String(currentYear)); setSelectedMonth('all'); }}
+              className={cn(
+                'px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border',
+                selectedYear === String(currentYear) && selectedMonth === 'all'
+                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                  : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
+              )}
+            >
+              ปีนี้ ({currentYear})
+            </button>
+            <button
+              onClick={() => { setSelectedYear('all'); setSelectedMonth('all'); }}
+              className={cn(
+                'px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border',
+                selectedYear === 'all' && selectedMonth === 'all'
+                  ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                  : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+              )}
+            >
+              ทั้งหมด
+            </button>
+          </div>
+        </div>
 
         {/* Stripe-style metric line charts */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

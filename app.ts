@@ -2727,5 +2727,25 @@ ${highPerformersContext || 'ยังไม่มีคอนเทนต์ท�
     });
   });
 
+  // -----------------------------------------------------------------
+  // Doc Numbers Cloud Sync
+  // -----------------------------------------------------------------
+  let cloudDocNumbers: Record<string, string> = {
+    quotation: 'QT26-001',
+    invoice: 'INV26-001',
+    receipt: 'RC26-001'
+  };
+
+  app.get("/api/doc-numbers", (_req: any, res: any) => {
+    res.json(cloudDocNumbers);
+  });
+
+  app.post("/api/doc-numbers", (req: any, res: any) => {
+    if (req.body && typeof req.body === 'object') {
+      cloudDocNumbers = { ...cloudDocNumbers, ...req.body };
+    }
+    res.json({ success: true, docNumbers: cloudDocNumbers });
+  });
+
   return app;
 }

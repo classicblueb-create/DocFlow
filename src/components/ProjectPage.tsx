@@ -121,6 +121,7 @@ export function ProjectPage({
  const [phases, setPhases] = useState<PaymentPhase[]>(() => parsePaymentPhases(task.paymentPhases));
  const [newPhaseLabel, setNewPhaseLabel] = useState('');
  const [newPhaseAmount, setNewPhaseAmount] = useState('');
+ const [newPhaseDueDate, setNewPhaseDueDate] = useState('');
 
   const commitPhases = (next: PaymentPhase[]) => {
     setPhases(next);
@@ -135,15 +136,18 @@ export function ProjectPage({
  const label = newPhaseLabel.trim();
  const amount = parseFloat(newPhaseAmount);
  if (!label || isNaN(amount) || amount <= 0) return;
- const next: PaymentPhase[] = [...phases, { id: Date.now().toString(), label, amount, paid: false }];
+ const next: PaymentPhase[] = [...phases, { id: Date.now().toString(), label, amount, dueDate: newPhaseDueDate || undefined, paid: false }];
  commitPhases(next);
- setNewPhaseLabel(''); setNewPhaseAmount('');
+ setNewPhaseLabel(''); setNewPhaseAmount(''); setNewPhaseDueDate('');
  };
 
  const togglePhasePaid = (id: string) => {
- const next = phases.map(p =>
- p.id === id ? { ...p, paid: !p.paid, paidAt: !p.paid ? new Date().toISOString().split('T')[0] : undefined } : p
- );
+ const next = phases.map(p => {
+   if (p.id !== id) return p;
+   const isPaid = !p.paid;
+   const paidDate = isPaid ? (p.paidAt || p.dueDate || new Date().toISOString().split('T')[0]) : undefined;
+   return { ...p, paid: isPaid, paidAt: paidDate, paidDate };
+ });
  commitPhases(next);
  };
 
@@ -159,6 +163,14 @@ export function ProjectPage({
 
  const updatePhaseLabel = (id: string, label: string) => {
  commitPhases(phases.map(p => p.id === id ? { ...p, label } : p));
+ };
+
+ const updatePhaseDueDate = (id: string, dueDate: string) => {
+ commitPhases(phases.map(p => p.id === id ? { ...p, dueDate } : p));
+ };
+
+ const updatePhasePaidAt = (id: string, paidAt: string) => {
+ commitPhases(phases.map(p => p.id === id ? { ...p, paidAt, paidDate: paidAt } : p));
  };
 
  // ── Invoice ──────────────────────────────────────────────────────────────
@@ -1098,7 +1110,7 @@ export function ProjectPage({
  {phase.paid && <Check className="w-3.5 h-3.5 text-white" strokeWidth={3} />}
  </button>
 
- {/* label */}
+ {/* label & date */}
  <div className="flex-1 min-w-0">
  <input
  value={phase.label}
@@ -1108,9 +1120,28 @@ export function ProjectPage({
  phase.paid ? 'text-emerald-800 line-through decoration-emerald-400' : 'text-slate-800'
  )}
  />
- {phase.paid && phase.paidAt && (
- <p className="text-[10px] text-emerald-500 font-medium">รับเงิน {phase.paidAt}</p>
- )}
+ <div className="flex flex-wrap items-center gap-2 mt-1 text-[11px]">
+   <div className="flex items-center gap-1 text-slate-500">
+     <span>กำหนดชำระ:</span>
+     <input
+       type="date"
+       value={phase.dueDate || ''}
+       onChange={e => updatePhaseDueDate(phase.id, e.target.value)}
+       className="bg-transparent border border-slate-200 rounded px-1 text-[11px] text-slate-700 outline-none focus:border-indigo-400"
+     />
+   </div>
+   {phase.paid && (
+     <div className="flex items-center gap-1 text-emerald-600 font-semibold">
+       <span>ชำระแล้วเมื่อ:</span>
+       <input
+         type="date"
+         value={phase.paidAt || phase.paidDate || ''}
+         onChange={e => updatePhasePaidAt(phase.id, e.target.value)}
+         className="bg-emerald-50 border border-emerald-300 rounded px-1 text-[11px] text-emerald-800 font-bold outline-none focus:border-emerald-500"
+       />
+     </div>
+   )}
+ </div>
  </div>
 
  {/* amount */}
@@ -1144,15 +1175,15 @@ export function ProjectPage({
  {/* Add new phase */}
  <div className="border border-dashed border-slate-200 rounded-2xl p-4 space-y-3 bg-slate-50/30">
  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">+ เพิ่มเฟสใหม่</p>
- <div className="flex gap-2">
+ <div className="flex flex-wrap gap-2">
  <input
  value={newPhaseLabel}
  onChange={e => setNewPhaseLabel(e.target.value)}
  onKeyDown={e => e.key === 'Enter' && addPhase()}
- placeholder="เช่น มัดจำ 30%, เฟส 1, ส่งงาน..."
- className="flex-1 text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-indigo-400 bg-white"
+ placeholder="เช่น มัดจำ 30%, งวดที่ 1..."
+ className="flex-1 min-w-[140px] text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-indigo-400 bg-white"
  />
- <div className="flex items-center border border-slate-200 rounded-xl px-3 py-2.5 bg-white gap-1 w-36">
+ <div className="flex items-center border border-slate-200 rounded-xl px-3 py-2.5 bg-white gap-1 w-32">
  <span className="text-xs text-slate-400 font-semibold shrink-0">฿</span>
  <input
  type="number"
@@ -1161,6 +1192,15 @@ export function ProjectPage({
  onKeyDown={e => e.key === 'Enter' && addPhase()}
  placeholder="จำนวนเงิน"
  className="w-full text-sm bg-transparent border-none outline-none tabular-nums"
+ />
+ </div>
+ <div className="flex items-center border border-slate-200 rounded-xl px-2 py-1 bg-white gap-1 text-xs">
+ <span className="text-[10px] text-slate-400 font-semibold shrink-0">กำหนด:</span>
+ <input
+ type="date"
+ value={newPhaseDueDate}
+ onChange={e => setNewPhaseDueDate(e.target.value)}
+ className="text-xs bg-transparent border-none outline-none text-slate-700"
  />
  </div>
  <button onClick={addPhase}

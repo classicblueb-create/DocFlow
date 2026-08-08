@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Settings, Download, Plus, X, Eye, Pencil } from 'lucide-react';
+import { Settings, Download, Plus, X, Eye, Pencil, History, Search, FileText } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
-import type { Client } from '../../types';
+import type { Client, IssuedDocument } from '../../types';
+import { saveDocNumbersCloud, subscribeDocNumbersCloud, saveIssuedDocument, subscribeIssuedDocuments } from '../../lib/db';
 
 interface DocFlowViewProps {
  // kept for API compatibility with App.tsx
@@ -17,7 +18,7 @@ const DICT = {
  th: {
  ui_settings: 'ข้อมูลผู้ออกเอกสาร', ui_pdf: 'ดาวน์โหลด PDF', ui_add: '+ เพิ่มรายการ', ui_cancel: 'ยกเลิก', ui_save: 'บันทึกเป็นค่าเริ่มต้น',
  ui_modTitle: 'ข้อมูลมาตรฐานผู้ออกเอกสาร', ui_modBrand: 'ชื่อบริษัท / แบรนด์', ui_modName: 'ชื่อ-นามสกุล (ผู้ลงนาม)', ui_modRole: 'ตำแหน่ง', ui_modAddr: 'ที่อยู่', ui_modTax: 'เลขผู้เสียภาษี', ui_modContact: 'เบอร์โทร / อีเมล', ui_modBank: 'รายละเอียดการชำระเงิน',
- lbl_no: 'เลขที่:', lbl_date: 'วันที่:', lbl_meta3Q: 'กำหนดยืนราคา:', lbl_meta3I: 'ครบกำหนดชำระ:', lbl_days: 'วัน',
+ lbl_no: 'เลขที่:', lbl_date: 'วันที่:', lbl_meta3Q: 'กำหนดยืนราคา:', lbl_meta3I: 'ครบกำหนดชำระ:', lbl_days: 'วัน', lbl_currency: 'สกุลเงิน:',
  lbl_cust: 'ลูกค้า:', lbl_addr: 'ที่อยู่:', lbl_tax: 'เลขประจำตัวผู้เสียภาษี:', lbl_contact: 'ผู้ติดต่อ:', lbl_phone: 'เบอร์โทรศัพท์:',
  th_no: '#', th_desc: 'รายละเอียด / Description', th_qty: 'จำนวน', th_price: 'ราคาต่อหน่วย', th_amt: 'ราคารวม',
  lbl_sub: 'ราคาก่อนภาษี', lbl_wht: 'หัก ณ ที่จ่าย', lbl_net_due: 'ยอดชำระสุทธิ', lbl_net_recv: 'ยอดรับชำระทั้งสิ้น', lbl_sigDate: 'วันที่:',
@@ -39,7 +40,7 @@ const DICT = {
  en: {
  ui_settings: 'Issuer Info', ui_pdf: 'Download PDF', ui_add: '+ Add Item', ui_cancel: 'Cancel', ui_save: 'Save Default',
  ui_modTitle: 'Standard Issuer Information', ui_modBrand: 'Company / Brand', ui_modName: 'Full Name (Signatory)', ui_modRole: 'Role / Position', ui_modAddr: 'Address', ui_modTax: 'Tax ID', ui_modContact: 'Phone / Email', ui_modBank: 'Payment Details',
- lbl_no: 'No.:', lbl_date: 'Date:', lbl_meta3Q: 'Validity:', lbl_meta3I: 'Due Date:', lbl_days: 'days',
+ lbl_no: 'No.:', lbl_date: 'Date:', lbl_meta3Q: 'Validity:', lbl_meta3I: 'Due Date:', lbl_days: 'days', lbl_currency: 'Currency:',
  lbl_cust: 'Customer:', lbl_addr: 'Address:', lbl_tax: 'Tax ID:', lbl_contact: 'Contact Person:', lbl_phone: 'Phone:',
  th_no: 'No.', th_desc: 'Description', th_qty: 'Qty', th_price: 'Unit Price', th_amt: 'Amount',
  lbl_sub: 'Subtotal', lbl_wht: 'Withholding Tax', lbl_net_due: 'Net Total Due', lbl_net_recv: 'Total Received', lbl_sigDate: 'Date:',
@@ -121,6 +122,19 @@ function AutoTextarea({ value, onChange, placeholder, style, className }: {
 // ─── Inline paper input styles ──────────────────────────────────────────────
 const fieldCls = "bg-transparent border border-dashed border-transparent hover:border-gray-300 focus:border-blue-500 focus:bg-blue-50 outline-none rounded px-1 py-0.5 w-full transition-colors duration-150 focus:border-solid";
 
+function incrementDocNo(current: string): string {
+  const matches = [...current.matchAll(/\d+/g)];
+  if (matches.length === 0) {
+    return current + '1';
+  }
+  const lastMatch = matches[matches.length - 1];
+  const digitsStr = lastMatch[0];
+  const index = lastMatch.index!;
+  const nextNum = parseInt(digitsStr, 10) + 1;
+  const padded = nextNum.toString().padStart(digitsStr.length, '0');
+  return current.substring(0, index) + padded + current.substring(index + digitsStr.length);
+}
+
 export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  const [lang, setLangState] = useState<Lang>(() => lsGet('df_lang', 'th'));
  const [docType, setDocTypeState] = useState<DocType>('quotation');
@@ -131,7 +145,34 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  const [exporting, setExporting] = useState(false);
 
  // Paper fields – live state
- const [docNo, setDocNo] = useState('QT26-001');
+ const [docNumbers, setDocNumbers] = useState<Record<DocType, string>>(() => ({
+   quotation: lsGet('df_docNo_quotation', 'QT26-001'),
+   invoice: lsGet('df_docNo_invoice', 'INV26-001'),
+   receipt: lsGet('df_docNo_receipt', 'RC26-001'),
+ }));
+ const [currency, setCurrency] = useState<'USD' | 'THB'>(() => lsGet('df_currency', 'THB'));
+ const docNo = docNumbers[docType];
+
+ // Issued Documents History state
+ const [issuedDocs, setIssuedDocs] = useState<IssuedDocument[]>([]);
+ const [showHistory, setShowHistory] = useState(false);
+ const [historySearch, setHistorySearch] = useState('');
+
+ // Subscribe to Cloud Doc Numbers Realtime Sync (across all devices)
+ useEffect(() => {
+   const unsub = subscribeDocNumbersCloud(cloudNumbers => {
+     if (cloudNumbers && typeof cloudNumbers === 'object') {
+       setDocNumbers(prev => ({
+         quotation: cloudNumbers.quotation || prev.quotation,
+         invoice: cloudNumbers.invoice || prev.invoice,
+         receipt: cloudNumbers.receipt || prev.receipt,
+       }));
+     }
+   });
+   const unsubDocs = subscribeIssuedDocuments(docs => setIssuedDocs(docs));
+   return () => { unsub(); unsubDocs(); };
+ }, []);
+
  const [docDate, setDocDate] = useState(() => new Date().toISOString().split('T')[0]);
  const [meta3, setMeta3] = useState('30');
  const [issuerName, setIssuerName] = useState('');
@@ -373,6 +414,40 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  pdf.addImage(imgData, 'PNG', 0, 0, pw, ph);
  pdf.save(`${DICT[lang].docTitles[docType]}_${docNo}.pdf`);
  showNotification(lang === 'th' ? 'ดาวน์โหลด PDF สำเร็จ' : 'PDF downloaded successfully');
+
+ // Save complete document record to Supabase Database!
+ const docRecord: IssuedDocument = {
+   id: `doc_${Date.now()}_${docNo.replace(/[^a-zA-Z0-9_-]/g, '')}`,
+   docNo,
+   docType,
+   lang,
+   currency,
+   docDate,
+   customerName: custName || 'ไม่ได้ระบุ',
+   customerAddr: custAddr,
+   customerTaxId: custTax,
+   customerContact: custContact,
+   customerPhone: custPhone,
+   subtotal,
+   whtAmount: wht,
+   whtPercent: whPct,
+   netTotal: net,
+   items: items.map(i => ({ desc: i.desc, qty: i.qty, price: i.price })),
+   issuerName,
+   termsDesc,
+   bankDesc,
+   createdAt: new Date().toISOString(),
+ };
+ await saveIssuedDocument(docRecord);
+
+ // Increment document number for this docType & sync to Cloud!
+ setDocNumbers(prev => {
+   const currentNo = prev[docType];
+   const nextNo = incrementDocNo(currentNo);
+   const nextNumbers = { ...prev, [docType]: nextNo };
+   saveDocNumbersCloud(nextNumbers);
+   return nextNumbers;
+ });
  } catch (err) {
  console.error(err);
  showNotification(lang === 'th' ? 'เกิดข้อผิดพลาดในการสร้าง PDF' : 'PDF generation failed', true);
@@ -415,7 +490,6 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  {/* ─── Toolbar ──────────────────────────────── */}
  <div className="sticky top-0 z-40 shadow-md">
  {/* Top row */}
- {/* Top row */}
  <div className="bg-white border-b border-gray-200 px-3 md:px-5 py-2.5 flex gap-2 items-center justify-between">
  {/* Doc Type Tabs */}
  <div className="flex gap-0.5 md:gap-1 bg-gray-100 p-0.5 md:p-1 rounded-lg overflow-x-auto hide-scrollbar shrink-0">
@@ -430,6 +504,14 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  ))}
  </div>
  <div className="flex gap-1.5 shrink-0">
+ <button
+ onClick={() => setShowHistory(true)}
+ className="flex items-center gap-1 px-2.5 md:px-3 py-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg text-xs font-semibold hover:bg-indigo-100 transition cursor-pointer"
+ >
+ <History className="w-3.5 h-3.5 text-indigo-600" />
+ <span className="hidden md:inline">ประวัติเอกสาร ({issuedDocs.length})</span>
+ <span className="md:hidden">ประวัติ ({issuedDocs.length})</span>
+ </button>
  <button
  onClick={openSettings}
  className="flex items-center gap-1 px-2.5 md:px-3 py-1.5 bg-gray-100 border border-gray-200 text-gray-600 rounded-lg text-xs font-semibold hover:bg-gray-200 transition"
@@ -529,7 +611,20 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  </div>
  <div style={{ display: 'grid', gridTemplateColumns: 'auto auto', gap: '4px 8px', alignItems: 'center', justifyContent: 'end', fontSize: '12px', marginTop: '8px' }}>
  <label style={{ fontWeight: 600, color: '#555', textAlign: 'right', whiteSpace: 'nowrap' }}>{d.lbl_no}</label>
- <input value={docNo} onChange={e => setDocNo(e.target.value)} style={{ ...inputInPaper, width: '120px', textAlign: 'right' }} className={fieldCls} placeholder="INV-2025-001" />
+ <input
+   value={docNo}
+   onChange={e => {
+     const val = e.target.value;
+     setDocNumbers(prev => {
+       const next = { ...prev, [docType]: val };
+       saveDocNumbersCloud(next);
+       return next;
+     });
+   }}
+   style={{ ...inputInPaper, width: '120px', textAlign: 'right' }}
+   className={fieldCls}
+   placeholder={docType === 'invoice' ? 'INV26-001' : docType === 'receipt' ? 'RC26-001' : 'QT26-001'}
+ />
  <label style={{ fontWeight: 600, color: '#555', textAlign: 'right', whiteSpace: 'nowrap' }}>{d.lbl_date}</label>
  <input type="date" value={docDate} onChange={e => { setDocDate(e.target.value); setSigRDate(e.target.value); }} style={{ ...inputInPaper, width: '120px', textAlign: 'right' }} className={fieldCls} />
  {docType !== 'receipt' && <>
@@ -541,6 +636,30 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  }
  </div>
  </>}
+ <label style={{ fontWeight: 600, color: '#555', textAlign: 'right', whiteSpace: 'nowrap' }}>{d.lbl_currency}</label>
+ <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '2px' }}>
+   <span>(</span>
+   <select
+     value={currency}
+     onChange={e => {
+       const val = e.target.value as 'USD' | 'THB';
+       setCurrency(val);
+       lsSet('df_currency', val);
+     }}
+     style={{
+       ...inputInPaper,
+       width: '60px',
+       textAlign: 'center',
+       fontWeight: 600,
+       cursor: 'pointer',
+     }}
+     className={fieldCls}
+   >
+     <option value="THB">THB</option>
+     <option value="USD">USD</option>
+   </select>
+   <span>)</span>
+ </div>
  </div>
  </div>
  </div>
@@ -593,7 +712,7 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '8px', fontSize: '12px' }}>
  <thead>
  <tr style={{ background: '#f3f4f6' }}>
- {[d.th_no, d.th_desc, d.th_qty, d.th_price, d.th_amt].map((h, i) => (
+ {[d.th_no, d.th_desc, d.th_qty, `${d.th_price} (${currency})`, `${d.th_amt} (${currency})`].map((h, i) => (
  <th key={i} style={{
  border: '1px solid #d4d4d4', padding: '8px', fontWeight: 600, color: '#444',
  textAlign: i === 0 ? 'center' : i === 1 ? 'left' : i === 2 ? 'center' : 'right',
@@ -617,7 +736,7 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  <input type="number" value={item.price} onChange={e => updateItem(item.id, 'price', e.target.value)} style={{ ...inputInPaper, textAlign: 'right' }} className={fieldCls} min="0" step="0.01" />
  </td>
  <td style={{ border: '1px solid #d4d4d4', padding: '6px', textAlign: 'right', verticalAlign: 'top', fontWeight: 500 }}>
- {fmt(item.qty * item.price)}
+ {currency === 'USD' ? '$' : '฿'}{fmt(item.qty * item.price)}
  </td>
  <td data-no-print style={{ border: '1px solid #d4d4d4', padding: '2px', textAlign: 'center', verticalAlign: 'top' }}>
  <button onClick={() => removeItem(item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', padding: '4px', borderRadius: '4px' }} className="hover:!text-red-500 hover:!bg-red-50">

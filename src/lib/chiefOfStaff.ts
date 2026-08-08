@@ -440,38 +440,59 @@ export function compileRevenueData(tasks: Task[]): RevenueSnapshot {
     }
 
     const incomeValue = myIncome > 0 ? myIncome : taskPrice;
+    const isDone = t.status === 'Done' || t.status === 'เสร็จสิ้น' || t.pipelineStage === 'won';
 
- // Completed checks
- const isDone = t.status === 'Done' || t.status === 'เสร็จสิ้น';
- const dateStr = t.endDate || t.startDate;
+    if (parsedPhases.length > 0) {
+      // Process phased payments by their paidAt date
+      parsedPhases.forEach(p => {
+        const pAmount = Number(p.amount || 0);
+        if (p.paid && pAmount > 0) {
+          const pDate = p.paidAt || p.paidDate || p.dueDate || t.updatedAt || t.endDate || t.startDate;
+          if (pDate) {
+            if (pDate.startsWith(currentMonthStr)) {
+              monthly += pAmount;
+            }
+            if (pDate.startsWith(currentYearStr)) {
+              annual += pAmount;
+              if (getQuarter(pDate) === currentQuarter) {
+                quarterly += pAmount;
+              }
+            }
+          }
+        }
+      });
+    } else {
+      // Completed / Done tasks without phases
+      const dateStr = t.endDate || t.startDate || t.updatedAt;
 
- if (isDone && dateStr) {
- if (dateStr.startsWith(currentMonthStr)) {
- monthly += incomeValue;
- }
- if (dateStr.startsWith(currentYearStr)) {
- annual += incomeValue;
- if (getQuarter(dateStr) === currentQuarter) {
- quarterly += incomeValue;
- }
- }
- }
+      if (isDone && dateStr) {
+        if (dateStr.startsWith(currentMonthStr)) {
+          monthly += incomeValue;
+        }
+        if (dateStr.startsWith(currentYearStr)) {
+          annual += incomeValue;
+          if (getQuarter(dateStr) === currentQuarter) {
+            quarterly += incomeValue;
+          }
+        }
+      }
+    }
 
- // Sales Pipeline
- if (t.pipelineStage) {
- const dealVal = Number(t.dealValue || t.price || 0);
- if (t.pipelineStage !== 'won' && t.pipelineStage !== 'lost') {
- pipelinePotential += dealVal;
- pendingDeals += 1;
- }
- if (t.pipelineStage === 'proposal') {
- openQuotations += 1;
- }
- if (t.pipelineStage === 'won') {
- closedWon += dealVal;
- closedWonCount += 1;
- }
- }
+    // Sales Pipeline
+    if (t.pipelineStage) {
+      const dealVal = Number(t.dealValue || t.price || 0);
+      if (t.pipelineStage !== 'won' && t.pipelineStage !== 'lost') {
+        pipelinePotential += dealVal;
+        pendingDeals += 1;
+      }
+      if (t.pipelineStage === 'proposal') {
+        openQuotations += 1;
+      }
+      if (t.pipelineStage === 'won') {
+        closedWon += dealVal;
+        closedWonCount += 1;
+      }
+    }
 
  // Cashflow parsing (paymentPhases and invoices)
  if (t.paymentPhases) {

@@ -545,3 +545,130 @@ export async function deleteProduct(id: string): Promise<void> {
   const { error } = await supabase.from('products').delete().eq('id', id);
   if (error) throw error;
 }
+
+// ── Doc Numbers Cloud Sync ───────────────────────────────────────────────────
+
+export async function saveDocNumbersCloud(docNumbers: Record<string, string>): Promise<void> {
+  // 1. LocalStorage
+  try {
+    if (docNumbers.quotation) localStorage.setItem('df_docNo_quotation', JSON.stringify(docNumbers.quotation));
+    if (docNumbers.invoice) localStorage.setItem('df_docNo_invoice', JSON.stringify(docNumbers.invoice));
+    if (docNumbers.receipt) localStorage.setItem('df_docNo_receipt', JSON.stringify(docNumbers.receipt));
+  } catch (e) {}
+
+  // 2. Supabase
+  try {
+    await supabase.from('templates').upsert({
+      id: 'df_doc_numbers_config',
+      name: 'Document Numbering Config',
+      details: JSON.stringify(docNumbers),
+    });
+  } catch (err) {
+    console.warn('[Supabase] Sync doc numbers failed:', err);
+  }
+
+  // 3. Express API Backup
+  try {
+    await fetch('/api/doc-numbers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(docNumbers),
+    });
+  } catch (e) {}
+}
+
+export function subscribeDocNumbersCloud(cb: (numbers: Record<string, string>) => void): Unsubscribe {
+  // 1. Initial fetch from Supabase
+  supabase.from('templates').select('*').eq('id', 'df_doc_numbers_config').single().then(({ data, error }) => {
+    if (!error && data && data.details) {
+      try {
+        const parsed = JSON.parse(data.details);
+        cb(parsed);
+      } catch (e) {}
+    } else {
+      // Fallback to Express API
+      fetch('/api/doc-numbers').then(r => r.json()).then(data => {
+        if (data && typeof data === 'object') cb(data);
+      }).catch(() => {});
+    }
+  });
+
+  // 2. Supabase Realtime channel
+  const channel = supabase.channel('doc-numbers-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'templates', filter: 'id=eq.df_doc_numbers_config' }, async (payload: any) => {
+      const details = payload?.new?.details;
+      if (details) {
+        try {
+          const parsed = JSON.parse(details);
+          cb(parsed);
+        } catch (e) {}
+      }
+    })
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
+
+// ── Issued Documents DB Storage & Realtime Sync ───────────────────────────────
+import type { IssuedDocument } from '../types';
+
+export async function saveIssuedDocument(doc: IssuedDocument): Promise<void> {
+  // Save to localStorage as immediate offline fallback list
+  try {
+    const listStr = localStorage.getItem('df_issued_documents') || '[]';
+    const list: IssuedDocument[] = JSON.parse(listStr);
+    const filtered = list.filter(d => d.id !== doc.id);
+    localStorage.setItem('df_issued_documents', JSON.stringify([doc, ...filtered]));
+  } catch (e) {}
+
+  // Save to Supabase
+  try {
+    const row = {
+      id: doc.id,
+      name: `Doc ${doc.docNo} (${doc.docType.toUpperCase()})`,
+      price: doc.netTotal,
+      details: JSON.stringify(doc),
+    };
+    await supabase.from('templates').upsert(row);
+  } catch (err) {
+    console.warn('[Supabase] Save issued document failed:', err);
+  }
+}
+
+export function subscribeIssuedDocuments(cb: (docs: IssuedDocument[]) => void): Unsubscribe {
+  const mapData = (data: any[]) => {
+    return (data || [])
+      .filter((r: any) => r.id && r.id.startsWith('doc_') && r.details)
+      .map((r: any) => {
+        try { return JSON.parse(r.details) as IssuedDocument; } catch { return null; }
+      })
+      .filter(Boolean) as IssuedDocument[];
+  };
+
+  // Initial fetch from Supabase
+  supabase.from('templates').select('*').like('id', 'doc_%').order('name').then(({ data, error }) => {
+    if (!error && data && data.length > 0) {
+      cb(mapData(data));
+    } else {
+      // Fallback to localStorage
+      try {
+        const local = JSON.parse(localStorage.getItem('df_issued_documents') || '[]');
+        if (Array.isArray(local)) cb(local);
+      } catch (e) {}
+    }
+  });
+
+  // Supabase Realtime channel
+  const channel = supabase.channel('issued-docs-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'templates' }, async () => {
+      const { data } = await supabase.from('templates').select('*').like('id', 'doc_%').order('name');
+      if (data) cb(mapData(data));
+    })
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}
