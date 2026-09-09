@@ -69,14 +69,14 @@ interface ItemRow { id: number; desc: string; qty: number; price: number; }
 
 const DEFAULT_ISSUER: Record<Lang, IssuerConfig> = {
  th: {
- brand: 'MODTY.AI', name: 'ศศิวรรณ จันทร์แดง', role: 'ผู้จัดการ',
+ brand: 'MODTY.AI', name: 'ศศิวรรณ จันทร์แดง', role: 'AI Consultant',
  address: '5/4 หมู่ 6 ตำบลเขาวง อำเภอพระพุทธบาท จังหวัดสระบุรี 18120',
  taxId: 'เลขประจำตัวผู้เสียภาษี: 1199600115041',
  contact: 'โทร: +66-99102-9991 | Email: modty.project@yahoo.com',
  bankInfo: 'ชำระเงินผ่านบัญชีธนาคาร\nธนาคารกสิกรไทย สาขาโรบินสันสระบุรี\nเลขบัญชี: 160-2-46775-5',
  },
  en: {
- brand: 'MODTY.AI', name: 'Siwan Jandang', role: 'Manager',
+ brand: 'MODTY.AI', name: 'Siwan Jandang', role: 'AI Consultant',
  address: '5/4 Moo 6, Khao Wong, Phra Phutthabat, Saraburi 18120',
  taxId: 'Tax ID: 1199600115041',
  contact: 'Tel: +66-99102-9991 | Email: modty.project@yahoo.com',
@@ -569,48 +569,56 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  </div>
 
  {/* ─── Paper ────────────────────────────────── */}
- <div
- ref={containerRef}
- className={`flex-1 overflow-auto p-3 md:p-6 lg:p-10 flex justify-center items-start ${mobileTab === 'preview' ? 'block' : ''}`}
- >
- <div
- style={{
- width: scale < 1 ? `${794 * scale}px` : undefined,
- height: scale < 1 ? `${paperHeight * scale}px` : undefined,
- position: 'relative',
- flexShrink: 0,
- }}
- className={mobileTab === 'preview' ? '' : ''}
- >
- <div
- ref={paperRef}
- style={{
- ...paperStyle,
- ...(scale < 1 ? {
- transformOrigin: 'top left',
- transform: `scale(${scale})`,
- position: 'absolute',
- top: 0,
- left: 0,
- } : {}),
- }}>
+  <div
+  ref={containerRef}
+  className={`flex-1 overflow-auto p-3 md:p-6 lg:p-10 flex justify-center items-start ${mobileTab === 'preview' ? 'block' : ''}`}
+  >
+  <div
+  style={{
+  width: scale < 1 ? `${794 * scale}px` : undefined,
+  height: scale < 1 ? `${paperHeight * scale}px` : undefined,
+  position: 'relative',
+  flexShrink: 0,
+  }}
+  className={mobileTab === 'preview' ? '' : ''}
+  >
+  <div
+  ref={paperRef}
+  style={{
+  ...paperStyle,
+  ...(scale < 1 ? {
+  transformOrigin: 'top left',
+  transform: `scale(${scale})`,
+  position: 'absolute',
+  top: 0,
+  left: 0,
+  } : {}),
+  }}>
  {/* Header */}
- <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', borderBottom: '1px solid #d4d4d4', paddingBottom: '16px', gap: '20px' }}>
- <div style={{ width: '180px', minHeight: '60px', display: 'flex', alignItems: 'flex-start' }}>
- {logoUrl
- ? <img src={logoUrl} alt="logo" style={{ maxWidth: '100%', maxHeight: '120px', objectFit: 'contain' }} crossOrigin="anonymous" />
- : <div style={{ width: '56px', height: '56px', background: '#1e293b', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: '22px' }}>M</div>
- }
+ <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', borderBottom: '1px solid #e5e7eb', paddingBottom: '16px', gap: '20px' }}>
+ <div style={{ flex: 1 }}>
+ {logoUrl && (
+ <div style={{ marginBottom: '10px' }}>
+ <img src={logoUrl} alt="logo" style={{ maxHeight: '70px', objectFit: 'contain' }} crossOrigin="anonymous" />
  </div>
- <div style={{ textAlign: 'right', width: '260px' }}>
- <div style={{ fontSize: '22px', fontWeight: 700, color: '#2563eb', fontFamily: font }}>
- <input value={d.docTitles[docType]} readOnly style={{ ...inputInPaper, textAlign: 'right', fontWeight: 700, fontSize: '22px', color: '#2563eb' }} />
+ )}
+ <div style={{ fontWeight: 700, fontSize: '15px', color: '#111827', marginBottom: '4px' }}>
+ <input value={issuerName} onChange={e => setIssuerName(e.target.value)} style={{ ...inputInPaper, fontWeight: 700, fontSize: '15px', color: '#111827' }} className={fieldCls} placeholder="ชื่อบริษัท / ผู้ออกเอกสาร" />
  </div>
- <div style={{ fontSize: '13px', fontWeight: 600, color: '#666', letterSpacing: '1px' }}>
- <input value={d.docSubtitles[docType]} readOnly style={{ ...inputInPaper, textAlign: 'right', fontWeight: 600, color: '#666' }} />
+ <AutoTextarea value={issuerAddr} onChange={setIssuerAddr} placeholder="ที่อยู่" style={{ ...inputInPaper, fontSize: '12px', color: '#374151', display: 'block', lineHeight: '1.4' }} className={`${fieldCls} mt-0.5`} />
+ <input value={issuerTax} onChange={e => setIssuerTax(e.target.value)} style={{ ...inputInPaper, fontSize: '12px', color: '#374151' }} className={`${fieldCls} mt-0.5`} placeholder="เลขประจำตัวผู้เสียภาษี" />
+ <input value={issuerContact} onChange={e => setIssuerContact(e.target.value)} style={{ ...inputInPaper, fontSize: '12px', color: '#374151' }} className={`${fieldCls} mt-0.5`} placeholder="เบอร์โทร / อีเมล" />
  </div>
- <div style={{ display: 'grid', gridTemplateColumns: 'auto auto', gap: '4px 8px', alignItems: 'center', justifyContent: 'end', fontSize: '12px', marginTop: '8px' }}>
- <label style={{ fontWeight: 600, color: '#555', textAlign: 'right', whiteSpace: 'nowrap' }}>{d.lbl_no}</label>
+
+ <div style={{ textAlign: 'right', minWidth: '240px' }}>
+ <div style={{ fontSize: '24px', fontWeight: 800, color: '#2563eb', fontFamily: font, lineHeight: '1.2' }}>
+ <input value={d.docTitles[docType]} readOnly style={{ ...inputInPaper, textAlign: 'right', fontWeight: 800, fontSize: '24px', color: '#2563eb' }} />
+ </div>
+ <div style={{ fontSize: '13px', fontWeight: 700, color: '#4b5563', letterSpacing: '0.5px', marginTop: '2px' }}>
+ <input value={d.docSubtitles[docType]} readOnly style={{ ...inputInPaper, textAlign: 'right', fontWeight: 700, fontSize: '13px', color: '#4b5563' }} />
+ </div>
+ <div style={{ display: 'grid', gridTemplateColumns: 'auto auto', gap: '4px 10px', alignItems: 'center', justifyContent: 'end', fontSize: '12px', marginTop: '12px' }}>
+ <label style={{ fontWeight: 600, color: '#4b5563', textAlign: 'right', whiteSpace: 'nowrap' }}>{d.lbl_no}</label>
  <input
    value={docNo}
    onChange={e => {
@@ -621,22 +629,22 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
        return next;
      });
    }}
-   style={{ ...inputInPaper, width: '120px', textAlign: 'right' }}
+   style={{ ...inputInPaper, width: '120px', textAlign: 'right', fontWeight: 600 }}
    className={fieldCls}
    placeholder={docType === 'invoice' ? 'INV26-001' : docType === 'receipt' ? 'RC26-001' : 'QT26-001'}
  />
- <label style={{ fontWeight: 600, color: '#555', textAlign: 'right', whiteSpace: 'nowrap' }}>{d.lbl_date}</label>
+ <label style={{ fontWeight: 600, color: '#4b5563', textAlign: 'right', whiteSpace: 'nowrap' }}>{d.lbl_date}</label>
  <input type="date" value={docDate} onChange={e => { setDocDate(e.target.value); setSigRDate(e.target.value); }} style={{ ...inputInPaper, width: '120px', textAlign: 'right' }} className={fieldCls} />
  {docType !== 'receipt' && <>
- <label style={{ fontWeight: 600, color: '#555', textAlign: 'right', whiteSpace: 'nowrap' }}>{meta3IsDate ? d.lbl_meta3I : d.lbl_meta3Q}</label>
+ <label style={{ fontWeight: 600, color: '#4b5563', textAlign: 'right', whiteSpace: 'nowrap' }}>{meta3IsDate ? d.lbl_meta3I : d.lbl_meta3Q}</label>
  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
  {meta3IsDate
  ? <input type="date" value={meta3} onChange={e => setMeta3(e.target.value)} style={{ ...inputInPaper, width: '120px', textAlign: 'right' }} className={fieldCls} />
- : <><input type="number" value={meta3} onChange={e => setMeta3(e.target.value)} style={{ ...inputInPaper, width: '40px', textAlign: 'right' }} className={fieldCls} /><span style={{ color: '#555', fontSize: '12px' }}>{d.lbl_days}</span></>
+ : <><input type="number" value={meta3} onChange={e => setMeta3(e.target.value)} style={{ ...inputInPaper, width: '40px', textAlign: 'right' }} className={fieldCls} /><span style={{ color: '#4b5563', fontSize: '12px' }}>{d.lbl_days}</span></>
  }
  </div>
  </>}
- <label style={{ fontWeight: 600, color: '#555', textAlign: 'right', whiteSpace: 'nowrap' }}>{d.lbl_currency}</label>
+ <label style={{ fontWeight: 600, color: '#4b5563', textAlign: 'right', whiteSpace: 'nowrap' }}>{d.lbl_currency}</label>
  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '2px' }}>
    <span>(</span>
    <select
@@ -650,7 +658,7 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
        ...inputInPaper,
        width: '60px',
        textAlign: 'center',
-       fontWeight: 600,
+       fontWeight: 700,
        cursor: 'pointer',
      }}
      className={fieldCls}
@@ -664,16 +672,8 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  </div>
  </div>
 
- {/* Issuer */}
- <div style={{ marginBottom: '20px' }}>
- <input value={issuerName} onChange={e => setIssuerName(e.target.value)} style={{ ...inputInPaper, fontWeight: 700, fontSize: '14px' }} className={fieldCls} placeholder="ชื่อบริษัท / ผู้ออกเอกสาร" />
- <AutoTextarea value={issuerAddr} onChange={setIssuerAddr} placeholder="ที่อยู่" style={{ ...inputInPaper, display: 'block' }} className={`${fieldCls} mt-0.5`} />
- <input value={issuerTax} onChange={e => setIssuerTax(e.target.value)} style={{ ...inputInPaper, fontSize: '12px', color: '#444' }} className={`${fieldCls} mt-0.5`} placeholder="เลขประจำตัวผู้เสียภาษี" />
- <input value={issuerContact} onChange={e => setIssuerContact(e.target.value)} style={{ ...inputInPaper, fontSize: '12px', color: '#444' }} className={`${fieldCls} mt-0.5`} placeholder="เบอร์โทร / อีเมล" />
- </div>
-
  {/* Customer */}
- <div style={{ border: '1px solid #d4d4d4', borderRadius: '6px', padding: '10px 14px', marginBottom: '20px', background: '#fafafa' }}>
+ <div style={{ border: '1px solid #e5e7eb', borderRadius: '12px', padding: '14px 18px', marginBottom: '20px', background: '#ffffff' }}>
  {([
  [d.lbl_cust, custName, setCustName, 'ระบุชื่อบริษัท หรือ ชื่อลูกค้า'],
  [d.lbl_addr, custAddr, setCustAddr, 'ระบุที่อยู่'],
@@ -681,24 +681,24 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  [d.lbl_contact, custContact, setCustContact, 'ชื่อผู้ติดต่อ'],
  [d.lbl_phone, custPhone, setCustPhone, 'เบอร์โทร'],
  ] as [string, string, (v: string) => void, string][]).map(([label, val, setter, ph]) => (
- <div key={label} style={{ display: 'flex', gap: '8px', marginBottom: '2px', alignItems: 'baseline' }}>
- <span style={{ flexShrink: 0, width: '120px', fontWeight: 600, fontSize: '12px', color: '#333' }}>{label}</span>
- {label === d.lbl_addr
- ? <AutoTextarea value={val} onChange={setter} placeholder={ph} style={{ ...inputInPaper, flex: 1 }} className={fieldCls} />
- : <input value={val} onChange={e => setter(e.target.value)} placeholder={ph} style={{ ...inputInPaper, flex: 1 }} className={fieldCls} />
+ <div key={label} style={{ display: 'flex', gap: '8px', marginBottom: '4px', alignItems: 'baseline' }}>
+ <span style={{ flexShrink: 0, width: '145px', fontWeight: 700, fontSize: '12px', color: '#111827' }}>{label}</span>
+ {label === (d.lbl_addr as string)
+ ? <AutoTextarea value={val} onChange={setter} placeholder={ph} style={{ ...inputInPaper, flex: 1, fontWeight: label === (d.lbl_cust as string) ? 700 : 400 }} className={fieldCls} />
+ : <input value={val} onChange={e => setter(e.target.value)} placeholder={ph} style={{ ...inputInPaper, flex: 1, fontWeight: (label === (d.lbl_cust as string) || label === (d.lbl_tax as string)) ? 700 : 400 }} className={fieldCls} />
  }
  </div>
  ))}
  {/* Client quick-select */}
  {clients.length > 0 && (
- <div data-no-print style={{ marginTop: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
- <span style={{ fontSize: '11px', color: '#888' }}>เลือกลูกค้า:</span>
+ <div data-no-print style={{ marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+ <span style={{ fontSize: '11px', color: '#6b7280' }}>เลือกลูกค้า:</span>
  <select
  onChange={e => {
  const c = clients.find(cl => cl.id === e.target.value);
  if (c) { setCustName(c.name); setCustAddr(c.address); setCustTax(c.taxId); }
  }}
- style={{ fontSize: '11px', border: '1px solid #ddd', borderRadius: '4px', padding: '2px 6px', background: '#fff' }}
+ style={{ fontSize: '11px', border: '1px solid #d1d5db', borderRadius: '4px', padding: '2px 6px', background: '#fff' }}
  defaultValue=""
  >
  <option value="" disabled>เลือกจากฐานข้อมูล...</option>
@@ -709,37 +709,38 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  </div>
 
  {/* Items Table */}
- <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '8px', fontSize: '12px' }}>
+ <div style={{ borderRadius: '8px', border: '1px solid #e5e7eb', overflow: 'hidden', marginBottom: '8px' }}>
+ <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
  <thead>
  <tr style={{ background: '#f3f4f6' }}>
  {[d.th_no, d.th_desc, d.th_qty, `${d.th_price} (${currency})`, `${d.th_amt} (${currency})`].map((h, i) => (
  <th key={i} style={{
- border: '1px solid #d4d4d4', padding: '8px', fontWeight: 600, color: '#444',
+ border: '1px solid #e5e7eb', padding: '10px 8px', fontWeight: 700, color: '#1f2937',
  textAlign: i === 0 ? 'center' : i === 1 ? 'left' : i === 2 ? 'center' : 'right',
- width: i === 0 ? '5%' : i === 1 ? '45%' : i === 2 ? '10%' : '17%',
+ width: i === 0 ? '5%' : i === 1 ? '52%' : i === 2 ? '10%' : '16%',
  }}>{h}</th>
  ))}
- <th data-no-print style={{ border: '1px solid #d4d4d4', padding: '4px', width: '4%' }} />
+ <th data-no-print style={{ border: '1px solid #e5e7eb', padding: '4px', width: '4%' }} />
  </tr>
  </thead>
  <tbody>
  {items.map((item, idx) => (
  <tr key={item.id}>
- <td style={{ border: '1px solid #d4d4d4', padding: '6px', textAlign: 'center', verticalAlign: 'top' }}>{idx + 1}</td>
- <td style={{ border: '1px solid #d4d4d4', padding: '4px', verticalAlign: 'top' }}>
- <AutoTextarea value={item.desc} onChange={v => updateItem(item.id, 'desc', v)} placeholder="รายละเอียดสินค้า / บริการ" style={{ ...inputInPaper }} className={fieldCls} />
+ <td style={{ border: '1px solid #e5e7eb', padding: '8px', textAlign: 'center', verticalAlign: 'top', color: '#374151' }}>{idx + 1}</td>
+ <td style={{ border: '1px solid #e5e7eb', padding: '6px 8px', verticalAlign: 'top' }}>
+ <AutoTextarea value={item.desc} onChange={v => updateItem(item.id, 'desc', v)} placeholder="รายละเอียดสินค้า / บริการ" style={{ ...inputInPaper, lineHeight: '1.5' }} className={fieldCls} />
  </td>
- <td style={{ border: '1px solid #d4d4d4', padding: '4px', verticalAlign: 'top' }}>
+ <td style={{ border: '1px solid #e5e7eb', padding: '6px 8px', verticalAlign: 'top' }}>
  <input type="number" value={item.qty} onChange={e => updateItem(item.id, 'qty', e.target.value)} style={{ ...inputInPaper, textAlign: 'center' }} className={fieldCls} min="0" step="1" />
  </td>
- <td style={{ border: '1px solid #d4d4d4', padding: '4px', verticalAlign: 'top' }}>
+ <td style={{ border: '1px solid #e5e7eb', padding: '6px 8px', verticalAlign: 'top' }}>
  <input type="number" value={item.price} onChange={e => updateItem(item.id, 'price', e.target.value)} style={{ ...inputInPaper, textAlign: 'right' }} className={fieldCls} min="0" step="0.01" />
  </td>
- <td style={{ border: '1px solid #d4d4d4', padding: '6px', textAlign: 'right', verticalAlign: 'top', fontWeight: 500 }}>
+ <td style={{ border: '1px solid #e5e7eb', padding: '8px', textAlign: 'right', verticalAlign: 'top', fontWeight: 700, color: '#111827' }}>
  {currency === 'USD' ? '$' : '฿'}{fmt(item.qty * item.price)}
  </td>
- <td data-no-print style={{ border: '1px solid #d4d4d4', padding: '2px', textAlign: 'center', verticalAlign: 'top' }}>
- <button onClick={() => removeItem(item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ccc', padding: '4px', borderRadius: '4px' }} className="hover:!text-red-500 hover:!bg-red-50">
+ <td data-no-print style={{ border: '1px solid #e5e7eb', padding: '2px', textAlign: 'center', verticalAlign: 'top' }}>
+ <button onClick={() => removeItem(item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: '4px', borderRadius: '4px' }} className="hover:!text-red-500 hover:!bg-red-50">
  <X className="w-3.5 h-3.5" />
  </button>
  </td>
@@ -747,6 +748,7 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  ))}
  </tbody>
  </table>
+ </div>
  <button
  data-no-print
  onClick={addItem}
@@ -757,90 +759,93 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  </button>
 
  {/* Bottom: Terms + Summary */}
- <div style={{ display: 'flex', gap: '24px', marginBottom: '40px', alignItems: 'flex-start' }}>
+ <div style={{ display: 'flex', gap: '20px', marginBottom: '40px', alignItems: 'flex-start' }}>
  {/* Terms / Bank */}
- <div style={{ flex: 1.5 }}>
+ <div style={{ flex: 1.4, display: 'flex', flexDirection: 'column', gap: '12px' }}>
+ <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '12px 16px', borderRadius: '10px' }}>
  <div style={{ fontWeight: 700, fontSize: '13px', color: '#2563eb', marginBottom: '4px' }}>
  {d.termsTitles[docType]}
  </div>
- <AutoTextarea value={termsDesc} onChange={setTermsDesc} placeholder="ระบุเงื่อนไขการชำระเงิน หรือหมายเหตุ" style={{ ...inputInPaper, marginBottom: '12px' }} className={`${fieldCls} text-xs`} />
- <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '10px', borderRadius: '6px' }}>
+ <AutoTextarea value={termsDesc} onChange={setTermsDesc} placeholder="ระบุเงื่อนไขการชำระเงิน หรือหมายเหตุ" style={{ ...inputInPaper, fontSize: '12px', color: '#374151' }} className={fieldCls} />
+ </div>
+ <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '12px 16px', borderRadius: '10px' }}>
  <div style={{ fontWeight: 700, fontSize: '13px', color: '#2563eb', marginBottom: '4px' }}>{d.bankTitles[docType]}</div>
- <AutoTextarea value={bankDesc} onChange={setBankDesc} placeholder="รายละเอียดธนาคาร" style={{ ...inputInPaper, fontSize: '12px' }} className={`${fieldCls} text-xs`} />
+ <AutoTextarea value={bankDesc} onChange={setBankDesc} placeholder="รายละเอียดธนาคาร" style={{ ...inputInPaper, fontSize: '12px', color: '#374151' }} className={fieldCls} />
  </div>
  </div>
 
  {/* Summary */}
  <div style={{ flex: 1 }}>
+ <div style={{ borderRadius: '8px', border: '1px solid #e5e7eb', overflow: 'hidden' }}>
  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
  <tbody>
  <tr>
- <td style={{ border: '1px solid #d4d4d4', padding: '6px 8px', color: '#444', fontWeight: 500 }}>{d.lbl_sub}</td>
- <td style={{ border: '1px solid #d4d4d4', padding: '6px 8px', textAlign: 'right', fontWeight: 500 }}>{fmt(subtotal)}</td>
+ <td style={{ border: '1px solid #e5e7eb', padding: '8px 10px', color: '#374151', fontWeight: 600 }}>{d.lbl_sub}</td>
+ <td style={{ border: '1px solid #e5e7eb', padding: '8px 10px', textAlign: 'right', fontWeight: 600, color: '#111827' }}>{fmt(subtotal)}</td>
  </tr>
  <tr>
- <td style={{ border: '1px solid #d4d4d4', padding: '6px 8px', color: '#444', fontWeight: 500 }}>
+ <td style={{ border: '1px solid #e5e7eb', padding: '8px 10px', color: '#374151', fontWeight: 600 }}>
  <span>{d.lbl_wht}</span>
- {/* แสดง input ตอนแก้ไข, แสดง text ตอน PDF */}
- <span data-no-print style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', background: '#fff', padding: '0 4px', border: '1px solid #ddd', borderRadius: '3px', marginLeft: '8px' }}>
- <input type="number" value={whPct} onChange={e => setWhPct(parseFloat(e.target.value) || 0)} min={0} step={0.5} style={{ width: '30px', textAlign: 'center', border: 'none', outline: 'none', fontSize: '11px', fontFamily: font }} />%
+ <span data-no-print style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', background: '#fff', padding: '0 4px', border: '1px solid #d1d5db', borderRadius: '3px', marginLeft: '6px' }}>
+ <input type="number" value={whPct} onChange={e => setWhPct(parseFloat(e.target.value) || 0)} min={0} step={0.5} style={{ width: '28px', textAlign: 'center', border: 'none', outline: 'none', fontSize: '11px', fontFamily: font }} />%
  </span>
- <span style={{ fontSize: '11px', color: '#666', marginLeft: '6px' }}>({whPct}%)</span>
+ <span style={{ fontSize: '11px', color: '#6b7280', marginLeft: '4px' }}>({whPct}%)</span>
  </td>
- <td style={{ border: '1px solid #d4d4d4', padding: '6px 8px', textAlign: 'right', fontWeight: 500 }}>{fmt(wht)}</td>
+ <td style={{ border: '1px solid #e5e7eb', padding: '8px 10px', textAlign: 'right', fontWeight: 600, color: '#111827' }}>{fmt(wht)}</td>
  </tr>
- <tr style={{ background: '#e5e7eb' }}>
- <td style={{ border: '1px solid #d4d4d4', padding: '6px 8px', fontWeight: 700, fontSize: '14px' }}>
+ <tr style={{ background: '#f3f4f6' }}>
+ <td style={{ border: '1px solid #e5e7eb', padding: '10px 10px', fontWeight: 800, fontSize: '13px', color: '#111827' }}>
  {docType === 'receipt' ? d.lbl_net_recv : d.lbl_net_due}
  </td>
- <td style={{ border: '1px solid #d4d4d4', padding: '6px 8px', textAlign: 'right', fontWeight: 700, fontSize: '14px' }}>{fmt(net)}</td>
+ <td style={{ border: '1px solid #e5e7eb', padding: '10px 10px', textAlign: 'right', fontWeight: 800, fontSize: '14px', color: '#111827' }}>{fmt(net)}</td>
  </tr>
  </tbody>
  </table>
  </div>
  </div>
+ </div>
 
  {/* Signatures */}
- <div style={{ display: 'flex', justifyContent: 'space-between', gap: '40px', marginTop: '20px', borderTop: '1px solid #d4d4d4', paddingTop: '16px' }}>
+ <div style={{ display: 'flex', justifyContent: 'space-between', gap: '40px', marginTop: 'auto', paddingTop: '24px', borderTop: '1px solid #e5e7eb' }}>
  {/* Left sig */}
  <div style={{ flex: 1, textAlign: 'center' }}>
- <div style={{ fontWeight: 700, marginBottom: '4px' }}>
- <input value={d.sigL_head[docType]} readOnly style={{ ...inputInPaper, textAlign: 'center', fontWeight: 700 }} className={fieldCls} />
+ <div style={{ fontWeight: 700, fontSize: '13px', color: '#111827', marginBottom: '4px' }}>
+ <input value={d.sigL_head[docType]} readOnly style={{ ...inputInPaper, textAlign: 'center', fontWeight: 700, fontSize: '13px', color: '#111827' }} className={fieldCls} />
  </div>
- <div style={{ fontSize: '11px', color: '#666', marginBottom: '32px', minHeight: '16px' }}>
- <input value={d.sigL_desc[docType]} readOnly style={{ ...inputInPaper, fontSize: '11px', color: '#666', textAlign: 'center' }} className={fieldCls} />
+ <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '32px', minHeight: '16px' }}>
+ <input value={d.sigL_desc[docType]} readOnly style={{ ...inputInPaper, fontSize: '11px', color: '#6b7280', textAlign: 'center' }} className={fieldCls} />
  </div>
- <div style={{ borderTop: '1px solid #333', paddingTop: '8px', display: 'inline-flex', width: '80%', justifyContent: 'center', gap: '4px', margin: '0 auto' }}>
+ <div style={{ borderTop: '1px solid #4b5563', paddingTop: '8px', display: 'inline-flex', width: '85%', justifyContent: 'center', gap: '4px', margin: '0 auto' }}>
  <span>(</span>
- <input value={sigLName} onChange={e => setSigLName(e.target.value)} style={{ ...inputInPaper, textAlign: 'center', width: '100px' }} className={fieldCls} placeholder="ชื่อ" />
+ <input value={sigLName} onChange={e => setSigLName(e.target.value)} style={{ ...inputInPaper, textAlign: 'center', width: '120px' }} className={fieldCls} placeholder="" />
  <span>)</span>
  </div>
  <div style={{ marginTop: '2px' }}>
- <input value={sigLRole} onChange={e => setSigLRole(e.target.value)} style={{ ...inputInPaper, fontSize: '11px', color: '#666', textAlign: 'center', width: '100px', margin: '0 auto' }} className={fieldCls} placeholder="ตำแหน่ง" />
+ <input value={sigLRole} onChange={e => setSigLRole(e.target.value)} style={{ ...inputInPaper, fontSize: '11px', color: '#6b7280', textAlign: 'center', width: '120px', margin: '0 auto' }} className={fieldCls} placeholder="" />
  </div>
- <div style={{ marginTop: '4px', fontSize: '12px', color: '#555', display: 'flex', justifyContent: 'center', gap: '4px', alignItems: 'center' }}>
+ <div style={{ marginTop: '6px', fontSize: '12px', color: '#4b5563', display: 'flex', justifyContent: 'center', gap: '4px', alignItems: 'center' }}>
  <span>{d.lbl_sigDate}</span>
- <input value={sigLDate} onChange={e => setSigLDate(e.target.value)} style={{ ...inputInPaper, width: '80px', textAlign: 'center' }} className={fieldCls} placeholder="____/____/____" />
+ <input value={sigLDate} onChange={e => setSigLDate(e.target.value)} style={{ ...inputInPaper, width: '100px', textAlign: 'center' }} className={fieldCls} placeholder="" />
  </div>
  </div>
 
  {/* Right sig */}
  <div style={{ flex: 1, textAlign: 'center' }}>
- <div style={{ fontWeight: 700, marginBottom: '4px' }}>
- <input value={d.sigR_head[docType]} readOnly style={{ ...inputInPaper, textAlign: 'center', fontWeight: 700 }} className={fieldCls} />
+ <div style={{ fontWeight: 700, fontSize: '13px', color: '#111827', marginBottom: '4px' }}>
+ <input value={d.sigR_head[docType]} readOnly style={{ ...inputInPaper, textAlign: 'center', fontWeight: 700, fontSize: '13px', color: '#111827' }} className={fieldCls} />
  </div>
- <div style={{ fontSize: '11px', color: '#666', marginBottom: '32px', minHeight: '16px' }}>
- <input value="" readOnly style={{ ...inputInPaper, fontSize: '11px', color: '#666', textAlign: 'center' }} className={fieldCls} />
+ <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '32px', minHeight: '16px' }}>
+ <input value="" readOnly style={{ ...inputInPaper, fontSize: '11px', color: '#6b7280', textAlign: 'center' }} className={fieldCls} />
  </div>
- <div style={{ borderTop: '1px solid #333', paddingTop: '8px', display: 'inline-flex', width: '80%', justifyContent: 'center', gap: '4px', margin: '0 auto' }}>
+ <div style={{ borderTop: '1px solid #4b5563', paddingTop: '8px', display: 'inline-flex', width: '85%', justifyContent: 'center', gap: '4px', margin: '0 auto' }}>
  <span>(</span>
- <input value={sigRName} onChange={e => setSigRName(e.target.value)} style={{ ...inputInPaper, textAlign: 'center', width: '120px' }} className={fieldCls} placeholder="ชื่อ" />
+ <input value={sigRName} onChange={e => setSigRName(e.target.value)} style={{ ...inputInPaper, textAlign: 'center', width: '140px' }} className={fieldCls} placeholder="ชื่อ" />
  <span>)</span>
  </div>
  <div style={{ marginTop: '2px' }}>
- <input value={sigRRole} onChange={e => setSigRRole(e.target.value)} style={{ ...inputInPaper, fontSize: '11px', color: '#666', textAlign: 'center', width: '120px', margin: '0 auto' }} className={fieldCls} placeholder="ตำแหน่ง" />
+ <input value={sigRRole} onChange={e => setSigRRole(e.target.value)} style={{ ...inputInPaper, fontSize: '11px', color: '#6b7280', textAlign: 'center', width: '140px', margin: '0 auto' }} className={fieldCls} placeholder="ตำแหน่ง" />
  </div>
- <div style={{ marginTop: '4px', fontSize: '12px', color: '#555', display: 'flex', justifyContent: 'center', gap: '4px', alignItems: 'center' }}>
+ <div style={{ marginTop: '6px', fontSize: '12px', color: '#4b5563', display: 'flex', justifyContent: 'center', gap: '4px', alignItems: 'center' }}>
  <span>{d.lbl_sigDate}</span>
  <input type="date" value={sigRDate} onChange={e => setSigRDate(e.target.value)} style={{ ...inputInPaper, width: '110px', textAlign: 'center' }} className={fieldCls} />
  </div>
