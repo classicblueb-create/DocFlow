@@ -2,7 +2,7 @@ import {
   Kanban, GanttChart, CalendarDays, PieChart,
   FileText, Users, Library, Sparkles, BrainCircuit,
   User, X, Lightbulb, TrendingUp, FolderKanban,
-  Video, LayoutDashboard, List, LogOut
+  Video, LayoutDashboard, List, LogOut, Receipt
 } from 'lucide-react';
 import { ViewType } from '../types';
 import { cn } from '../lib/utils';
@@ -133,6 +133,7 @@ export function Sidebar({ currentView, onViewChange, isMobileOpen, setIsMobileOp
               <NavItem view="docflow"   icon={FileText}   label="ออกเอกสาร" iconClass="text-amber-600" labelClass="text-amber-800" />
               <NavItem view="clients"   icon={Users}      label="ฐานลูกค้า (Clients)" iconClass="text-emerald-600" labelClass="text-emerald-800" />
               <NavItem view="templates" icon={Library}    label="คลังงาน (Templates)" iconClass="text-blue-600" labelClass="text-blue-800" />
+              <NavItem view="expenses"  icon={Receipt}    label="ค่าใช้จ่ายของฉัน" iconClass="text-rose-600" labelClass="text-rose-800" />
             </div>
           </div>
 

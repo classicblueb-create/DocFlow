@@ -13,6 +13,7 @@ import { IdeasView } from './components/views/IdeasView';
 import { ContentPlanView } from './components/views/ContentPlanView';
 import { AgentsView } from './components/views/AgentsView';
 import { DocFlowView } from './components/views/DocFlowView';
+import { ExpensesView } from './components/views/ExpensesView';
 import { CalendarView, GanttView } from './components/views/Placeholders';
 import { ClientsView, TemplatesView } from './components/views/ListViews';
 import { ProjectPage } from './components/ProjectPage';
@@ -25,16 +26,17 @@ import { DocSettingsModal } from './components/modals/DocSettingsModal';
 import { ThemeSettingsModal } from './components/modals/ThemeSettingsModal';
 import { GlobalSearch } from './components/GlobalSearch';
 
-import { ViewType, Task, Client, Template, Idea, ContentPlan, ProjectCategory } from './types';
+import { ViewType, Task, Client, Template, Idea, ContentPlan, ProjectCategory, Expense } from './types';
 import {
  subscribeTasks, subscribeClients, subscribeTemplates, subscribeIdeas,
- subscribeCategories,
+ subscribeCategories, subscribeExpenses,
  saveTask, deleteTask as dbDeleteTask,
  saveClient, deleteClient as dbDeleteClient,
  saveTemplate, deleteTemplate as dbDeleteTemplate,
  saveIdea, deleteIdea as dbDeleteIdea,
  saveCategory, deleteCategory as dbDeleteCategory,
  saveContentPlan, deleteContentPlan as dbDeleteContentPlan,
+ saveExpense, deleteExpense as dbDeleteExpense,
 } from './lib/db';
 import { getSession, onAuthStateChange } from './lib/auth';
 import { applyTheme } from './lib/theme';
@@ -44,6 +46,7 @@ const LS_TASKS = 'docflow_local_tasks';
 const LS_CLIENTS = 'docflow_local_clients';
 const LS_TEMPLATES = 'docflow_local_templates';
 const LS_IDEAS = 'docflow_local_ideas';
+const LS_EXPENSES = 'modty_expenses';
 
 
 function lsGet<T>(key: string, fallback: T): T {
@@ -90,6 +93,7 @@ export default function App() {
  const [contentPlans, setContentPlans] = useState<ContentPlan[]>([]);
  const [isRefreshingPlans, setIsRefreshingPlans] = useState(false);
  const [categories, setCategories] = useState<ProjectCategory[]>([]);
+ const [expenses, setExpenses] = useState<Expense[]>(() => lsGet(LS_EXPENSES, []));
 
  // ── Apply theme on mount ──────────────────────────────────────────────────
  useEffect(() => { applyTheme(); }, []);
@@ -185,6 +189,10 @@ export default function App() {
  const unsubCategories = subscribeCategories(data => {
  setCategories(data);
  });
+ const unsubExpenses = subscribeExpenses(data => {
+ setExpenses(data);
+ lsSet(LS_EXPENSES, data);
+ });
  // Fetch Content Plans from Notion (primary source)
  loadNotionContentPlans();
 
@@ -194,6 +202,7 @@ export default function App() {
  unsubTemplates();
  unsubIdeas();
  unsubCategories();
+ unsubExpenses();
  };
  }, [authed, loadNotionContentPlans]);
 
@@ -399,6 +408,44 @@ export default function App() {
  } catch { showNotification('ลบ Category ไม่สำเร็จ', true); }
  }, [showNotification]);
 
+ // ── Expense handlers ───────────────────────────────────────────────────────
+ const handleSaveExpense = useCallback(async (expense: Expense) => {
+   try {
+     await saveExpense(expense);
+     showNotification('บันทึกค่าใช้จ่ายเรียบร้อย');
+   } catch (e: any) {
+     showNotification(`บันทึกค่าใช้จ่ายไม่สำเร็จ: ${e?.message || ''}`, true);
+   }
+ }, [showNotification]);
+
+ const handleUpdateExpense = useCallback(async (expense: Expense) => {
+   setExpenses(prev => {
+     const next = prev.map(e => e.id === expense.id ? expense : e);
+     lsSet(LS_EXPENSES, next);
+     return next;
+   });
+   try {
+     await saveExpense(expense);
+     showNotification('อัปเดตค่าใช้จ่ายเรียบร้อย');
+   } catch (e: any) {
+     showNotification(`อัปเดตไม่สำเร็จ: ${e?.message || ''}`, true);
+   }
+ }, [showNotification]);
+
+ const handleDeleteExpense = useCallback(async (id: string) => {
+   setExpenses(prev => {
+     const next = prev.filter(e => e.id !== id);
+     lsSet(LS_EXPENSES, next);
+     return next;
+   });
+   try {
+     await dbDeleteExpense(id);
+     showNotification('ลบค่าใช้จ่ายเรียบร้อย');
+   } catch (e: any) {
+     showNotification(`ลบไม่สำเร็จ: ${e?.message || ''}`, true);
+   }
+ }, [showNotification]);
+
  // ── Consult agent ──────────────────────────────────────────────────────────
  const handleConsultAgent = useCallback((agentId: string, _initialPrompt?: string) => {
  setSelectedAgent(agentId);
@@ -466,7 +513,7 @@ export default function App() {
  case 'calendar': return <CalendarView tasks={filteredTasks} onTaskClick={handleTaskClick} />;
 
  case 'dashboard':
- return <DashboardView tasks={filteredTasks} categories={categories} />;
+ return <DashboardView tasks={filteredTasks} categories={categories} expenses={expenses} />;
 
  case 'pipeline':
  return (
@@ -544,7 +591,18 @@ export default function App() {
  />
  );
 
- default:
+
+  case 'expenses':
+  return (
+    <ExpensesView
+      expenses={expenses}
+      onSaveExpense={handleSaveExpense}
+      onUpdateExpense={handleUpdateExpense}
+      onDeleteExpense={handleDeleteExpense}
+    />
+  );
+
+  default:
  return (
  <BoardView
  tasks={filteredTasks}

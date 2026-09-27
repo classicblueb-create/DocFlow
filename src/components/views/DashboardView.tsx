@@ -4,13 +4,14 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart as RechartsPie, Pie, Cell, Area, AreaChart, RadialBarChart, RadialBar,
 } from 'recharts';
-import { Task, ProjectCategory } from '../../types';
-import { TrendingUp, CheckCircle, Clock, CalendarDays } from 'lucide-react';
+import { Task, ProjectCategory, Expense } from '../../types';
+import { TrendingUp, CheckCircle, Clock, CalendarDays, Receipt, TrendingDown, DollarSign } from 'lucide-react';
 import { cn, getTaskPrice, getTaskProfit } from '../../lib/utils';
 
 interface DashboardViewProps {
   tasks: Task[];
   categories: ProjectCategory[];
+  expenses?: Expense[];
 }
 
 // ── Stripe-style metric card with line chart ──────────────────────────────────
@@ -82,7 +83,7 @@ function KpiChip({ label, value, sub, accent }: { label: string; value: string; 
   );
 }
 
-export function DashboardView({ tasks, categories }: DashboardViewProps) {
+export function DashboardView({ tasks, categories, expenses: expensesProp }: DashboardViewProps) {
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1;
@@ -91,6 +92,65 @@ export function DashboardView({ tasks, categories }: DashboardViewProps) {
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
 
   const MONTH_NAMES = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
+
+  const USD_RATE = 35;
+  const allExpenses = useMemo((): Expense[] => {
+    if (expensesProp && expensesProp.length > 0) return expensesProp;
+    try {
+      const raw = localStorage.getItem('modty_expenses');
+      return raw ? JSON.parse(raw) : (expensesProp || []);
+    } catch { return expensesProp || []; }
+  }, [expensesProp]);
+
+  const getExpenseDate = (e: Expense): string => {
+    return e.startDate || e.nextBillingDate || (e.createdAt ? e.createdAt.slice(0, 10) : '');
+  };
+
+  const getExpenseAmountTHB = (e: Expense): number => {
+    return (e.currency === 'USD' ? e.amount * USD_RATE : e.amount) || 0;
+  };
+
+  const calculateExpenseForMonth = (monthKey: string, expList: Expense[]) => {
+    let recurring = 0;
+    let oneTime = 0;
+    const oneTimeItems: Expense[] = [];
+    const recurringItems: Expense[] = [];
+
+    expList.forEach(e => {
+      const amtTHB = getExpenseAmountTHB(e);
+      if (e.billingCycle === 'one-time') {
+        const expMonth = getExpenseDate(e).slice(0, 7);
+        if (expMonth === monthKey) {
+          oneTime += amtTHB;
+          oneTimeItems.push(e);
+        }
+      } else if (e.billingCycle === 'monthly') {
+        if (!e.isActive) return;
+        const startMonth = (e.startDate || e.createdAt)?.slice(0, 7) || '2000-01';
+        const endMonth = e.endDate ? e.endDate.slice(0, 7) : '9999-12';
+        if (monthKey >= startMonth && monthKey <= endMonth) {
+          recurring += amtTHB;
+          recurringItems.push(e);
+        }
+      } else if (e.billingCycle === 'yearly') {
+        if (!e.isActive) return;
+        const startMonth = (e.startDate || e.createdAt)?.slice(0, 7) || '2000-01';
+        const endMonth = e.endDate ? e.endDate.slice(0, 7) : '9999-12';
+        if (monthKey >= startMonth && monthKey <= endMonth) {
+          recurring += amtTHB / 12;
+          recurringItems.push(e);
+        }
+      }
+    });
+
+    return {
+      total: recurring + oneTime,
+      recurring,
+      oneTime,
+      oneTimeItems,
+      recurringItems,
+    };
+  };
 
   const availableYears = useMemo(() => {
     const years = new Set<string>([String(currentYear)]);
@@ -110,8 +170,12 @@ export function DashboardView({ tasks, categories }: DashboardViewProps) {
         } catch (e) {}
       }
     });
+    allExpenses.forEach(e => {
+      const d = getExpenseDate(e);
+      if (d && d.length >= 4) years.add(d.slice(0, 4));
+    });
     return Array.from(years).sort((a, b) => b.localeCompare(a));
-  }, [tasks, currentYear]);
+  }, [tasks, allExpenses, currentYear]);
 
   const inPeriod = (dateStr?: string) => {
     if (!dateStr) return false;
@@ -202,54 +266,84 @@ export function DashboardView({ tasks, categories }: DashboardViewProps) {
     return { totalRevenue: tr, earnedRevenue: er, pendingRevenue: pr, totalProfit: tp, totalDevCost: tc };
   }, [tasks, selectedYear, selectedMonth]);
 
-  // ── Build monthly time-series (last 12 months) ──────────────────────────────
-  const { grossData, netData, customerData } = useMemo(() => {
-    // Generate last 12 month keys
-    const now = new Date();
+  // ── Build monthly time-series (last 12 months) — ใช้วันที่จ่ายจริง ──────────
+  const { grossData, netData, customerData, monthlyPaidData } = useMemo(() => {
+    const nowD = new Date();
     const keys: string[] = [];
     for (let i = 11; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const d = new Date(nowD.getFullYear(), nowD.getMonth() - i, 1);
       keys.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
     }
 
     const gross: Record<string, number> = {};
     const net: Record<string, number> = {};
+    const paid: Record<string, number> = {};
     const newCust: Record<string, Set<string>> = {};
-    const firstSeen: Record<string, string> = {}; // customer → first month
+    const firstSeen: Record<string, string> = {};
 
-    keys.forEach(k => { gross[k] = 0; net[k] = 0; newCust[k] = new Set(); });
+    keys.forEach(k => { gross[k] = 0; net[k] = 0; paid[k] = 0; newCust[k] = new Set(); });
 
     tasks.forEach(t => {
-      const d = t.startDate || t.endDate;
-      const key = d?.slice(0, 7);
-      if (!key || !gross.hasOwnProperty(key)) return;
-
       const price  = getTaskPrice(t);
       const profit = getTaskProfit(t);
 
-      gross[key] += price;
-      net[key]   += profit;
+      // Gross/Net: ใช้ startDate เป็น task date
+      const taskKey = (t.startDate || t.endDate)?.slice(0, 7);
+      if (taskKey && Object.prototype.hasOwnProperty.call(gross, taskKey)) {
+        gross[taskKey] += price;
+        net[taskKey]   += profit;
+      }
 
+      // Paid Revenue: ใช้ paidAt จาก payment phases เป็นหลัก
+      if (t.paymentPhases) {
+        try {
+          const phases = JSON.parse(t.paymentPhases);
+          if (Array.isArray(phases)) {
+            phases.forEach((p: any) => {
+              if (!p.paid) return;
+              const paidDateStr = p.paidAt || p.paidDate;
+              const paidKey = paidDateStr?.slice(0, 7);
+              if (paidKey && Object.prototype.hasOwnProperty.call(paid, paidKey)) {
+                paid[paidKey] += Number(p.amount || 0);
+              }
+            });
+          }
+        } catch {}
+      } else {
+        if (t.status === 'Done' || t.status === 'เสร็จสิ้น' || t.pipelineStage === 'won') {
+          const paidKey = (t.endDate || t.updatedAt)?.slice(0, 7);
+          if (paidKey && Object.prototype.hasOwnProperty.call(paid, paidKey)) {
+            paid[paidKey] += price;
+          }
+        }
+      }
+
+      // New Customers
       if (t.customer) {
-        if (!firstSeen[t.customer]) {
-          firstSeen[t.customer] = key;
-          newCust[key].add(t.customer);
+        const custKey = (t.startDate || t.endDate)?.slice(0, 7);
+        if (custKey) {
+          if (!firstSeen[t.customer]) {
+            firstSeen[t.customer] = custKey;
+            if (newCust[custKey]) newCust[custKey].add(t.customer);
+          }
         }
       }
     });
 
+    const MONTH_SHORT = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
     const label = (k: string) => {
-      const [, m] = k.split('-');
-      const names = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
-      return names[parseInt(m, 10) - 1] || m;
+      const [y, m] = k.split('-');
+      return `${MONTH_SHORT[parseInt(m, 10) - 1]} ${String(y).slice(2)}`;
     };
 
     return {
-      grossData:    keys.map(k => ({ month: label(k), gross: gross[k] })),
-      netData:      keys.map(k => ({ month: label(k), net:   net[k] })),
-      customerData: keys.map(k => ({ month: label(k), newCustomers: newCust[k].size })),
+      grossData:       keys.map(k => ({ month: label(k), gross: gross[k] })),
+      netData:         keys.map(k => ({ month: label(k), net:   net[k]   })),
+      customerData:    keys.map(k => ({ month: label(k), newCustomers: newCust[k].size })),
+      monthlyPaidData: keys.map(k => ({ month: label(k), paid: paid[k]  })),
     };
   }, [tasks]);
+
 
   const totalNewCustomers = useMemo(() => {
     const seen = new Set<string>();
@@ -361,6 +455,136 @@ export function DashboardView({ tasks, categories }: DashboardViewProps) {
 
   const thb = (v: number) => `฿${v.toLocaleString()}`;
 
+  // ── Expense data & period summaries ──────────────────────────────────────
+  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+
+  const periodExpenseSummary = useMemo(() => {
+    if (selectedYear !== 'all' && selectedMonth !== 'all') {
+      const targetKey = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+      const res = calculateExpenseForMonth(targetKey, allExpenses);
+      return {
+        ...res,
+        isSpecificMonth: true,
+        monthKey: targetKey,
+        title: `ค่าใช้จ่ายเดือน ${MONTH_NAMES[parseInt(selectedMonth, 10) - 1]} ${selectedYear}`,
+      };
+    } else if (selectedYear !== 'all' && selectedMonth === 'all') {
+      let total = 0;
+      let recurring = 0;
+      let oneTime = 0;
+      const oneTimeItems: Expense[] = [];
+      const recurringItems: Expense[] = [];
+
+      for (let m = 1; m <= 12; m++) {
+        const targetKey = `${selectedYear}-${String(m).padStart(2, '0')}`;
+        const res = calculateExpenseForMonth(targetKey, allExpenses);
+        total += res.total;
+        recurring += res.recurring;
+        oneTime += res.oneTime;
+        res.oneTimeItems.forEach(item => {
+          if (!oneTimeItems.some(x => x.id === item.id)) oneTimeItems.push(item);
+        });
+      }
+
+      return {
+        total,
+        recurring,
+        oneTime,
+        oneTimeItems,
+        recurringItems,
+        isSpecificMonth: false,
+        monthKey: selectedYear,
+        title: `ค่าใช้จ่ายทั้งปี ${selectedYear}`,
+      };
+    } else {
+      const res = calculateExpenseForMonth(currentMonthKey, allExpenses);
+      return {
+        ...res,
+        isSpecificMonth: true,
+        monthKey: currentMonthKey,
+        title: `ค่าใช้จ่ายเดือนนี้ (${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()})`,
+      };
+    }
+  }, [allExpenses, selectedYear, selectedMonth, currentMonthKey]);
+
+  const monthlyExpenseTotal = periodExpenseSummary.total;
+
+  // ── Current month income vs expense ──────────────────────────────────────
+  const currentMonthIncome = useMemo(() => {
+    let total = 0;
+    tasks.forEach(t => {
+      if (t.paymentPhases) {
+        try {
+          const phases = JSON.parse(t.paymentPhases);
+          if (Array.isArray(phases)) {
+            phases.forEach((p: any) => {
+              if (!p.paid) return;
+              const pd = (p.paidAt || p.paidDate || '')?.slice(0,7);
+              if (pd === currentMonthKey) total += Number(p.amount || 0);
+            });
+          }
+        } catch {}
+      } else if ((t.status === 'Done' || t.status === 'เสร็จสิ้น' || t.pipelineStage === 'won')) {
+        const key = (t.endDate || t.updatedAt || '')?.slice(0,7);
+        if (key === currentMonthKey) total += getTaskPrice(t);
+      }
+    });
+    return total;
+  }, [tasks, currentMonthKey]);
+
+  const currentPeriodRevenue = selectedYear === 'all' && selectedMonth === 'all' ? currentMonthIncome : earnedRevenue;
+  const periodNetProfit = currentPeriodRevenue - periodExpenseSummary.total;
+  const currentMonthNetProfit = currentMonthIncome - calculateExpenseForMonth(currentMonthKey, allExpenses).total;
+
+  // ── 12-month income vs expense chart ────────────────────────────────────
+  const incomeVsExpenseData = useMemo(() => {
+    const MONTH_SHORT = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+    const nowD = new Date();
+    const keys: string[] = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(nowD.getFullYear(), nowD.getMonth() - i, 1);
+      keys.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`);
+    }
+
+    const incomeMap: Record<string,number> = {};
+    keys.forEach(k => { incomeMap[k] = 0; });
+
+    tasks.forEach(t => {
+      if (t.paymentPhases) {
+        try {
+          const phases = JSON.parse(t.paymentPhases);
+          if (Array.isArray(phases)) {
+            phases.forEach((p: any) => {
+              if (!p.paid) return;
+              const k = (p.paidAt || p.paidDate || '')?.slice(0,7);
+              if (k && incomeMap.hasOwnProperty(k)) incomeMap[k] += Number(p.amount || 0);
+            });
+          }
+        } catch {}
+      } else if (t.status === 'Done' || t.status === 'เสร็จสิ้น' || t.pipelineStage === 'won') {
+        const k = (t.endDate || t.updatedAt || '')?.slice(0,7);
+        if (k && incomeMap.hasOwnProperty(k)) incomeMap[k] += getTaskPrice(t);
+      }
+    });
+
+    return keys.map(k => {
+      const [yr, mo] = k.split('-');
+      const income = incomeMap[k] || 0;
+      const expRes = calculateExpenseForMonth(k, allExpenses);
+      return {
+        month: `${MONTH_SHORT[parseInt(mo,10)-1]} ${String(yr).slice(2)}`,
+        monthKey: k,
+        income,
+        expense: Math.round(expRes.total),
+        recurringExpense: Math.round(expRes.recurring),
+        oneTimeExpense: Math.round(expRes.oneTime),
+        oneTimeCount: expRes.oneTimeItems.length,
+        net: Math.round(income - expRes.total),
+      };
+    });
+  }, [tasks, allExpenses]);
+
+
   return (
     <div className="flex-1 overflow-y-auto hide-scrollbar p-4 md:p-6">
       <div className="max-w-6xl w-full mx-auto space-y-6">
@@ -445,7 +669,7 @@ export function DashboardView({ tasks, categories }: DashboardViewProps) {
         </div>
 
         {/* Stripe-style metric line charts */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard
             label="Gross Volume"
             total={`฿${totalRevenue.toLocaleString()}`}
@@ -455,7 +679,7 @@ export function DashboardView({ tasks, categories }: DashboardViewProps) {
             formatter={thb}
           />
           <MetricCard
-            label="Net Volume (กำไรสุทธิ)"
+            label="Net Volume (กำไรก่อนหักค่าใช้จ่าย)"
             total={`฿${totalProfit.toLocaleString()}`}
             data={netData}
             dataKey="net"
@@ -463,22 +687,220 @@ export function DashboardView({ tasks, categories }: DashboardViewProps) {
             formatter={thb}
           />
           <MetricCard
-            label="New Customers"
-            total={`${totalNewCustomers} ราย`}
-            data={customerData}
-            dataKey="newCustomers"
-            color="#8b5cf6"
-            formatter={v => `${v} ราย`}
+            label={periodExpenseSummary.title}
+            total={`฿${Math.round(periodExpenseSummary.total).toLocaleString()}`}
+            data={incomeVsExpenseData}
+            dataKey="expense"
+            color="#f43f5e"
+            formatter={thb}
+          />
+          <MetricCard
+            label={selectedYear === 'all' && selectedMonth === 'all' ? 'กำไรสุทธิเดือนนี้ (หลังหักค่าใช้จ่าย)' : 'กำไรสุทธิรอบที่เลือก (หลังหักค่าใช้จ่าย)'}
+            total={`${periodNetProfit >= 0 ? '' : '-'}฿${Math.abs(Math.round(periodNetProfit)).toLocaleString()}`}
+            data={incomeVsExpenseData}
+            dataKey="net"
+            color={periodNetProfit >= 0 ? '#10b981' : '#f43f5e'}
+            formatter={thb}
           />
         </div>
 
         {/* KPI chips */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
           <KpiChip label="Closed Won"   value={`฿${closedWon.toLocaleString()}`}      sub={`ปิดดีลแล้ว ${closedWonCount} ดีล`} accent="border-emerald-500" />
           <KpiChip label="รับแล้ว"      value={`฿${earnedRevenue.toLocaleString()}`}  sub="งานเสร็จสิ้น"            accent="border-emerald-400" />
           <KpiChip label="ค้างรับ"      value={`฿${pendingRevenue.toLocaleString()}`} sub="ยังไม่เสร็จ"              accent="border-amber-400" />
-          <KpiChip label="ต้นทุน Dev"   value={`฿${totalDevCost.toLocaleString()}`}   sub="ค่าจ้าง Dev รวม"          accent="border-rose-400" />
+          <KpiChip
+            label="ค่าใช้จ่ายรอบนี้"
+            value={`฿${Math.round(periodExpenseSummary.total).toLocaleString()}`}
+            sub={`ประจำ ฿${Math.round(periodExpenseSummary.recurring).toLocaleString()} · รายครั้ง ฿${Math.round(periodExpenseSummary.oneTime).toLocaleString()}`}
+            accent="border-rose-400"
+          />
+          <KpiChip
+            label="กำไรสุทธิรอบนี้"
+            value={`${periodNetProfit >= 0 ? '+' : '-'}฿${Math.abs(Math.round(periodNetProfit)).toLocaleString()}`}
+            sub={periodNetProfit >= 0 ? '✅ มีกำไร' : '⚠️ ขาดทุน'}
+            accent={periodNetProfit >= 0 ? 'border-emerald-500' : 'border-rose-600'}
+          />
           <KpiChip label="งานทั้งหมด"   value={`${tasks.length}`}                     sub={`เสร็จ ${doneCount} งาน`} accent="border-indigo-400" />
+        </div>
+
+        {/* ── Income vs Expense vs Net Profit Chart ──────────────────────── */}
+        <div className="glass-card rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <div>
+              <h3 className="font-black text-sm text-slate-800">รายรับ vs ค่าใช้จ่าย vs กำไรสุทธิ (12 เดือนล่าสุด)</h3>
+              <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                สีเขียว = รายรับ · สีแดง = ค่าใช้จ่าย · เส้นน้ำเงิน = กำไรสุทธิ (ลบค่าใช้จ่ายแล้ว)
+              </p>
+            </div>
+            <div className="flex gap-3 flex-wrap">
+              <span className="flex items-center gap-1 text-[10px] font-semibold text-slate-500">
+                <span className="w-2.5 h-2.5 rounded-sm bg-emerald-400 inline-block"/>รายรับ
+              </span>
+              <span className="flex items-center gap-1 text-[10px] font-semibold text-slate-500">
+                <span className="w-2.5 h-2.5 rounded-sm bg-rose-400 inline-block"/>ค่าใช้จ่าย
+              </span>
+              <span className="flex items-center gap-1 text-[10px] font-semibold text-slate-500">
+                <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block"/>กำไรสุทธิ
+              </span>
+            </div>
+          </div>
+          <ResponsiveContainer width="100%" height={240}>
+            <BarChart data={incomeVsExpenseData} margin={{ left: 8, right: 8, top: 16, bottom: 0 }} barSize={12} barGap={3}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+              <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
+              <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={v => v >= 1000 ? `฿${(v/1000).toFixed(0)}k` : `฿${v}`} />
+              <Tooltip
+                contentStyle={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', fontSize: 11 }}
+                formatter={(value: number, name: string) => {
+                  const labels: Record<string, string> = { income: 'รายรับ', expense: 'ค่าใช้จ่ายรวม (ประจำ+รายครั้ง)', net: 'กำไรสุทธิ' };
+                  return [`฿${value.toLocaleString()}`, labels[name] ?? name];
+                }}
+              />
+              <Bar dataKey="income" fill="#34d399" radius={[4,4,0,0]} name="income" />
+              <Bar dataKey="expense" fill="#f87171" radius={[4,4,0,0]} name="expense" />
+              <Line type="monotone" dataKey="net" stroke="#6366f1" strokeWidth={2.5} dot={{ r: 3, fill: '#6366f1', strokeWidth: 0 }} activeDot={{ r: 5 }} name="net" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* ── Period Expense & One-Time Detail Breakdown ──────────────────── */}
+        <div className="glass-card rounded-2xl p-5 border border-white/60">
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
+            <div>
+              <h3 className="font-black text-sm text-slate-800 flex items-center gap-2">
+                <Receipt className="w-4 h-4 text-rose-500" />
+                รายละเอียดค่าใช้จ่ายรอบนี้ ({periodExpenseSummary.title})
+              </h3>
+              <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                รวมค่าใช้จ่ายประจำ (Subscriptions/Tools) และค่าใช้จ่ายรายครั้งที่เกิดขึ้นในรอบนี้
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-1 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-black">
+                รวมทั้งหมด ฿{Math.round(periodExpenseSummary.total).toLocaleString()}
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+            <div className="bg-slate-50/80 rounded-xl p-3 border border-slate-100 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] text-slate-400 font-bold uppercase">ค่าใช้จ่ายประจำ (Recurring)</p>
+                <p className="text-base font-black text-slate-800">฿{Math.round(periodExpenseSummary.recurring).toLocaleString()}</p>
+              </div>
+              <span className="text-[11px] font-semibold text-slate-500 bg-white px-2 py-1 rounded-lg border border-slate-200">
+                {periodExpenseSummary.recurringItems.length} รายการ
+              </span>
+            </div>
+            <div className="bg-rose-50/60 rounded-xl p-3 border border-rose-100 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] text-rose-600 font-bold uppercase">ค่าใช้จ่ายรายครั้ง (One-Time)</p>
+                <p className="text-base font-black text-rose-700">฿{Math.round(periodExpenseSummary.oneTime).toLocaleString()}</p>
+              </div>
+              <span className="text-[11px] font-bold text-rose-600 bg-white px-2 py-1 rounded-lg border border-rose-200">
+                {periodExpenseSummary.oneTimeItems.length} รายการ
+              </span>
+            </div>
+          </div>
+
+          {/* List of One-time expenses for this period */}
+          {periodExpenseSummary.oneTimeItems.length > 0 ? (
+            <div className="space-y-2">
+              <p className="text-[11px] font-bold text-slate-600">รายการค่าใช้จ่ายรายครั้งในรอบนี้:</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {periodExpenseSummary.oneTimeItems.map(item => {
+                  const amtTHB = getExpenseAmountTHB(item);
+                  return (
+                    <div key={item.id} className="bg-white/80 rounded-xl p-2.5 border border-slate-200 flex items-center justify-between shadow-xs">
+                      <div className="min-w-0 pr-2">
+                        <p className="text-xs font-bold text-slate-800 truncate">{item.name}</p>
+                        <p className="text-[10px] text-slate-400 truncate">
+                          {item.vendor || 'รายครั้ง'} · {getExpenseDate(item) || 'ไม่ระบุวันที่'}
+                        </p>
+                      </div>
+                      <span className="text-xs font-black text-rose-600 shrink-0">
+                        {item.currency === 'USD' ? `$${item.amount.toLocaleString()} ` : ''}฿{amtTHB.toLocaleString()}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <p className="text-xs text-slate-400 italic">ไม่มีค่าใช้จ่ายรายครั้งในรอบที่เลือก (มีเฉพาะค่าใช้จ่ายประจำ)</p>
+          )}
+        </div>
+
+        {/* ── Monthly Revenue Bar Chart ────────────────────────────────────── */}
+        <div className="glass-card rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="font-black text-sm text-slate-800">รายได้รายเดือน (12 เดือนล่าสุด)</h3>
+              <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                คำนวณจากวันที่รับเงินจริง (paidAt) · สีเขียว = รับแล้ว, สีม่วง = Gross ทั้งหมด
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <span className="flex items-center gap-1 text-[10px] font-semibold text-slate-500">
+                <span className="w-2.5 h-2.5 rounded-sm bg-emerald-400 inline-block"/>รับแล้ว
+              </span>
+              <span className="flex items-center gap-1 text-[10px] font-semibold text-slate-500">
+                <span className="w-2.5 h-2.5 rounded-sm bg-indigo-300 inline-block"/>Gross
+              </span>
+            </div>
+          </div>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart
+              data={monthlyPaidData.map((m, i) => ({ ...m, gross: grossData[i]?.gross ?? 0 }))}
+              margin={{ left: 8, right: 8, top: 16, bottom: 0 }}
+              barCategoryGap="28%"
+            >
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              <XAxis
+                dataKey="month"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: 9, fill: '#94a3b8', fontWeight: 600 }}
+              />
+              <YAxis
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: 9, fill: '#94a3b8' }}
+                tickFormatter={v => v >= 1000 ? `฿${(v / 1000).toFixed(0)}k` : v > 0 ? `฿${v}` : ''}
+              />
+              <Tooltip
+                formatter={(v: any, name: string) => [
+                  `฿${Number(v).toLocaleString('en-US', { minimumFractionDigits: 0 })}`,
+                  name === 'paid' ? 'รับแล้ว' : 'Gross รวม'
+                ]}
+                cursor={{ fill: 'rgba(99,102,241,0.06)' }}
+                contentStyle={{ borderRadius: '10px', fontSize: '11px', border: '1px solid #e2e8f0' }}
+              />
+              <Bar dataKey="gross" name="gross" fill="#a5b4fc" radius={[4, 4, 0, 0]} maxBarSize={28} />
+              <Bar dataKey="paid"  name="paid"  fill="#34d399" radius={[4, 4, 0, 0]} maxBarSize={28} />
+            </BarChart>
+          </ResponsiveContainer>
+          {/* Month summary row */}
+          <div className="mt-3 grid grid-cols-6 md:grid-cols-12 gap-1">
+            {monthlyPaidData.map((m, i) => {
+              const gross = grossData[i]?.gross ?? 0;
+              const isPeak = m.paid > 0 && m.paid === Math.max(...monthlyPaidData.map(x => x.paid));
+              return (
+                <div key={m.month} className={`text-center p-1 rounded-lg ${isPeak ? 'bg-emerald-50 ring-1 ring-emerald-300' : ''}`}>
+                  <p className="text-[9px] text-slate-400 font-semibold leading-none">{m.month}</p>
+                  <p className={`text-[10px] font-black leading-tight mt-0.5 ${m.paid > 0 ? 'text-emerald-600' : 'text-slate-300'}`}>
+                    {m.paid >= 1000 ? `฿${(m.paid / 1000).toFixed(0)}k` : m.paid > 0 ? `฿${m.paid}` : '-'}
+                  </p>
+                  {gross > 0 && gross !== m.paid && (
+                    <p className="text-[8px] text-indigo-300 font-semibold leading-none">
+                      {gross >= 1000 ? `฿${(gross / 1000).toFixed(0)}k` : `฿${gross}`}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* Status counts */}

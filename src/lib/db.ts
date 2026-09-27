@@ -4,7 +4,7 @@
  * และส่งข้อมูลแบบ Shadow write ไปที่ Google Sheets ด้วยในพื้นหลัง
  */
 import { supabase } from './supabase';
-import type { Task, Client, Template, Idea, ProjectCategory, ContentPlan } from '../types';
+import type { Task, Client, Template, Idea, ProjectCategory, ContentPlan, Expense } from '../types';
 import {
   saveTaskToSheet, deleteTaskFromSheet,
   saveClientToSheet, deleteClientFromSheet,
@@ -672,3 +672,193 @@ export function subscribeIssuedDocuments(cb: (docs: IssuedDocument[]) => void): 
     supabase.removeChannel(channel);
   };
 }
+
+// ── Expenses (Supabase) ───────────────────────────────────────────────────────
+
+function mapExpenseRow(r: any): Expense {
+  if (r.details) {
+    try {
+      const parsed = JSON.parse(r.details);
+      if (parsed && typeof parsed === 'object' && parsed.id) return parsed as Expense;
+    } catch {}
+  }
+  return {
+    id: r.id,
+    name: r.name || '',
+    category: r.category || 'other',
+    amount: Number(r.amount ?? r.price ?? 0),
+    currency: r.currency || 'THB',
+    billingCycle: r.billing_cycle || r.billingCycle || 'monthly',
+    nextBillingDate: r.next_billing_date || r.nextBillingDate || undefined,
+    startDate: r.start_date || r.startDate || undefined,
+    endDate: r.end_date || r.endDate || undefined,
+    vendor: r.vendor || undefined,
+    notes: r.notes || undefined,
+    isActive: r.is_active !== undefined ? Boolean(r.is_active) : (r.isActive !== undefined ? Boolean(r.isActive) : true),
+    createdAt: r.created_at || r.createdAt || new Date().toISOString(),
+    paymentMethod: r.payment_method || r.paymentMethod || undefined,
+    url: r.url || undefined,
+  };
+}
+
+export function subscribeExpenses(cb: (expenses: Expense[]) => void): Unsubscribe {
+  let activeChannel: any = null;
+  let disposed = false;
+
+  const mapFromTemplates = (data: any[]): Expense[] => {
+    return (data || [])
+      .filter((r: any) => r.id && r.id.startsWith('exp_') && r.details)
+      .map((r: any) => {
+        try {
+          return JSON.parse(r.details) as Expense;
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean) as Expense[];
+  };
+
+  // 1. Try native expenses table first
+  supabase.from('expenses').select('*').order('created_at', { ascending: false }).then(async ({ data, error }) => {
+    if (disposed) return;
+    if (!error && data) {
+      if (data.length === 0) {
+        // If native table is newly created and empty, migrate existing local/template expenses
+        try {
+          const { data: tData } = await supabase.from('templates').select('*').like('id', 'exp_%');
+          if (tData && tData.length > 0) {
+            const mapped = mapFromTemplates(tData);
+            cb(mapped);
+            for (const item of mapped) {
+              await saveExpense(item);
+            }
+          } else {
+            const local = JSON.parse(localStorage.getItem('modty_expenses') || '[]');
+            if (Array.isArray(local) && local.length > 0) {
+              cb(local);
+              for (const item of local) {
+                await saveExpense(item);
+              }
+            } else {
+              cb([]);
+            }
+          }
+        } catch {
+          cb([]);
+        }
+      } else {
+        cb(data.map(mapExpenseRow));
+      }
+
+      activeChannel = supabase.channel('expenses-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, async () => {
+          const { data: updated } = await supabase.from('expenses').select('*').order('created_at', { ascending: false });
+          if (updated && !disposed) cb(updated.map(mapExpenseRow));
+        })
+        .subscribe();
+    } else {
+      // 2. Fallback to templates table (guaranteed available in Supabase)
+      const { data: tData, error: tErr } = await supabase.from('templates').select('*').like('id', 'exp_%');
+      if (disposed) return;
+      if (!tErr && tData && tData.length > 0) {
+        cb(mapFromTemplates(tData));
+      } else {
+        // Fallback to localStorage if any
+        try {
+          const local = JSON.parse(localStorage.getItem('modty_expenses') || '[]');
+          if (Array.isArray(local) && local.length > 0) {
+            cb(local);
+            // Auto migrate local items to Supabase templates so cloud has them
+            local.forEach((e: Expense) => {
+              supabase.from('templates').upsert({
+                id: `exp_${e.id}`,
+                name: `Expense: ${e.name}`,
+                price: e.amount,
+                details: JSON.stringify(e),
+              }).catch(() => {});
+            });
+          }
+        } catch {}
+      }
+
+      activeChannel = supabase.channel('expenses-templates-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'templates' }, async () => {
+          const { data: updatedTemplates } = await supabase.from('templates').select('*').like('id', 'exp_%');
+          if (updatedTemplates && !disposed) cb(mapFromTemplates(updatedTemplates));
+        })
+        .subscribe();
+    }
+  });
+
+  return () => {
+    disposed = true;
+    if (activeChannel) {
+      supabase.removeChannel(activeChannel);
+    }
+  };
+}
+
+export async function saveExpense(expense: Expense): Promise<void> {
+  // 1. Immediate localStorage update for offline resilience
+  try {
+    const listStr = localStorage.getItem('modty_expenses') || '[]';
+    const list: Expense[] = JSON.parse(listStr);
+    const filtered = list.filter(e => e.id !== expense.id);
+    localStorage.setItem('modty_expenses', JSON.stringify([expense, ...filtered]));
+  } catch {}
+
+  // 2. Try native expenses table
+  try {
+    const { error: expErr } = await supabase.from('expenses').upsert({
+      id: expense.id,
+      name: expense.name,
+      category: expense.category,
+      amount: expense.amount,
+      currency: expense.currency,
+      billing_cycle: expense.billingCycle,
+      next_billing_date: expense.nextBillingDate || null,
+      start_date: expense.startDate || null,
+      end_date: expense.endDate || null,
+      vendor: expense.vendor || null,
+      notes: expense.notes || null,
+      is_active: expense.isActive,
+      created_at: expense.createdAt,
+      payment_method: expense.paymentMethod || null,
+      url: expense.url || null,
+    });
+    if (!expErr) return;
+  } catch {}
+
+  // 3. Fallback to templates table (pre-configured in Supabase)
+  const row = {
+    id: `exp_${expense.id}`,
+    name: `Expense: ${expense.name}`,
+    price: expense.amount,
+    details: JSON.stringify(expense),
+  };
+  const { error: tErr } = await supabase.from('templates').upsert(row);
+  if (tErr) throw tErr;
+}
+
+export async function deleteExpense(id: string): Promise<void> {
+  // 1. LocalStorage
+  try {
+    const listStr = localStorage.getItem('modty_expenses') || '[]';
+    const list: Expense[] = JSON.parse(listStr);
+    localStorage.setItem('modty_expenses', JSON.stringify(list.filter(e => e.id !== id)));
+  } catch {}
+
+  // 2. Try native expenses table
+  try {
+    await supabase.from('expenses').delete().eq('id', id);
+  } catch {}
+
+  // 3. Fallback to templates table
+  try {
+    const { error: tErr } = await supabase.from('templates').delete().eq('id', `exp_${id}`);
+    if (tErr) console.warn('[Supabase] deleteExpense from templates failed:', tErr);
+  } catch (err) {
+    console.warn('[Supabase] deleteExpense failed:', err);
+  }
+}
+

@@ -13,7 +13,38 @@ export type ViewType =
   | 'pipeline'
   | 'categories'
   | 'portfolio'
-  | 'content_plan';
+  | 'content_plan'
+  | 'expenses';
+
+export type ExpenseCategory =
+  | 'subscription'
+  | 'tools'
+  | 'freelance'
+  | 'ads'
+  | 'office'
+  | 'software'
+  | 'education'
+  | 'other';
+
+export type ExpenseBillingCycle = 'monthly' | 'yearly' | 'one-time';
+
+export interface Expense {
+  id: string;
+  name: string;
+  category: ExpenseCategory;
+  amount: number;
+  currency: 'THB' | 'USD';
+  billingCycle: ExpenseBillingCycle;
+  nextBillingDate?: string;
+  startDate?: string;
+  endDate?: string;
+  vendor?: string;
+  notes?: string;
+  isActive: boolean;
+  createdAt: string;
+  paymentMethod?: string;
+  url?: string;
+}
 
 export interface Task {
   id: string | number;

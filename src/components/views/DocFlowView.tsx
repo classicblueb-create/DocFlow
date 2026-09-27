@@ -91,6 +91,28 @@ function lsSet(key: string, val: unknown) {
  try { localStorage.setItem(key, JSON.stringify(val)); } catch { /* ignore */ }
 }
 
+// ─── PDF Blob Storage (≤1MB limit) ─────────────────────────────────────────
+const PDF_BLOB_PREFIX = 'df_pdf_';
+const MAX_PDF_BYTES = 1_048_576; // 1 MB
+
+function savePdfBlob(docId: string, dataUrl: string): boolean {
+ // base64 to bytes: length * 3/4
+ const approxBytes = Math.floor(dataUrl.length * 0.75);
+ if (approxBytes > MAX_PDF_BYTES) return false;
+ try {
+ localStorage.setItem(`${PDF_BLOB_PREFIX}${docId}`, dataUrl);
+ return true;
+ } catch { return false; }
+}
+
+function getPdfBlob(docId: string): string | null {
+ try { return localStorage.getItem(`${PDF_BLOB_PREFIX}${docId}`); } catch { return null; }
+}
+
+function deletePdfBlob(docId: string) {
+ try { localStorage.removeItem(`${PDF_BLOB_PREFIX}${docId}`); } catch { /* ignore */ }
+}
+
 const FONTS = [
  { label: 'Prompt (ทันสมัย)', value: "'Prompt', sans-serif" },
  { label: 'Sarabun (ทางการ)', value: "'Sarabun', sans-serif" },
@@ -157,6 +179,7 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  const [issuedDocs, setIssuedDocs] = useState<IssuedDocument[]>([]);
  const [showHistory, setShowHistory] = useState(false);
  const [historySearch, setHistorySearch] = useState('');
+ const [historyFilter, setHistoryFilter] = useState<'all' | 'quotation' | 'invoice' | 'receipt'>('all');
 
  // Subscribe to Cloud Doc Numbers Realtime Sync (across all devices)
  useEffect(() => {
@@ -386,7 +409,7 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  paper.style.boxShadow = 'none';
 
  const canvas = await html2canvas(paper, {
- scale: 2,
+ scale: 1.5,
  useCORS: true,
  logging: false,
  scrollY: 0,
@@ -407,17 +430,26 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  replacements.forEach(({ original, fake }) => { fake.remove(); original.style.display = ''; });
  hiddenEls.forEach(({ el, prev }) => { el.style.display = prev; });
 
- const imgData = canvas.toDataURL('image/png');
+ const imgData = canvas.toDataURL('image/jpeg', 0.85);
  const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
  const pw = pdf.internal.pageSize.getWidth();
  const ph = (canvas.height * pw) / canvas.width;
- pdf.addImage(imgData, 'PNG', 0, 0, pw, ph);
+ pdf.addImage(imgData, 'JPEG', 0, 0, pw, ph, undefined, 'FAST');
  pdf.save(`${DICT[lang].docTitles[docType]}_${docNo}.pdf`);
- showNotification(lang === 'th' ? 'ดาวน์โหลด PDF สำเร็จ' : 'PDF downloaded successfully');
+
+ // Save PDF blob to localStorage (≤1MB)
+ const docIdForBlob = `doc_${Date.now()}_${docNo.replace(/[^a-zA-Z0-9_-]/g, '')}`;
+ const pdfDataUrl = pdf.output('datauristring');
+ const saved = savePdfBlob(docIdForBlob, pdfDataUrl);
+ showNotification(
+ lang === 'th'
+ ? `ดาวน์โหลด PDF สำเร็จ${saved ? ' (บันทึกไว้ในประวัติแล้ว)' : ' (ไฟล์ใหญ่เกิน 1MB — ไม่บันทึกใน PDF viewer)'}`
+ : `PDF downloaded${saved ? ' (saved to history)' : ' (>1MB — not saved in viewer)'}`
+ );
 
  // Save complete document record to Supabase Database!
  const docRecord: IssuedDocument = {
-   id: `doc_${Date.now()}_${docNo.replace(/[^a-zA-Z0-9_-]/g, '')}`,
+   id: docIdForBlob,
    docNo,
    docType,
    lang,
@@ -596,7 +628,7 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
   }}>
  {/* Header */}
  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', borderBottom: '1px solid #e5e7eb', paddingBottom: '16px', gap: '20px' }}>
- <div style={{ flex: 1 }}>
+ <div style={{ flex: 1, minWidth: 0 }}>
  {logoUrl && (
  <div style={{ marginBottom: '10px' }}>
  <img src={logoUrl} alt="logo" style={{ maxHeight: '70px', objectFit: 'contain' }} crossOrigin="anonymous" />
@@ -607,10 +639,10 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  </div>
  <AutoTextarea value={issuerAddr} onChange={setIssuerAddr} placeholder="ที่อยู่" style={{ ...inputInPaper, fontSize: '12px', color: '#374151', display: 'block', lineHeight: '1.4' }} className={`${fieldCls} mt-0.5`} />
  <input value={issuerTax} onChange={e => setIssuerTax(e.target.value)} style={{ ...inputInPaper, fontSize: '12px', color: '#374151' }} className={`${fieldCls} mt-0.5`} placeholder="เลขประจำตัวผู้เสียภาษี" />
- <input value={issuerContact} onChange={e => setIssuerContact(e.target.value)} style={{ ...inputInPaper, fontSize: '12px', color: '#374151' }} className={`${fieldCls} mt-0.5`} placeholder="เบอร์โทร / อีเมล" />
+ <input value={issuerContact} onChange={e => setIssuerContact(e.target.value)} style={{ ...inputInPaper, fontSize: '11.5px', color: '#374151', whiteSpace: 'nowrap', minWidth: '100%' }} className={`${fieldCls} mt-0.5`} placeholder="เบอร์โทร / อีเมล" />
  </div>
 
- <div style={{ textAlign: 'right', minWidth: '240px' }}>
+ <div style={{ textAlign: 'right', minWidth: '220px', flexShrink: 0 }}>
  <div style={{ fontSize: '24px', fontWeight: 800, color: '#2563eb', fontFamily: font, lineHeight: '1.2' }}>
  <input value={d.docTitles[docType]} readOnly style={{ ...inputInPaper, textAlign: 'right', fontWeight: 800, fontSize: '24px', color: '#2563eb' }} />
  </div>
@@ -896,6 +928,164 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  <div className="p-4 bg-gray-50 flex justify-end gap-2 rounded-b-2xl border-t border-gray-100 sticky bottom-0">
  <button onClick={() => setShowSettings(false)} className="px-4 py-2 bg-gray-200 text-gray-700 hover:bg-gray-300 rounded-lg text-sm font-semibold transition">{d.ui_cancel}</button>
  <button onClick={saveSettings} className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg text-sm font-semibold transition">{d.ui_save}</button>
+ </div>
+ </div>
+ </div>
+ )}
+
+ {/* ─── History Modal ───────────────────────────────────────── */}
+ {showHistory && (
+ <div
+ className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center backdrop-blur-sm p-4"
+ onClick={e => e.target === e.currentTarget && setShowHistory(false)}
+ >
+ <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+ {/* Header */}
+ <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gradient-to-r from-indigo-50 to-purple-50 rounded-t-2xl sticky top-0">
+ <div className="flex items-center gap-2">
+ <History className="w-5 h-5 text-indigo-600" />
+ <div>
+ <h2 className="text-base font-bold text-gray-900">ประวัติเอกสาร</h2>
+ <p className="text-xs text-gray-400">{issuedDocs.length} รายการ · PDF ≤1MB จะดูได้ในระบบ</p>
+ </div>
+ </div>
+ <button onClick={() => setShowHistory(false)} className="text-gray-400 hover:text-gray-600 transition"><X className="w-5 h-5" /></button>
+ </div>
+
+ {/* Search + Filter */}
+ <div className="p-4 border-b border-gray-100 flex gap-2 flex-wrap">
+ <div className="relative flex-1 min-w-[160px]">
+ <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+ <input
+ value={historySearch}
+ onChange={e => setHistorySearch(e.target.value)}
+ placeholder="ค้นหาเลขที่ / ชื่อลูกค้า..."
+ className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-400"
+ />
+ </div>
+ {(['all', 'quotation', 'invoice', 'receipt'] as const).map(type => (
+ <button
+ key={type}
+ onClick={() => setHistoryFilter(type)}
+ className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition border ${
+ historyFilter === type
+ ? 'bg-indigo-600 text-white border-indigo-600'
+ : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300'
+ }`}
+ >
+ {type === 'all' ? 'ทั้งหมด' : type === 'quotation' ? 'ใบเสนอราคา' : type === 'invoice' ? 'ใบแจ้งหนี้' : 'ใบเสร็จ'}
+ </button>
+ ))}
+ </div>
+
+ {/* List */}
+ <div className="overflow-y-auto flex-1">
+ {(() => {
+ const filtered = issuedDocs
+ .filter(doc =>
+ (historyFilter === 'all' || doc.docType === historyFilter) &&
+ (historySearch === '' ||
+ doc.docNo.toLowerCase().includes(historySearch.toLowerCase()) ||
+ doc.customerName.toLowerCase().includes(historySearch.toLowerCase()))
+ )
+ .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+ if (filtered.length === 0) {
+ return (
+ <div className="flex flex-col items-center justify-center h-40 text-gray-400">
+ <FileText className="w-10 h-10 mb-2 opacity-30" />
+ <p className="text-sm font-semibold">ยังไม่มีเอกสาร</p>
+ </div>
+ );
+ }
+
+ return filtered.map(doc => {
+ const hasPdf = !!getPdfBlob(doc.id);
+ const typeLabel: Record<string, string> = { quotation: 'ใบเสนอราคา', invoice: 'ใบแจ้งหนี้', receipt: 'ใบเสร็จ' };
+ const typeColor: Record<string, string> = { quotation: 'bg-blue-100 text-blue-700', invoice: 'bg-amber-100 text-amber-700', receipt: 'bg-emerald-100 text-emerald-700' };
+ const dateStr = doc.createdAt ? new Date(doc.createdAt).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+
+ return (
+ <div key={doc.id} className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 hover:bg-indigo-50/40 transition group">
+ {/* Doc Type Badge */}
+ <span className={`shrink-0 px-2 py-0.5 rounded-md text-[10px] font-bold ${typeColor[doc.docType] || 'bg-gray-100 text-gray-600'}`}>
+ {typeLabel[doc.docType] || doc.docType}
+ </span>
+
+ {/* Info */}
+ <div className="flex-1 min-w-0">
+ <div className="flex items-center gap-2">
+ <span className="font-bold text-sm text-gray-900 truncate">{doc.docNo}</span>
+ {!hasPdf && <span className="text-[10px] text-orange-500 font-semibold shrink-0">⚠ ไม่มี PDF (&gt;1MB)</span>}
+ </div>
+ <p className="text-xs text-gray-500 truncate">{doc.customerName} · {dateStr}</p>
+ </div>
+
+ {/* Amount */}
+ <div className="shrink-0 text-right">
+ <p className="text-sm font-black text-gray-900">
+ {doc.currency === 'USD' ? '$' : '฿'}{doc.netTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+ </p>
+ </div>
+
+ {/* Actions */}
+ <div className="shrink-0 flex gap-1">
+ {hasPdf ? (
+ <>
+ <button
+ title="ดูเอกสาร"
+ onClick={() => {
+ const blob = getPdfBlob(doc.id);
+ if (!blob) return;
+ const win = window.open();
+ if (win) {
+ win.document.write(`<iframe width='100%' height='100%' style='border:none' src='${blob}'></iframe>`);
+ }
+ }}
+ className="p-1.5 rounded-lg bg-indigo-100 text-indigo-600 hover:bg-indigo-200 transition"
+ >
+ <Eye className="w-3.5 h-3.5" />
+ </button>
+ <button
+ title="ดาวน์โหลด PDF ซ้ำ"
+ onClick={() => {
+ const blob = getPdfBlob(doc.id);
+ if (!blob) return;
+ const a = document.createElement('a');
+ a.href = blob;
+ a.download = `${typeLabel[doc.docType]}_${doc.docNo}.pdf`;
+ a.click();
+ }}
+ className="p-1.5 rounded-lg bg-emerald-100 text-emerald-600 hover:bg-emerald-200 transition"
+ >
+ <Download className="w-3.5 h-3.5" />
+ </button>
+ </>
+ ) : (
+ <div className="w-16" />
+ )}
+ <button
+ title="ลบออกจากประวัติ"
+ onClick={() => {
+ if (!window.confirm(`ลบ ${doc.docNo} ออกจากประวัติ?`)) return;
+ deletePdfBlob(doc.id);
+ showNotification('ลบ PDF ออกจากประวัติแล้ว');
+ }}
+ className="p-1.5 rounded-lg text-gray-300 hover:bg-red-100 hover:text-red-500 transition"
+ >
+ <X className="w-3.5 h-3.5" />
+ </button>
+ </div>
+ </div>
+ );
+ });
+ })()}
+ </div>
+
+ {/* Footer */}
+ <div className="p-3 bg-gray-50 rounded-b-2xl border-t border-gray-100 flex justify-between items-center">
+ <p className="text-[10px] text-gray-400">PDF ถูกบันทึกใน Browser (localStorage) · ล้างได้ที่ปุ่มลบ</p>
+ <button onClick={() => setShowHistory(false)} className="px-4 py-1.5 bg-gray-200 text-gray-700 hover:bg-gray-300 rounded-lg text-xs font-semibold transition">ปิด</button>
  </div>
  </div>
  </div>
