@@ -1,12 +1,20 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import {
   BarChart, Bar, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart as RechartsPie, Pie, Cell, Area, AreaChart, RadialBarChart, RadialBar,
 } from 'recharts';
 import { Task, ProjectCategory, Expense } from '../../types';
-import { TrendingUp, CheckCircle, Clock, CalendarDays, Receipt, TrendingDown, DollarSign } from 'lucide-react';
+import { 
+  TrendingUp, CheckCircle, Clock, CalendarDays, Receipt, TrendingDown, DollarSign,
+  Palette, ChevronDown, ChevronUp, Sparkles, Layers
+} from 'lucide-react';
 import { cn, getTaskPrice, getTaskProfit } from '../../lib/utils';
+import { getTheme, setTheme, ThemeId, THEMES } from '../../lib/theme';
+import { SalesMonkThemeDashboard } from '../themes/SalesMonkThemeDashboard';
+import { SaddamThemeDashboard } from '../themes/SaddamThemeDashboard';
+import { WarmEditorialThemeDashboard } from '../themes/WarmEditorialThemeDashboard';
+import { DeiBentoThemeDashboard } from '../themes/DeiBentoThemeDashboard';
 
 interface DashboardViewProps {
   tasks: Task[];
@@ -84,6 +92,26 @@ function KpiChip({ label, value, sub, accent }: { label: string; value: string; 
 }
 
 export function DashboardView({ tasks, categories, expenses: expensesProp }: DashboardViewProps) {
+  const [activeTheme, setActiveTheme] = useState<ThemeId>(() => getTheme());
+  const [showDetailedLedger, setShowDetailedLedger] = useState(false);
+
+  useEffect(() => {
+    const handleThemeChange = (e: any) => {
+      if (e.detail) {
+        setActiveTheme(e.detail as ThemeId);
+      } else {
+        setActiveTheme(getTheme());
+      }
+    };
+    window.addEventListener('modty-theme-change', handleThemeChange);
+    return () => window.removeEventListener('modty-theme-change', handleThemeChange);
+  }, []);
+
+  const handleSelectTheme = (themeId: ThemeId) => {
+    setTheme(themeId);
+    setActiveTheme(themeId);
+  };
+
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1;
@@ -586,11 +614,93 @@ export function DashboardView({ tasks, categories, expenses: expensesProp }: Das
 
 
   return (
-    <div className="flex-1 overflow-y-auto hide-scrollbar p-4 md:p-6">
-      <div className="max-w-6xl w-full mx-auto space-y-6">
+    <div className="flex-1 overflow-y-auto hide-scrollbar p-3 md:p-6">
+      <div className="max-w-7xl w-full mx-auto space-y-6">
 
-        {/* Period Filter Bar */}
-        <div className="glass-card rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 border border-white/60 shadow-sm">
+        {/* ── Theme Switcher Bar ── */}
+        <div className="glass-card rounded-2xl p-3 md:p-4 flex flex-wrap items-center justify-between gap-3 border border-slate-200/80 shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-xs">
+              <Palette className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black text-slate-800 uppercase tracking-wider">ธีมตามภาพต้นแบบ</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/60">
+                  4 สไตล์ตรงตามภาพ
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 font-medium">สลับดูการจัดวาง สี และ HTML ที่แกะจากภาพทั้ง 4 ภาพได้ทันที</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100/80 rounded-xl overflow-x-auto hide-scrollbar">
+            {THEMES.map((th) => {
+              const isActive = activeTheme === th.id;
+              return (
+                <button
+                  key={th.id}
+                  onClick={() => handleSelectTheme(th.id)}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap',
+                    isActive
+                      ? 'bg-white text-slate-900 shadow-xs ring-1 ring-black/5'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+                  )}
+                >
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: th.colors.primary }} />
+                  <span>{th.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* ── Decoded Reference Layout Component ── */}
+        {activeTheme === 'salesmonk' && (
+          <SalesMonkThemeDashboard tasks={tasks} categories={categories} expenses={allExpenses} />
+        )}
+        {activeTheme === 'saddam' && (
+          <SaddamThemeDashboard tasks={tasks} categories={categories} expenses={allExpenses} />
+        )}
+        {activeTheme === 'editorial' && (
+          <WarmEditorialThemeDashboard tasks={tasks} categories={categories} expenses={allExpenses} />
+        )}
+        {activeTheme === 'dei' && (
+          <DeiBentoThemeDashboard tasks={tasks} categories={categories} expenses={allExpenses} />
+        )}
+
+        {/* ── Collapsible Detailed Accounting Ledger & Period Filter ── */}
+        <div className="pt-2">
+          <button
+            onClick={() => setShowDetailedLedger(!showDetailedLedger)}
+            className="flex items-center justify-between w-full p-4 rounded-2xl glass-card text-left transition-all hover:border-indigo-300 group cursor-pointer shadow-xs border border-slate-200/80"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-slate-100 group-hover:bg-indigo-50 text-slate-600 group-hover:text-indigo-600 flex items-center justify-center transition-colors">
+                <Receipt className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-slate-800">
+                  ตารางบัญชีละเอียด & สถิติย้อนหลัง (Detailed Accounting & Ledger Breakdown)
+                </p>
+                <p className="text-xs text-slate-400">
+                  {showDetailedLedger ? 'คลิกเพื่อซ่อน' : 'คลิกเพื่อเปิดดู'} ตัวกรองปี/เดือน, กราฟ Gross Sales, รายรับ-รายจ่ายรายเดือน และตารางสถานะงาน
+                </p>
+              </div>
+            </div>
+            {showDetailedLedger ? (
+              <ChevronUp className="w-5 h-5 text-slate-400 group-hover:text-slate-600" />
+            ) : (
+              <ChevronDown className="w-5 h-5 text-slate-400 group-hover:text-slate-600" />
+            )}
+          </button>
+
+          {showDetailedLedger && (
+            <div className="mt-6 space-y-6 animate-fade-in">
+
+              {/* Period Filter Bar */}
+              <div className="glass-card rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 border border-white/60 shadow-sm">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600 font-black">
               <CalendarDays className="w-4 h-4" />
@@ -1209,6 +1319,9 @@ export function DashboardView({ tasks, categories, expenses: expensesProp }: Das
             )}
           </div>
 
+        </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

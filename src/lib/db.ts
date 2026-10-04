@@ -770,12 +770,14 @@ export function subscribeExpenses(cb: (expenses: Expense[]) => void): Unsubscrib
             cb(local);
             // Auto migrate local items to Supabase templates so cloud has them
             local.forEach((e: Expense) => {
-              supabase.from('templates').upsert({
-                id: `exp_${e.id}`,
-                name: `Expense: ${e.name}`,
-                price: e.amount,
-                details: JSON.stringify(e),
-              }).catch(() => {});
+              Promise.resolve(
+                supabase.from('templates').upsert({
+                  id: `exp_${e.id}`,
+                  name: `Expense: ${e.name}`,
+                  price: e.amount,
+                  details: JSON.stringify(e),
+                })
+              ).catch(() => {});
             });
           }
         } catch {}

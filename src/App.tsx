@@ -648,6 +648,7 @@ export default function App() {
  }}
  isMobileOpen={isMobileOpen}
  setIsMobileOpen={setIsMobileOpen}
+ onOpenTheme={() => setIsThemeOpen(true)}
  />
 
  <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -661,6 +662,7 @@ export default function App() {
  categoryName={activeCategoryName}
  onBgUpload={handleBgUpload}
  onBgRemove={handleBgRemove}
+ onOpenTheme={() => setIsThemeOpen(true)}
  />
 
  <main className="flex-1 relative overflow-hidden flex flex-col">
