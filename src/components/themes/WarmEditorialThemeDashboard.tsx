@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { 
-  Bell, Settings, Star, Laptop, Video, Briefcase, 
-  Box, ChevronRight, CheckCircle, TrendingUp
+  Laptop, Video, Briefcase, Box, Star, 
+  Calendar as CalendarIcon, CheckCircle2, ArrowRight, User, TrendingUp, Sparkles, FolderKanban
 } from 'lucide-react';
 import { Task, ProjectCategory, Expense } from '../../types';
 
@@ -9,17 +9,50 @@ interface ThemeDashboardProps {
   tasks: Task[];
   categories: ProjectCategory[];
   expenses?: Expense[];
+  onOpenTaskModal?: () => void;
 }
 
 export function WarmEditorialThemeDashboard({ tasks, categories, expenses = [] }: ThemeDashboardProps) {
   const [selectedFilter, setSelectedFilter] = useState('All');
 
-  const filters = [
-    { id: 'All', label: 'All', icon: null },
-    { id: 'IT', label: 'IT & Software', icon: Laptop },
-    { id: 'Media', label: 'Media Training', icon: Video },
-    { id: 'Business', label: 'Business', icon: Briefcase },
-    { id: 'Interior', label: 'Interior', icon: Box },
+  const completedTasks = tasks.filter(t => t.status === 'Done' || t.status === 'เสร็จสิ้น' || t.status === 'done');
+  const inProgressTasks = tasks.filter(t => t.status === 'In Progress' || t.status === 'กำลังทำ' || t.status === 'in_progress');
+  const totalRevenue = completedTasks.reduce((sum, t) => sum + (Number(t.price) || 0), 0);
+  const totalExpenses = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+  const netProfit = totalRevenue - totalExpenses;
+
+  // Filter tasks by selected category
+  const filteredTasks = useMemo(() => {
+    if (selectedFilter === 'All') return tasks;
+    return tasks.filter(t => t.categoryId === selectedFilter);
+  }, [tasks, selectedFilter]);
+
+  const getCatName = (catId?: string) => {
+    return categories.find(c => c.id === catId)?.name || 'ทั่วไป';
+  };
+
+  // 4 Top Featured Projects to show in the 2x2 Sorbet Pastel Cards
+  const featuredProjects = useMemo(() => {
+    return filteredTasks.slice(0, 4);
+  }, [filteredTasks]);
+
+  // Monthly activity data for stacked bar chart
+  const activityData = [
+    { day: 'จ.', val1: 40, val2: 25, val3: 35 },
+    { day: 'อ.', val1: 65, val2: 20, val3: 15 },
+    { day: 'พ.', val1: 45, val2: 30, val3: 25 },
+    { day: 'พฤ.', val1: 80, val2: 15, val3: 5 },
+    { day: 'ศ.', val1: 70, val2: 20, val3: 10 },
+    { day: 'ส.', val1: 30, val2: 40, val3: 30 },
+    { day: 'อา.', val1: 20, val2: 30, val3: 50 },
+  ];
+
+  // 4 Color Palettes for the 2x2 cards (Peach, Apricot, Lavender, Pistachio)
+  const cardPalettes = [
+    { bg: 'bg-[#ffdac6]', border: 'border-[#fdba99]/60', tagBg: 'bg-white/80', tagText: 'text-[#9a3412]', fill: '#ea580c' },
+    { bg: 'bg-[#fed7aa]', border: 'border-[#fdba74]/60', tagBg: 'bg-white/80', tagText: 'text-[#9a3412]', fill: '#ea580c' },
+    { bg: 'bg-[#e9d5ff]', border: 'border-[#d8b4fe]/60', tagBg: 'bg-white/80', tagText: 'text-[#6b21a8]', fill: '#9333ea' },
+    { bg: 'bg-[#d1fae5]', border: 'border-[#a7f3d0]/60', tagBg: 'bg-white/80', tagText: 'text-[#065f46]', fill: '#059669' },
   ];
 
   return (
@@ -33,237 +66,186 @@ export function WarmEditorialThemeDashboard({ tasks, categories, expenses = [] }
           
           {/* Big Editorial Heading */}
           <div>
+            <span className="text-[11px] font-bold uppercase tracking-widest text-[#78716c] mb-1 block">
+              ModtyTasks Editorial Overview
+            </span>
             <h1 className="text-3xl md:text-5xl font-black text-[#1c1917] tracking-tight leading-tight">
-              Invest in your<br />education
+              สร้างสรรค์ผลงาน<br />และขยายธุรกิจของคุณ
             </h1>
           </div>
 
-          {/* Category Filter Pills (Black Capsule for Active) */}
+          {/* Category Filter Pills (Black Capsule for Active - Decoded from Image 3) */}
           <div className="flex items-center gap-2.5 overflow-x-auto hide-scrollbar pb-1">
-            {filters.map((f) => {
-              const isActive = selectedFilter === f.id;
-              const Icon = f.icon;
+            <button
+              onClick={() => setSelectedFilter('All')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                selectedFilter === 'All'
+                  ? 'bg-[#1c1917] text-[#faf6ee] shadow-sm'
+                  : 'bg-white/80 border border-[#ede5d8] text-[#57534e] hover:bg-white hover:text-[#1c1917]'
+              }`}
+            >
+              <span>ทั้งหมด ({tasks.length})</span>
+            </button>
+            {categories.slice(0, 5).map((cat) => {
+              const isActive = selectedFilter === cat.id || selectedFilter === cat.name;
               return (
                 <button
-                  key={f.id}
-                  onClick={() => setSelectedFilter(f.id)}
+                  key={cat.id}
+                  onClick={() => setSelectedFilter(cat.id)}
                   className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                     isActive
                       ? 'bg-[#1c1917] text-[#faf6ee] shadow-sm'
                       : 'bg-white/80 border border-[#ede5d8] text-[#57534e] hover:bg-white hover:text-[#1c1917]'
                   }`}
                 >
-                  {Icon && <Icon className="w-3.5 h-3.5" />}
-                  <span>{f.label}</span>
+                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: cat.color || '#f59e0b' }} />
+                  <span>{cat.name}</span>
                 </button>
               );
             })}
           </div>
 
-          {/* "Most popular" Header */}
-          <div className="flex items-center justify-between">
+          {/* Section Divider */}
+          <div className="flex items-center justify-between pt-2">
             <span className="text-xs font-bold text-[#78716c] uppercase tracking-wider">
-              Most popular
+              โครงการเด่น & งานสำคัญ (Featured Projects)
+            </span>
+            <span className="text-xs font-semibold text-[#a8a29e]">
+              แสดง {featuredProjects.length} จาก {filteredTasks.length} รายการ
             </span>
           </div>
 
           {/* ── 2x2 Rich Pastel Sorbet Cards (Decoded from Image 3) ── */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            
-            {/* Card 1: Peach Sorbet Card */}
-            <div className="rounded-3xl p-5 md:p-6 bg-[#ffdac6] border border-[#fdba99]/60 flex flex-col justify-between shadow-xs hover:shadow-md transition-all group">
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/70 text-[#9a3412] text-[10px] font-bold">
-                    <Laptop className="w-3 h-3" /> IT & Software
-                  </span>
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/70 text-[#9a3412] text-[10px] font-bold">
-                    <Star className="w-3 h-3 fill-[#ea580c] text-[#ea580c]" /> 4.8
-                  </span>
-                </div>
-                <h3 className="text-base md:text-lg font-black text-[#1c1917] leading-snug mt-4 mb-2">
-                  CCNA 2020 200-125 Video Boot Camp
-                </h3>
+            {featuredProjects.length === 0 ? (
+              <div className="col-span-2 py-12 text-center text-sm font-semibold text-[#78716c] bg-white/60 rounded-3xl border border-[#ede5d8]">
+                ยังไม่มีงานในหมวดหมู่นี้
               </div>
-              <div className="flex items-center justify-between pt-4 mt-2 border-t border-[#fdba99]/40">
-                <span className="text-xs font-semibold text-[#78716c]">9,530 students</span>
-                <div className="flex -space-x-1.5">
-                  <div className="w-6 h-6 rounded-full bg-slate-800 text-white flex items-center justify-center text-[9px] font-bold border-2 border-white">JD</div>
-                  <div className="w-6 h-6 rounded-full bg-amber-600 text-white flex items-center justify-center text-[9px] font-bold border-2 border-white">SM</div>
-                </div>
-              </div>
-            </div>
+            ) : (
+              featuredProjects.map((t, idx) => {
+                const p = cardPalettes[idx % cardPalettes.length];
+                const isWon = t.status === 'Done' || t.status === 'เสร็จสิ้น';
+                return (
+                  <div 
+                    key={t.id} 
+                    className={`rounded-3xl p-5 md:p-6 ${p.bg} border ${p.border} flex flex-col justify-between shadow-xs hover:shadow-md transition-all group min-h-[220px]`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full ${p.tagBg} ${p.tagText} text-[10px] font-bold truncate max-w-[140px]`}>
+                          <FolderKanban className="w-3 h-3 shrink-0" />
+                          <span className="truncate">{getCatName(t.categoryId)}</span>
+                        </span>
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full ${p.tagBg} ${p.tagText} text-[10px] font-bold`}>
+                          {t.status}
+                        </span>
+                      </div>
+                      <h3 className="text-base md:text-lg font-black text-[#1c1917] leading-snug mt-4 mb-2 line-clamp-2">
+                        {t.name}
+                      </h3>
+                      <p className="text-xs font-medium text-[#78716c] truncate">
+                        ลูกค้า: {t.customer || 'งานภายในองค์กร'}
+                      </p>
+                    </div>
 
-            {/* Card 2: Apricot Honey Card */}
-            <div className="rounded-3xl p-5 md:p-6 bg-[#fed7aa] border border-[#fdba74]/60 flex flex-col justify-between shadow-xs hover:shadow-md transition-all group">
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/70 text-[#9a3412] text-[10px] font-bold">
-                    <Briefcase className="w-3 h-3" /> Business
-                  </span>
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/70 text-[#9a3412] text-[10px] font-bold">
-                    <Star className="w-3 h-3 fill-[#ea580c] text-[#ea580c]" /> 4.9
-                  </span>
-                </div>
-                <h3 className="text-base md:text-lg font-black text-[#1c1917] leading-snug mt-4 mb-2">
-                  Powerful Business Writing: How to Write Concisely
-                </h3>
-              </div>
-              <div className="flex items-center justify-between pt-4 mt-2 border-t border-[#fdba74]/40">
-                <span className="text-xs font-semibold text-[#78716c]">1,463 students</span>
-                <div className="flex -space-x-1.5">
-                  <div className="w-6 h-6 rounded-full bg-emerald-800 text-white flex items-center justify-center text-[9px] font-bold border-2 border-white">MK</div>
-                  <div className="w-6 h-6 rounded-full bg-indigo-700 text-white flex items-center justify-center text-[9px] font-bold border-2 border-white">TH</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Card 3: Lavender Lilac Card */}
-            <div className="rounded-3xl p-5 md:p-6 bg-[#e9d5ff] border border-[#d8b4fe]/60 flex flex-col justify-between shadow-xs hover:shadow-md transition-all group">
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/70 text-[#6b21a8] text-[10px] font-bold">
-                    <Video className="w-3 h-3" /> Media Training
-                  </span>
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/70 text-[#6b21a8] text-[10px] font-bold">
-                    <Star className="w-3 h-3 fill-[#9333ea] text-[#9333ea]" /> 4.9
-                  </span>
-                </div>
-                <h3 className="text-base md:text-lg font-black text-[#1c1917] leading-snug mt-4 mb-2">
-                  Certified Six Sigma Yellow Belt Training
-                </h3>
-              </div>
-              <div className="flex items-center justify-between pt-4 mt-2 border-t border-[#d8b4fe]/40">
-                <span className="text-xs font-semibold text-[#78716c]">6,726 students</span>
-                <div className="flex -space-x-1.5">
-                  <div className="w-6 h-6 rounded-full bg-purple-800 text-white flex items-center justify-center text-[9px] font-bold border-2 border-white">AB</div>
-                  <div className="w-6 h-6 rounded-full bg-teal-700 text-white flex items-center justify-center text-[9px] font-bold border-2 border-white">PL</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Card 4: Pistachio Mint Card */}
-            <div className="rounded-3xl p-5 md:p-6 bg-[#d1fae5] border border-[#a7f3d0]/60 flex flex-col justify-between shadow-xs hover:shadow-md transition-all group">
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/70 text-[#065f46] text-[10px] font-bold">
-                    <Box className="w-3 h-3" /> Interior
-                  </span>
-                  <div className="flex items-center gap-1">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/70 text-[#065f46] text-[10px] font-bold">
-                      <Star className="w-3 h-3 fill-[#059669] text-[#059669]" /> 5.0
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 text-[9px] font-black">
-                      Top 10
-                    </span>
+                    <div className="flex items-center justify-between pt-4 mt-2 border-t border-black/10">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#78716c]">มูลค่างาน</span>
+                        <p className="text-sm font-black text-[#1c1917]">
+                          ฿{Number(t.price || 0).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] font-bold text-[#78716c]">กำหนดส่ง</span>
+                        <p className="text-xs font-bold text-[#1c1917]">
+                          {t.endDate || t.startDate || 'เร็วๆ นี้'}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <h3 className="text-base md:text-lg font-black text-[#1c1917] leading-snug mt-4 mb-2">
-                  How to Design a Room in 10 Easy Steps
-                </h3>
-              </div>
-              <div className="flex items-center justify-between pt-4 mt-2 border-t border-[#a7f3d0]/40">
-                <span className="text-xs font-semibold text-[#78716c]">8,735 students</span>
-                <div className="flex -space-x-1.5">
-                  <div className="w-6 h-6 rounded-full bg-emerald-800 text-white flex items-center justify-center text-[9px] font-bold border-2 border-white">RJ</div>
-                  <div className="w-6 h-6 rounded-full bg-rose-700 text-white flex items-center justify-center text-[9px] font-bold border-2 border-white">FD</div>
-                </div>
-              </div>
-            </div>
-
+                );
+              })
+            )}
           </div>
 
         </div>
 
-        {/* Right Column: Annette Black Profile & Stacked Activity Bar Chart (4 Cols) */}
-        <div className="lg:col-span-4 flex flex-col gap-5">
+        {/* Right Column: Profile & Multi-Color Stacked Bar Activity (4 Cols) */}
+        <div className="lg:col-span-4 flex flex-col gap-6">
           
-          <div className="rounded-3xl p-6 bg-[#fffdf8] border border-[#ede5d8] shadow-xs flex flex-col gap-5">
-            {/* Top Icons */}
-            <div className="flex items-center justify-between text-[#78716c]">
-              <button className="p-2 rounded-xl hover:bg-black/5 cursor-pointer">
-                <Bell className="w-4 h-4" />
-              </button>
-              <button className="p-2 rounded-xl hover:bg-black/5 cursor-pointer">
-                <Settings className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* User Profile */}
-            <div className="flex flex-col items-center text-center">
-              <div className="w-16 h-16 rounded-full bg-[#f3e8ff] p-1 border-2 border-[#c084fc] flex items-center justify-center mb-2">
-                <div className="w-full h-full rounded-full bg-[#1c1917] text-white flex items-center justify-center font-black text-lg">
-                  AB
-                </div>
+          {/* User Profile Card (Decoded from Annette Black card) */}
+          <div className="rounded-3xl p-6 bg-white border border-[#ede5d8] shadow-xs flex flex-col gap-5">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#fed7aa] to-[#ffdac6] border-2 border-[#1c1917] flex items-center justify-center text-2xl font-black text-[#1c1917] shadow-xs">
+                M
               </div>
-              <h2 className="text-lg font-black text-[#1c1917]">Annette Black</h2>
-            </div>
-
-            {/* 274 Friends Pill */}
-            <div className="flex items-center justify-between p-3 rounded-2xl bg-[#faf6ee] border border-[#ede5d8]">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-[#1c1917]">274 Friends</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="flex -space-x-1.5">
-                  <div className="w-5 h-5 rounded-full bg-slate-800 text-white text-[8px] flex items-center justify-center">1</div>
-                  <div className="w-5 h-5 rounded-full bg-amber-600 text-white text-[8px] flex items-center justify-center">2</div>
-                </div>
-                <ChevronRight className="w-3.5 h-3.5 text-[#a8a29e]" />
+              <div>
+                <h3 className="font-black text-lg text-[#1c1917]">Modty</h3>
+                <p className="text-xs font-semibold text-[#78716c]">DocFlow & ModtyTasks Lead</p>
               </div>
             </div>
 
-            {/* Activity Multi-colored Stacked Bar Chart */}
-            <div className="flex flex-col gap-2 pt-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-[#78716c]">Activity</span>
-                <span className="text-[11px] font-semibold text-[#a8a29e]">Year v</span>
+            {/* Quick Stat Pill Chips */}
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <div className="p-3 rounded-2xl bg-[#faf6ee] border border-[#ede5d8]">
+                <span className="text-[10px] font-bold text-[#78716c] uppercase">งานที่เสร็จแล้ว</span>
+                <p className="text-xl font-black text-[#1c1917] mt-0.5">{completedTasks.length} งาน</p>
               </div>
-              <div className="flex items-baseline gap-2 mb-2">
-                <span className="text-2xl font-black text-[#1c1917]">3.5h</span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#fef3c7] text-[#92400e]">
-                  👍 Great result!
-                </span>
+              <div className="p-3 rounded-2xl bg-[#faf6ee] border border-[#ede5d8]">
+                <span className="text-[10px] font-bold text-[#78716c] uppercase">กำไรสุทธิ</span>
+                <p className="text-xl font-black text-emerald-700 mt-0.5">฿{netProfit.toLocaleString()}</p>
+              </div>
+            </div>
+
+            {/* Stacked Activity Bar Chart (Multi-color bar chart) */}
+            <div className="pt-2">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-bold text-[#1c1917]">สถิติการส่งมอบงาน (Output Activity)</span>
+                <span className="text-[10px] font-bold text-[#78716c]">รายสัปดาห์</span>
               </div>
 
-              {/* Stacked Bars Mockup */}
-              <div className="flex items-end justify-between gap-1.5 h-24 pt-2 border-b border-[#ede5d8]">
-                {['Jan', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((m, idx) => {
-                  const isCurrent = m === 'Dec';
-                  return (
-                    <div key={m} className="flex flex-col items-center gap-1.5 flex-1">
-                      <div className="w-full flex flex-col gap-0.5 rounded-lg overflow-hidden">
-                        <div className="h-4 bg-[#fed7aa]" />
-                        <div className="h-3 bg-[#d1fae5]" />
-                        <div className="h-5 bg-[#e9d5ff]" />
-                      </div>
-                      <span className={`text-[10px] font-bold ${isCurrent ? 'bg-[#1c1917] text-white px-1.5 py-0.5 rounded-md' : 'text-[#a8a29e]'}`}>
-                        {m}
-                      </span>
+              {/* Multi-color stacked bars */}
+              <div className="flex items-end justify-between gap-2 h-32 pt-2 px-1 border-b border-[#ede5d8]">
+                {activityData.map((d, i) => (
+                  <div key={i} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
+                    <div className="w-full max-w-[18px] flex flex-col rounded-t-md overflow-hidden" style={{ height: `${d.val1 + d.val2}%` }}>
+                      {/* Top bar (Black) */}
+                      <div className="w-full bg-[#1c1917]" style={{ height: `${d.val1}%` }} />
+                      {/* Mid bar (Warm Apricot) */}
+                      <div className="w-full bg-[#fed7aa]" style={{ height: `${d.val2}%` }} />
+                      {/* Bottom bar (Pistachio) */}
+                      <div className="w-full bg-[#a7f3d0]" style={{ height: `${d.val3}%` }} />
                     </div>
-                  );
-                })}
+                    <span className="text-[9px] font-bold text-[#78716c]">{d.day}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Chart Legend */}
+              <div className="flex items-center justify-center gap-4 mt-3 text-[10px] font-bold text-[#78716c]">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#1c1917]" />
+                  <span>ส่งมอบแล้ว</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#fed7aa]" />
+                  <span>กำลังทำ</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#a7f3d0]" />
+                  <span>รอตรวจ</span>
+                </div>
               </div>
             </div>
 
-            {/* My Courses Section */}
-            <div className="flex flex-col gap-3 pt-2">
-              <span className="text-xs font-bold text-[#78716c]">My courses</span>
-              <div className="rounded-2xl p-3.5 bg-[#fef2f2] border border-[#fecaca] flex flex-col gap-1">
-                <div className="flex items-center justify-between text-[10px] font-bold text-[#991b1b]">
-                  <span>💻 IT & Software</span>
-                  <span>★ 4.8</span>
-                </div>
-                <h4 className="font-bold text-xs text-[#1c1917]">Flutter Masterclass (Dart, APIs, Firebase & More)</h4>
-                <span className="text-[10px] text-[#78716c]">9,530 students</span>
+            {/* Overall Revenue Callout */}
+            <div className="p-4 rounded-2xl bg-[#1c1917] text-[#faf6ee] flex items-center justify-between mt-2">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-[#a8a29e]">รายรับปิดการขายทั้งหมด</span>
+                <p className="text-xl font-black text-white mt-0.5">฿{totalRevenue.toLocaleString()}</p>
               </div>
-
-              <div className="rounded-2xl p-3.5 bg-[#fef3c7] border border-[#fde68a] flex flex-col gap-1">
-                <div className="flex items-center justify-between text-[10px] font-bold text-[#92400e]">
-                  <span>💼 Business</span>
-                  <span>★ 4.9</span>
-                </div>
-                <h4 className="font-bold text-xs text-[#1c1917]">Executive Strategy Masterclass</h4>
+              <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center text-amber-300">
+                <Sparkles className="w-4 h-4" />
               </div>
             </div>
 

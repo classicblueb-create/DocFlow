@@ -513,7 +513,14 @@ export default function App() {
  case 'calendar': return <CalendarView tasks={filteredTasks} onTaskClick={handleTaskClick} />;
 
  case 'dashboard':
- return <DashboardView tasks={filteredTasks} categories={categories} expenses={expenses} />;
+ return (
+   <DashboardView 
+     tasks={filteredTasks} 
+     categories={categories} 
+     expenses={expenses} 
+     onOpenTaskModal={() => { setEditingTask(null); setIsTaskModalOpen(true); }}
+   />
+ );
 
  case 'pipeline':
  return (

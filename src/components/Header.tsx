@@ -74,16 +74,16 @@ export function Header({
 
   return (
     <header
-      className="h-14 md:h-16 px-4 md:px-6 flex justify-between items-center shrink-0 z-10 app-header border-b border-white/20"
+      className="h-14 md:h-16 px-4 md:px-6 flex justify-between items-center shrink-0 z-10 app-header border-b border-[var(--header-border,#e2e8f0)]"
     >
       <div className="flex items-center gap-3">
         <button
-          className="md:hidden p-2 -ml-2 rounded-xl hover:bg-slate-100/30 text-slate-650 transition-colors"
+          className="md:hidden p-2 -ml-2 rounded-xl hover:bg-slate-100/30 text-slate-600 transition-colors"
           onClick={onMenuClick}
         >
           <Menu className="w-5 h-5" />
         </button>
-        <h2 className="text-base md:text-lg font-black text-slate-850 truncate max-w-[160px] md:max-w-none">
+        <h2 className="text-base md:text-lg font-black text-slate-800 app-header-title truncate max-w-[160px] md:max-w-none">
           {title}
         </h2>
         {isSyncing && (

@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { 
-  Play, Check, MoreHorizontal, Lock, Search, 
-  Sparkles, Clock, Calendar, Star, ChevronDown, CheckCircle
+  Sparkles, Clock, CheckCircle2, ChevronDown, 
+  Calendar, ArrowUpRight, Search, Plus, Filter, 
+  Layers, FolderKanban, ShieldCheck, Zap
 } from 'lucide-react';
 import { Task, ProjectCategory, Expense } from '../../types';
 
@@ -9,12 +10,35 @@ interface ThemeDashboardProps {
   tasks: Task[];
   categories: ProjectCategory[];
   expenses?: Expense[];
+  onOpenTaskModal?: () => void;
 }
 
-export function DeiBentoThemeDashboard({ tasks, categories, expenses = [] }: ThemeDashboardProps) {
+export function DeiBentoThemeDashboard({ tasks, categories, expenses = [], onOpenTaskModal }: ThemeDashboardProps) {
   const completedTasks = tasks.filter(t => t.status === 'Done' || t.status === 'เสร็จสิ้น' || t.status === 'done');
   const inProgressTasks = tasks.filter(t => t.status === 'In Progress' || t.status === 'กำลังทำ' || t.status === 'in_progress');
   const upcomingTasks = tasks.filter(t => t.status === 'To Do' || t.status === 'รอดำเนินการ' || t.status === 'todo');
+
+  const totalRevenue = completedTasks.reduce((sum, t) => sum + (Number(t.price) || 0), 0);
+  const totalExpenses = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+
+  // Top active projects
+  const activeProjects = useMemo(() => {
+    return tasks.slice(0, 3);
+  }, [tasks]);
+
+  // Featured hero project for the tilted card
+  const heroTask = tasks[0] || {
+    id: 'hero',
+    name: 'พัฒนาและส่งมอบระบบ ModtyTasks',
+    price: 45000,
+    status: 'In Progress',
+    customer: 'Enterprise Client',
+    endDate: '2026-10-15',
+  };
+
+  const getCatName = (catId?: string) => {
+    return categories.find(c => c.id === catId)?.name || 'โครงการ';
+  };
 
   return (
     <div className="w-full flex flex-col gap-5 animate-fade-in p-1 text-slate-900">
@@ -22,26 +46,30 @@ export function DeiBentoThemeDashboard({ tasks, categories, expenses = [] }: The
       {/* ── Top Obsidian Header (Decoded from Image 4) ── */}
       <div className="bg-[#000000] text-white px-5 py-3.5 rounded-2xl flex items-center justify-between shadow-xl border border-white/10">
         <div className="flex items-center gap-6">
-          <span className="text-xl font-black tracking-tight text-white">Dei</span>
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-black text-sm">
+              M
+            </div>
+            <span className="text-lg font-black tracking-tight text-white">ModtyTasks</span>
+          </div>
           <div className="hidden md:flex items-center gap-4 text-xs font-semibold text-slate-400">
             <span className="text-white flex items-center gap-1.5 font-bold cursor-pointer">
-              🎓 Learning Plan
+              ⚡ ภาพรวมงาน
             </span>
-            <span className="hover:text-white transition-colors cursor-pointer">👥 Community</span>
-            <span className="hover:text-white transition-colors cursor-pointer">⏱️ Schedule</span>
-            <span className="hover:text-white transition-colors cursor-pointer">🛡️ Compliance</span>
-            <span className="hover:text-white transition-colors cursor-pointer">▦ Workspace</span>
+            <span className="hover:text-white transition-colors cursor-pointer">📋 กระดานงาน</span>
+            <span className="hover:text-white transition-colors cursor-pointer">💰 ปิดการขาย</span>
+            <span className="hover:text-white transition-colors cursor-pointer">📊 ค่าใช้จ่าย</span>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/15 transition-all cursor-pointer">
             <div className="w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center text-[10px] font-bold">
-              ET
+              MO
             </div>
             <div className="hidden sm:block text-left text-[11px] leading-tight">
-              <p className="font-bold text-white">Ellington Thom</p>
-              <p className="text-[9px] text-slate-400">annette@gmail.com</p>
+              <p className="font-bold text-white">Modty Team</p>
+              <p className="text-[9px] text-slate-400">admin@modty.com</p>
             </div>
             <ChevronDown className="w-3 h-3 text-slate-400 ml-1" />
           </div>
@@ -55,216 +83,193 @@ export function DeiBentoThemeDashboard({ tasks, categories, expenses = [] }: The
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-              My Learning Plan ⏱️
+              ภาพรวมโครงการ & ไทม์ไลน์ ⏱️
             </h1>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Search Pill */}
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input 
-                type="text" 
-                placeholder="Search..." 
-                className="pl-8 pr-4 py-1.5 text-xs rounded-full bg-white border border-slate-200 text-slate-800 outline-none w-36 sm:w-44 shadow-2xs" 
-              />
+          {/* 3 Bento Stat Counters (Decoded from Image 4) */}
+          <div className="flex items-center gap-2 self-start md:self-auto overflow-x-auto hide-scrollbar">
+            <div className="px-3.5 py-1.5 rounded-xl bg-white border border-slate-200/80 shadow-2xs flex items-center gap-2 whitespace-nowrap">
+              <span className="text-xs font-black text-slate-900">{tasks.length}</span>
+              <span className="text-xs font-semibold text-slate-500">ทั้งหมด</span>
             </div>
-
-            {/* 3 Bento Counters (26 Total, 2 Completed, 23 Upcoming) */}
-            <div className="flex items-center gap-2">
-              <div className="px-3.5 py-1.5 rounded-xl bg-white border border-slate-200 text-center shadow-2xs">
-                <span className="text-base font-black text-slate-900 block leading-none">{tasks.length || 26}</span>
-                <span className="text-[9px] font-bold text-slate-400">Total</span>
-              </div>
-              
-              <div className="px-3.5 py-1.5 rounded-xl bg-[#d1fae5] border border-[#a7f3d0] text-center shadow-2xs">
-                <span className="text-base font-black text-[#065f46] block leading-none">{completedTasks.length || 2}</span>
-                <span className="text-[9px] font-bold text-[#065f46]">Completed 🎉</span>
-              </div>
-
-              <div className="px-3.5 py-1.5 rounded-xl bg-white border border-slate-200 text-center shadow-2xs">
-                <span className="text-base font-black text-slate-900 block leading-none">{upcomingTasks.length || 23}</span>
-                <span className="text-[9px] font-bold text-slate-400">Upcoming</span>
-              </div>
+            <div className="px-3.5 py-1.5 rounded-xl bg-white border border-slate-200/80 shadow-2xs flex items-center gap-2 whitespace-nowrap">
+              <span className="text-xs font-black text-emerald-600">{completedTasks.length}</span>
+              <span className="text-xs font-semibold text-slate-500">เสร็จแล้ว 🎉</span>
+            </div>
+            <div className="px-3.5 py-1.5 rounded-xl bg-white border border-slate-200/80 shadow-2xs flex items-center gap-2 whitespace-nowrap">
+              <span className="text-xs font-black text-indigo-600">{inProgressTasks.length}</span>
+              <span className="text-xs font-semibold text-slate-500">กำลังทำ ⏱️</span>
             </div>
           </div>
         </div>
 
-        {/* ── Main Layout: Tree Grid & Right Events Column ── */}
+        {/* ── Bento Grid: Left Main Section (8 Cols) + Right Events (4 Cols) ── */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
-          {/* Left Column: Learning Nodes Tree (8 Cols) */}
-          <div className="lg:col-span-8 flex flex-col gap-5">
+          {/* Left Column (8 Cols): Hero Tilted Card + Active Tasks Bento */}
+          <div className="lg:col-span-8 flex flex-col gap-6">
             
-            {/* Node 1: Medical Terminology */}
-            <div className="rounded-2xl bg-white p-5 border border-slate-200/90 shadow-2xs flex items-start justify-between group hover:shadow-md transition-all">
-              <div className="space-y-1.5 max-w-md">
-                <h3 className="font-black text-base text-slate-900">Medical Terminology</h3>
-                <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                  Learn basic medical language for effective communication across departments.
-                </p>
-                <div className="pt-2">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#d1fae5] text-[#065f46] text-xs font-bold border border-[#a7f3d0]">
-                    Completed 🌿
+            {/* Hero Card with Tilted Media Card Visual (Decoded from Image 4) */}
+            <div className="rounded-3xl p-6 md:p-8 bg-gradient-to-br from-[#18181b] to-[#27272a] text-white shadow-xl relative overflow-hidden flex flex-col md:flex-row justify-between gap-6">
+              
+              {/* Left Content */}
+              <div className="flex flex-col justify-between max-w-sm z-10">
+                <div>
+                  <span className="px-3 py-1 rounded-full bg-white/10 text-white text-[10px] font-bold uppercase tracking-wider inline-block mb-3">
+                    🚀 โครงการสำคัญ (Primary Milestone)
+                  </span>
+                  <h2 className="text-xl md:text-2xl font-black text-white leading-tight">
+                    {heroTask.name}
+                  </h2>
+                  <p className="text-xs text-slate-300 mt-2 font-medium">
+                    ลูกค้า: {heroTask.customer || 'งานหลักองค์กร'}
+                  </p>
+                </div>
+
+                <div className="mt-6 flex items-center gap-4">
+                  <div className="flex items-center gap-2 text-xs font-bold text-white bg-white/15 px-3 py-1.5 rounded-xl">
+                    <Clock className="w-3.5 h-3.5 text-indigo-300" />
+                    <span>กำหนดส่ง: {heroTask.endDate || 'เร็วๆ นี้'}</span>
+                  </div>
+                  <span className="text-sm font-black text-emerald-400">
+                    ฿{Number(heroTask.price || 0).toLocaleString()}
                   </span>
                 </div>
               </div>
 
-              <div className="flex items-center gap-1.5">
-                <button className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700">
-                  <MoreHorizontal className="w-4 h-4" />
-                </button>
-                <div className="w-7 h-7 rounded-full bg-[#18181b] text-white flex items-center justify-center">
-                  <Check className="w-4 h-4 stroke-[3]" />
-                </div>
-              </div>
-            </div>
-
-            {/* Node 2: Floating Tilted Purple Media Card (Pharmacology Basics) */}
-            <div className="rounded-3xl p-6 bg-[#f3e8ff] border border-[#e9d5ff] shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-5 transform -rotate-1 hover:rotate-0 transition-transform duration-200">
-              <div className="space-y-2 max-w-sm">
-                <span className="text-[10px] font-black text-purple-700 uppercase tracking-widest">
-                  Featured Module
-                </span>
-                <h3 className="font-black text-lg text-slate-900 leading-tight">
-                  Pharmacology Basics
-                </h3>
-                <p className="text-xs text-slate-600 font-medium leading-relaxed">
-                  Learn basic medical language for effective communication and clinical operations.
-                </p>
-                <div className="flex items-center gap-3 pt-2">
-                  <span className="px-3 py-1 rounded-full bg-white text-purple-900 text-xs font-bold shadow-2xs">
-                    ⏱️ Watching 00:30
-                  </span>
-                  <div className="flex -space-x-1.5">
-                    <div className="w-6 h-6 rounded-full bg-purple-700 text-white text-[8px] flex items-center justify-center font-bold border-2 border-white">JD</div>
-                    <div className="w-6 h-6 rounded-full bg-emerald-600 text-white text-[8px] flex items-center justify-center font-bold border-2 border-white">SM</div>
-                    <div className="w-6 h-6 rounded-full bg-amber-500 text-white text-[8px] flex items-center justify-center font-bold border-2 border-white">AB</div>
+              {/* Right Floating Tilted Violet Card (Decoded 3D tilt effect) */}
+              <div className="relative flex items-center justify-center min-w-[200px]">
+                <div 
+                  className="w-48 h-40 rounded-2xl bg-gradient-to-br from-[#c084fc] via-[#a855f7] to-[#7c3aed] p-4 text-white shadow-2xl transform rotate-6 hover:rotate-2 transition-transform duration-300 border-2 border-white/20 flex flex-col justify-between"
+                  style={{ transform: 'perspective(600px) rotateY(-8deg) rotateZ(5deg)' }}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-xs font-black">
+                      ⚡
+                    </span>
+                    <span className="text-[10px] font-bold bg-white/20 px-2 py-0.5 rounded-full">
+                      Priority High
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold text-purple-100 uppercase">ยอดปิดการขาย</span>
+                    <p className="text-xl font-black text-white">฿{totalRevenue.toLocaleString()}</p>
+                    <div className="w-full bg-white/20 h-1.5 rounded-full mt-2 overflow-hidden">
+                      <div className="bg-white h-full rounded-full" style={{ width: '75%' }} />
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Big Play Button Circle */}
-              <div className="w-16 h-16 rounded-full bg-white text-[#9333ea] flex items-center justify-center shadow-lg hover:scale-105 transition-all cursor-pointer self-center">
-                <Play className="w-7 h-7 fill-[#9333ea] ml-1" />
-              </div>
             </div>
 
-            {/* Node 3: Anatomy and Physiology */}
-            <div className="rounded-2xl bg-white p-5 border border-slate-200/90 shadow-2xs flex items-start justify-between group hover:shadow-md transition-all">
-              <div className="space-y-1.5 max-w-md">
-                <h3 className="font-black text-base text-slate-900">Anatomy and Physiology</h3>
-                <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                  Understand the structure and function of the human body and bio-systems.
-                </p>
-                <div className="pt-2">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#d1fae5] text-[#065f46] text-xs font-bold border border-[#a7f3d0]">
-                    Completed 🌿
-                  </span>
-                </div>
-              </div>
+            {/* Active Projects Bento List */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {activeProjects.map((t, idx) => {
+                const isDone = t.status === 'Done' || t.status === 'เสร็จสิ้น';
+                return (
+                  <div key={t.id} className="rounded-2xl p-5 bg-white border border-slate-200/90 shadow-2xs flex flex-col justify-between hover:shadow-md transition-all">
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                          {getCatName(t.categoryId)}
+                        </span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                          isDone ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-indigo-50 text-indigo-600 border-indigo-100'
+                        }`}>
+                          {t.status}
+                        </span>
+                      </div>
+                      <h3 className="font-black text-sm text-slate-800 line-clamp-1">{t.name}</h3>
+                      <p className="text-[11px] text-slate-400 mt-1">ลูกค้า: {t.customer || 'ทั่วไป'}</p>
+                    </div>
 
-              <div className="flex items-center gap-1.5">
-                <button className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700">
-                  <MoreHorizontal className="w-4 h-4" />
-                </button>
-                <div className="w-7 h-7 rounded-full bg-[#18181b] text-white flex items-center justify-center">
-                  <Check className="w-4 h-4 stroke-[3]" />
-                </div>
-              </div>
-            </div>
-
-            {/* Node 4: Medical Ethics and Professionalism */}
-            <div className="rounded-2xl bg-white p-5 border border-slate-200/90 shadow-2xs flex items-start justify-between group hover:shadow-md transition-all opacity-85">
-              <div className="space-y-1.5 max-w-md">
-                <h3 className="font-black text-base text-slate-900">Medical Ethics and Professionalism</h3>
-                <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                  Understand ethical principles and professionalism in modern healthcare.
-                </p>
-                <div className="pt-2">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-bold border border-slate-200">
-                    Upcoming ⏱️
-                  </span>
-                </div>
-              </div>
-
-              <div className="w-7 h-7 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center">
-                <Lock className="w-4 h-4" />
-              </div>
+                    <div className="pt-4 mt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                      <span className="font-bold text-slate-900">฿{Number(t.price || 0).toLocaleString()}</span>
+                      <span className="text-[10px] font-semibold text-slate-400">{t.endDate || 'ไม่มีกำหนด'}</span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
           </div>
 
-          {/* Right Column: "My Events 🧐" (4 Cols) */}
+          {/* Right Column (4 Cols): "My Events 🧐" Card List */}
           <div className="lg:col-span-4 flex flex-col gap-4">
-            <h2 className="text-xl font-black text-slate-900 tracking-tight">
-              My Events 🧐
-            </h2>
+            
+            <div className="rounded-3xl p-6 bg-white border border-slate-200/90 shadow-2xs flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-black text-base text-slate-900 flex items-center gap-1.5">
+                  กิจกรรมและกำหนดส่ง 🧐
+                </h3>
+                <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
+                  Upcoming
+                </span>
+              </div>
 
-            {/* Event 1: Webinar (Cyan Card) */}
-            <div className="rounded-2xl p-4 bg-[#e0f7fa] border border-[#b2ebf2] flex flex-col gap-2 shadow-2xs">
-              <div className="flex items-center justify-between text-xs font-bold text-[#006064]">
-                <div className="flex items-center gap-2">
-                  <div className="w-5 h-5 rounded-full bg-[#00838f] text-white text-[9px] flex items-center justify-center font-bold">W</div>
-                  <span>Webinar</span>
-                </div>
-                <span>Tu, 25.03</span>
-              </div>
-              <p className="text-xs text-[#004d40] font-semibold leading-relaxed">
-                Understanding medical research, critical appraisal skills, and evidence-based guidelines in practice.
-              </p>
-              <div className="pt-2 text-[10px] font-bold text-[#00838f]">
-                ⏱️ Start at 12:30
-              </div>
-            </div>
+              {/* Event Cards */}
+              <div className="flex flex-col gap-3">
+                {tasks.slice(0, 4).map((t, i) => {
+                  const colors = [
+                    'bg-[#ede9fe] border-[#ddd6fe] text-[#6b21a8]',
+                    'bg-[#fed7aa] border-[#fdba74] text-[#9a3412]',
+                    'bg-[#dcfce7] border-[#bbf7d0] text-[#166534]',
+                    'bg-[#dbeafe] border-[#bfdbfe] text-[#1e40af]',
+                  ];
+                  const c = colors[i % colors.length];
 
-            {/* Event 2: Lesson (Lilac Card) */}
-            <div className="rounded-2xl p-4 bg-[#f3e8ff] border border-[#e9d5ff] flex flex-col gap-2 shadow-2xs">
-              <div className="flex items-center justify-between text-xs font-bold text-[#6b21a8]">
-                <span>📊 Lesson</span>
-                <span>We, 26.03</span>
+                  return (
+                    <div key={t.id} className={`rounded-2xl p-4 border ${c} flex flex-col gap-2 transition-all hover:scale-[1.01]`}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase tracking-wider">
+                          📅 {t.endDate || t.startDate || 'สัปดาห์นี้'}
+                        </span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/70">
+                          {t.status}
+                        </span>
+                      </div>
+                      <h4 className="font-black text-xs text-slate-900 line-clamp-1">{t.name}</h4>
+                      <p className="text-[10px] font-medium opacity-80">มูลค่างาน: ฿{Number(t.price || 0).toLocaleString()}</p>
+                    </div>
+                  );
+                })}
               </div>
-              <p className="text-xs text-[#581c87] font-semibold leading-relaxed">
-                Overview of healthcare delivery systems, health policy, and their impact on patient care.
-              </p>
-            </div>
-
-            {/* Event 3: Task (Butter Yellow Card) */}
-            <div className="rounded-2xl p-4 bg-[#fef9c3] border border-[#fef08a] flex flex-col gap-2 shadow-2xs">
-              <div className="flex items-center justify-between text-xs font-bold text-[#854d0e]">
-                <span>⭐ Task</span>
-                <span>Th, 27.03</span>
-              </div>
-              <p className="text-xs text-[#713f12] font-semibold leading-relaxed">
-                Examination of major global health issues, infectious diseases, and healthcare disparities.
-              </p>
-            </div>
-
-            {/* Floating Mint Sticky Note at Bottom */}
-            <div className="rounded-2xl p-4 bg-[#dcfce7] border border-[#bbf7d0] shadow-lg flex flex-col gap-2 transform rotate-1 mt-2">
-              <div className="flex items-center justify-between text-xs font-bold text-[#166534]">
-                <span>📌 Priority Note</span>
-                <span>Fr, 28.03</span>
-              </div>
-              <p className="text-xs text-[#14532d] font-semibold leading-relaxed">
-                Importance of teamwork and communication among healthcare professionals for optimal patient outcomes.
-              </p>
             </div>
 
           </div>
 
         </div>
 
-        {/* ── Floating Bottom Tool Dock (Decoded from Image 4) ── */}
-        <div className="flex justify-center mt-3">
-          <div className="bg-[#18181b] text-white px-4 py-2.5 rounded-full shadow-2xl flex items-center gap-2.5 border border-white/20">
-            <button className="w-7 h-7 rounded-full bg-white text-black font-black text-xs flex items-center justify-center hover:scale-105 transition-all">T</button>
-            <button className="w-7 h-7 rounded-full bg-[#38bdf8] text-black font-black text-xs flex items-center justify-center hover:scale-105 transition-all">A</button>
-            <button className="w-7 h-7 rounded-full bg-[#f472b6] text-black font-black text-xs flex items-center justify-center hover:scale-105 transition-all">📝</button>
-            <button className="w-7 h-7 rounded-full bg-[#facc15] text-black font-black text-xs flex items-center justify-center hover:scale-105 transition-all">📋</button>
-            <button className="w-7 h-7 rounded-full bg-[#c084fc] text-black font-black text-xs flex items-center justify-center hover:scale-105 transition-all">💬</button>
-            <button className="w-7 h-7 rounded-full bg-[#4ade80] text-black font-black text-xs flex items-center justify-center hover:scale-105 transition-all">😊</button>
-            <button className="w-7 h-7 rounded-full bg-white/20 text-white font-black text-xs flex items-center justify-center hover:bg-white/30 transition-all">+</button>
+        {/* ── Floating Tool Dock Capsule (Decoded from Image 4) ── */}
+        <div className="sticky bottom-2 mx-auto px-4 py-2 rounded-full bg-white/95 backdrop-blur-md border border-slate-200/80 shadow-lg flex items-center gap-3 z-20">
+          <button 
+            onClick={() => {
+              if (onOpenTaskModal) onOpenTaskModal();
+              else {
+                const btn = document.querySelector('button[title*="สร้าง"]') as HTMLButtonElement;
+                if (btn) btn.click();
+              }
+            }}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-900 text-white text-xs font-bold hover:bg-black shadow-xs cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>สร้างงานใหม่</span>
+          </button>
+          
+          <div className="h-4 w-px bg-slate-200" />
+          
+          <div className="flex items-center gap-2">
+            <span className="w-7 h-7 rounded-full bg-[#f43f5e] text-white flex items-center justify-center text-xs font-bold shadow-xs cursor-pointer hover:scale-105 transition-transform" title="งานด่วน">
+              🔥
+            </span>
+            <span className="w-7 h-7 rounded-full bg-[#8b5cf6] text-white flex items-center justify-center text-xs font-bold shadow-xs cursor-pointer hover:scale-105 transition-transform" title="สรุปบัญชี">
+              💎
+            </span>
+            <span className="w-7 h-7 rounded-full bg-[#10b981] text-white flex items-center justify-center text-xs font-bold shadow-xs cursor-pointer hover:scale-105 transition-transform" title="ปิดดีลแล้ว">
+              🎉
+            </span>
           </div>
         </div>
 

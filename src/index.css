@@ -283,6 +283,42 @@ input, select, textarea {
   color: #10b981 !important;
 }
 
+/* Header theme overrides */
+[data-theme="dei"] .app-header {
+  background-color: #000000 !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #ffffff !important;
+}
+[data-theme="dei"] .app-header .app-header-title {
+  color: #ffffff !important;
+}
+[data-theme="dei"] .app-header .glass-input {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
+}
+[data-theme="dei"] .app-header .glass-input::placeholder {
+  color: #94a3b8 !important;
+}
+
+[data-theme="editorial"] .app-header {
+  background-color: #faf6ee !important;
+  border-color: #ede5d8 !important;
+}
+[data-theme="editorial"] .app-header .app-header-title {
+  color: #1c1917 !important;
+}
+
+[data-theme="saddam"] .app-header {
+  background-color: #f1f4f8 !important;
+  border-color: #e2e8f0 !important;
+}
+
+[data-theme="salesmonk"] .app-header {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+}
+
 /* Nav Item styling */
 .app-nav-item {
   border-radius: var(--btn-radius);

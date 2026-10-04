@@ -20,6 +20,7 @@ interface DashboardViewProps {
   tasks: Task[];
   categories: ProjectCategory[];
   expenses?: Expense[];
+  onOpenTaskModal?: () => void;
 }
 
 // ── Stripe-style metric card with line chart ──────────────────────────────────
@@ -91,7 +92,7 @@ function KpiChip({ label, value, sub, accent }: { label: string; value: string; 
   );
 }
 
-export function DashboardView({ tasks, categories, expenses: expensesProp }: DashboardViewProps) {
+export function DashboardView({ tasks, categories, expenses: expensesProp, onOpenTaskModal }: DashboardViewProps) {
   const [activeTheme, setActiveTheme] = useState<ThemeId>(() => getTheme());
   const [showDetailedLedger, setShowDetailedLedger] = useState(false);
 
@@ -658,16 +659,16 @@ export function DashboardView({ tasks, categories, expenses: expensesProp }: Das
 
         {/* ── Decoded Reference Layout Component ── */}
         {activeTheme === 'salesmonk' && (
-          <SalesMonkThemeDashboard tasks={tasks} categories={categories} expenses={allExpenses} />
+          <SalesMonkThemeDashboard tasks={tasks} categories={categories} expenses={allExpenses} onOpenTaskModal={onOpenTaskModal} />
         )}
         {activeTheme === 'saddam' && (
-          <SaddamThemeDashboard tasks={tasks} categories={categories} expenses={allExpenses} />
+          <SaddamThemeDashboard tasks={tasks} categories={categories} expenses={allExpenses} onOpenTaskModal={onOpenTaskModal} />
         )}
         {activeTheme === 'editorial' && (
-          <WarmEditorialThemeDashboard tasks={tasks} categories={categories} expenses={allExpenses} />
+          <WarmEditorialThemeDashboard tasks={tasks} categories={categories} expenses={allExpenses} onOpenTaskModal={onOpenTaskModal} />
         )}
         {activeTheme === 'dei' && (
-          <DeiBentoThemeDashboard tasks={tasks} categories={categories} expenses={allExpenses} />
+          <DeiBentoThemeDashboard tasks={tasks} categories={categories} expenses={allExpenses} onOpenTaskModal={onOpenTaskModal} />
         )}
 
         {/* ── Collapsible Detailed Accounting Ledger & Period Filter ── */}
