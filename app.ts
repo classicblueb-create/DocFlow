@@ -1365,6 +1365,102 @@ ${ideasContext || 'ยังไม่มีไอเดีย'}
     }
   });
 
+  // Telegram push notification for Daily Solo Briefing
+  app.post("/api/notify/telegram-briefing", async (req, res) => {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = telegramChatId || process.env.TELEGRAM_CHAT_ID;
+
+    if (!token) {
+      return res.status(503).json({ error: "TELEGRAM_BOT_TOKEN ยังไม่ได้ตั้งค่าในไฟล์ .env" });
+    }
+    if (!chatId) {
+      return res.status(503).json({ error: "ยังไม่มี TELEGRAM_CHAT_ID — ส่งข้อความหาบอทในแชทก่อน แล้วลองใหม่" });
+    }
+
+    const { topTasks = [], pendingQuotations = [], pendingInvoices = [], meetings = [] } = req.body;
+
+    const todayDateStr = new Date().toLocaleDateString('th-TH', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+
+    const lines: string[] = [
+      `🌅 สรุปงานและเงินประจำวัน (ModtyTasks Solo Briefing)`,
+      `📅 วัน${todayDateStr}`,
+      `━━━━━━━━━━━━━━━━━━`,
+    ];
+
+    // 1. Top Tasks
+    if (topTasks.length > 0) {
+      lines.push(`🎯 Top งานสำคัญวันนี้ (ตาม Priority):`);
+      topTasks.forEach((t: any, idx: number) => {
+        const score = t.prioScore ? ` [Prio: ${t.prioScore}]` : '';
+        const end = t.endDate ? ` (ส่ง: ${t.endDate})` : '';
+        lines.push(`${idx + 1}. ${t.name}${score}${end}`);
+        if (t.prioReason) lines.push(`   ↳ ${t.prioReason}`);
+      });
+      lines.push(`━━━━━━━━━━━━━━━━━━`);
+    }
+
+    // 2. Pending Documents & Cash Flow Follow-up
+    if (pendingQuotations.length > 0 || pendingInvoices.length > 0) {
+      lines.push(`💰 เรดาร์ติดตามเอกสาร & เงิน (Follow-Up):`);
+      if (pendingQuotations.length > 0) {
+        lines.push(`📑 ใบเสนอราคารอเซ็นกลับ (${pendingQuotations.length} ฉบับ):`);
+        pendingQuotations.forEach((q: any) => {
+          const status = q.daysRemaining < 0 
+            ? `⚠️ เกิน 7 วันแล้ว (${Math.abs(q.daysRemaining)} วัน)`
+            : q.daysRemaining === 0 
+            ? `⏳ ครบกำหนดวันนี้!` 
+            : `เหลืออีก ${q.daysRemaining} วัน`;
+          lines.push(`• ${q.docNo} - ${q.customerName || 'ลูกค้า'}: ฿${Number(q.netTotal || 0).toLocaleString()} (${status})`);
+        });
+      }
+      if (pendingInvoices.length > 0) {
+        lines.push(`💵 ใบแจ้งหนี้รอชำระ (${pendingInvoices.length} ฉบับ):`);
+        pendingInvoices.forEach((inv: any) => {
+          lines.push(`• ${inv.docNo} - ${inv.customerName || 'ลูกค้า'}: ฿${Number(inv.netTotal || 0).toLocaleString()}`);
+        });
+      }
+      lines.push(`━━━━━━━━━━━━━━━━━━`);
+    }
+
+    // 3. Meetings
+    if (meetings.length > 0) {
+      lines.push(`📅 ตารางนัดหมายวันนี้ (${meetings.length} นัด):`);
+      meetings.forEach((m: any) => {
+        lines.push(`• ${m.time} - ${m.title}`);
+      });
+      lines.push(`━━━━━━━━━━━━━━━━━━`);
+    }
+
+    lines.push(`💪 สู้ๆ นะครับ! ทำงานคนเดียวแต่ระบบช่วยจำให้ครบ 100% ✨`);
+
+    try {
+      const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: lines.join('\n')
+        })
+      });
+
+      if (!response.ok) {
+        const err = await response.text();
+        console.error("[Telegram Briefing Push Error]", err);
+        return res.status(response.status).json({ error: err || "Telegram API error" });
+      }
+
+      return res.json({ ok: true, count: lines.length });
+    } catch (e: any) {
+      console.error("[Telegram] Briefing fetch error:", e);
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
   // Telegram push notification for due-soon tasks (within 5 days)
   const handleDueSoon = async (req: any, res: any) => {
     const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -2731,12 +2827,19 @@ ${highPerformersContext || 'ยังไม่มีคอนเทนต์ท�
   // Doc Numbers Cloud Sync
   // -----------------------------------------------------------------
   let cloudDocNumbers: Record<string, string> = {
-    quotation: 'QT26-001',
-    invoice: 'INV26-001',
-    receipt: 'RC26-001'
+    quotation: 'QT26-017',
+    invoice: 'INV26-010',
+    receipt: 'RC26-006'
   };
 
-  app.get("/api/doc-numbers", (_req: any, res: any) => {
+  app.get("/api/doc-numbers", async (_req: any, res: any) => {
+    try {
+      const { data } = await supabase.from('templates').select('details').eq('id', 'df_doc_numbers_config').single();
+      if (data?.details) {
+        const parsed = JSON.parse(data.details);
+        cloudDocNumbers = { ...cloudDocNumbers, ...parsed };
+      }
+    } catch (e) {}
     res.json(cloudDocNumbers);
   });
 
@@ -2745,6 +2848,157 @@ ${highPerformersContext || 'ยังไม่มีคอนเทนต์ท�
       cloudDocNumbers = { ...cloudDocNumbers, ...req.body };
     }
     res.json({ success: true, docNumbers: cloudDocNumbers });
+  });
+
+  // -----------------------------------------------------------------
+  // Automated Receipt Email Notification
+  // -----------------------------------------------------------------
+  app.post("/api/documents/send-receipt-email", async (req: any, res: any) => {
+    try {
+      const {
+        receiptNo,
+        invoiceNo,
+        customerName,
+        netTotal,
+        currency = 'THB',
+        recipientEmail = 'sasiwanjandaeng@gmail.com',
+        docDate,
+        dueDate,
+        items = [],
+      } = req.body;
+
+      if (!receiptNo || !invoiceNo) {
+        return res.status(400).json({ error: "ต้องระบุ receiptNo และ invoiceNo" });
+      }
+
+      const formattedTotal = `${currency === 'USD' ? '$' : '฿'}${Number(netTotal || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+      const emailSubject = `[ModtyTasks] ใบเสร็จรับเงินอัตโนมัติ ${receiptNo} (อ้างอิงใบแจ้งหนี้ ${invoiceNo}) - ${customerName || 'ลูกค้า'}`;
+      
+      const emailHtml = `
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
+          <div style="border-bottom: 2px solid #2563eb; padding-bottom: 16px; margin-bottom: 20px;">
+            <h2 style="color: #1e293b; margin: 0 0 4px 0; font-size: 20px;">🧾 ออกใบเสร็จรับเงินอัตโนมัติสำเร็จ</h2>
+            <p style="color: #64748b; margin: 0; font-size: 13px;">ระบบสร้างใบเสร็จรับเงินทันทีจากใบแจ้งหนี้ (รอบกำหนดชำระภายใน 7 วัน)</p>
+          </div>
+          
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 14px;">
+            <tr>
+              <td style="padding: 8px 0; color: #64748b; width: 140px;">เลขที่ใบเสร็จรับเงิน:</td>
+              <td style="padding: 8px 0; color: #0f172a; font-weight: bold;">${receiptNo}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; color: #64748b;">อ้างอิงใบแจ้งหนี้:</td>
+              <td style="padding: 8px 0; color: #2563eb; font-weight: bold;">${invoiceNo}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; color: #64748b;">ลูกค้า:</td>
+              <td style="padding: 8px 0; color: #0f172a; font-weight: 600;">${customerName || '-'}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; color: #64748b;">วันที่ออกเอกสาร:</td>
+              <td style="padding: 8px 0; color: #0f172a;">${docDate || new Date().toISOString().split('T')[0]}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; color: #64748b;">กำหนดชำระ (7 วัน):</td>
+              <td style="padding: 8px 0; color: #d97706; font-weight: bold;">${dueDate || '-'}</td>
+            </tr>
+            <tr>
+              <td style="padding: 12px 0 8px 0; color: #64748b; border-top: 1px dashed #cbd5e1;">ยอดเงินสุทธิ:</td>
+              <td style="padding: 12px 0 8px 0; color: #16a34a; font-size: 18px; font-weight: 800; border-top: 1px dashed #cbd5e1;">${formattedTotal}</td>
+            </tr>
+          </table>
+
+          ${Array.isArray(items) && items.length > 0 ? `
+            <div style="background: #f8fafc; border-radius: 8px; padding: 12px; margin-bottom: 20px;">
+              <h4 style="margin: 0 0 8px 0; font-size: 12px; color: #475569; text-transform: uppercase;">รายการสินค้า/บริการ</h4>
+              <ul style="margin: 0; padding-left: 18px; font-size: 13px; color: #334155;">
+                ${items.map((i: any) => `<li>${i.desc || 'รายการ'} (x${i.qty || 1}) - ${currency === 'USD' ? '$' : '฿'}${Number(i.price || 0).toLocaleString()}</li>`).join('')}
+              </ul>
+            </div>
+          ` : ''}
+
+          <div style="border-top: 1px solid #e2e8f0; padding-top: 16px; margin-top: 24px; font-size: 12px; color: #94a3b8; text-align: center;">
+            <p style="margin: 0;">ส่งจากระบบอัตโนมัติ DocFlow / ModtyTasks</p>
+            <p style="margin: 4px 0 0 0;">ผู้รับ: <strong>${recipientEmail}</strong></p>
+          </div>
+        </div>
+      `;
+
+      let emailSent = false;
+      let emailError = null;
+
+      if (process.env.RESEND_API_KEY) {
+        try {
+          const resendResp = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              from: process.env.RESEND_FROM || "DocFlow <notifications@resend.dev>",
+              to: [recipientEmail],
+              subject: emailSubject,
+              html: emailHtml,
+            })
+          });
+          if (resendResp.ok) {
+            emailSent = true;
+          } else {
+            const errText = await resendResp.text();
+            emailError = `Resend API error: ${errText}`;
+            console.warn("[Resend Warning]", emailError);
+          }
+        } catch (e: any) {
+          emailError = e.message;
+        }
+      }
+
+      // Also send Telegram push notification if bot is configured
+      const tgToken = process.env.TELEGRAM_BOT_TOKEN;
+      const tgChatId = telegramChatId || process.env.TELEGRAM_CHAT_ID;
+      if (tgToken && tgChatId) {
+        try {
+          const tgText = [
+            '🧾 ออกใบเสร็จรับเงินอัตโนมัติสำเร็จ!',
+            '━━━━━━━━━━━━━━━',
+            `📄 เลขที่ใบเสร็จ: ${receiptNo}`,
+            `🔗 อ้างอิงใบแจ้งหนี้: ${invoiceNo}`,
+            `👤 ลูกค้า: ${customerName || '-'}`,
+            `💰 ยอดรวมสุทธิ: ${formattedTotal}`,
+            `📅 ครบกำหนดชำระ: ${dueDate || 'ภายใน 7 วัน'}`,
+            `✉️ ส่งเมลไปที่: ${recipientEmail}`,
+            '━━━━━━━━━━━━━━━',
+            'ส่งจากระบบอัตโนมัติ DocFlow 🚀'
+          ].join('\n');
+
+          await fetch(`https://api.telegram.org/bot${tgToken}/sendMessage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chat_id: tgChatId, text: tgText })
+          });
+        } catch (e) {
+          console.warn("[Telegram notification failed]", e);
+        }
+      }
+
+      console.log(`[Auto Receipt Email] Dispatched to ${recipientEmail} for Receipt ${receiptNo} (Invoice ${invoiceNo})`);
+
+      res.json({
+        success: true,
+        sentTo: recipientEmail,
+        receiptNo,
+        invoiceNo,
+        deliveredViaApi: emailSent,
+        subject: emailSubject,
+        htmlPreview: emailHtml,
+        timestamp: new Date().toISOString()
+      });
+    } catch (err: any) {
+      console.error("[send-receipt-email error]", err);
+      res.status(500).json({ error: err.message || "Failed to process receipt email" });
+    }
   });
 
   return app;

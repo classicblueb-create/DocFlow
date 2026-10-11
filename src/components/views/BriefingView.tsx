@@ -1,13 +1,16 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { ProductRevenueWidget } from '../widgets/ProductRevenueWidget';
 import { CustomTrackerWidget } from '../widgets/CustomTrackerWidget';
+import { SoloFollowUpRadar } from '../widgets/SoloFollowUpRadar';
+import { AgentBatonCenter } from '../widgets/AgentBatonCenter';
+import { saveContentPlan, subscribeIssuedDocuments } from '../../lib/db';
 import { 
   TrendingUp, Users, CheckCircle, FileText, AlertCircle, Sparkles, Loader2,
   DollarSign, Wallet, Hourglass, CalendarDays, ChevronRight, CheckSquare,
   ListTodo, Plus, Target, ShieldAlert, Sparkle, BrainCircuit, RefreshCw, Send, Bot, ClipboardCheck, UserCircle2,
   Video, Radio, Flame, HelpCircle, ExternalLink, Bell
 } from 'lucide-react';
-import { Task, Client, Idea, Subtask, ProjectCategory, ContentPlan } from '../../types';
+import { Task, Client, Idea, Subtask, ProjectCategory, ContentPlan, IssuedDocument } from '../../types';
 import { cn, getTaskPrice } from '../../lib/utils';
 import {
   calculateTaskPriorityScore,
@@ -235,6 +238,22 @@ ${categoriesListStr}
 
   // ── Compile calculations ──
   const revenueData = useMemo(() => compileRevenueData(tasks), [tasks]);
+
+  const handleOpenDocFlowWithData = (docData: any) => {
+    sessionStorage.setItem('df_prefill_document', JSON.stringify(docData));
+    onViewChange('docflow');
+  };
+
+  const handleSaveContentPlanDirect = async (plan: Partial<ContentPlan>) => {
+    await saveContentPlan(plan as ContentPlan);
+  };
+
+  // Subscribe to issued documents once for the entire briefing view
+  const [issuedDocs, setIssuedDocs] = useState<IssuedDocument[]>([]);
+  useEffect(() => {
+    const unsub = subscribeIssuedDocuments(docs => setIssuedDocs(docs || []));
+    return () => unsub();
+  }, []);
   
   // Parse subtasks from all tasks and tag them with parent task name
   const allSubtasksWithParent = useMemo(() => {
@@ -598,6 +617,27 @@ ${categoriesListStr}
         ))}
       </div>
 
+      {/* ── Autonomous Multi-Agent Baton Activity Center ── */}
+      <AgentBatonCenter
+        tasks={tasks}
+        documents={issuedDocs}
+        clients={clients}
+        contentPlans={contentPlans}
+        onOpenDocFlowWithData={handleOpenDocFlowWithData}
+        onOpenDocFlow={() => onViewChange('docflow')}
+        onOpenContentPlan={() => onViewChange('content_plan')}
+        onSaveContentPlan={handleSaveContentPlanDirect}
+        showNotification={showNotification}
+      />
+
+      {/* ── Solo Follow-Up Radar & Action Center ── */}
+      <SoloFollowUpRadar
+        documents={issuedDocs}
+        onOpenDocFlow={() => onViewChange('docflow')}
+        showNotification={showNotification}
+        topTasks={prioritizedTasks}
+        gcalEvents={gcalEvents}
+      />
 
       {/* ── Google Calendar + Notion Content Plans Row ──────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 shrink-0">

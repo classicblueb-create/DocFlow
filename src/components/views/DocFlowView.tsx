@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Settings, Download, Plus, X, Eye, Pencil, History, Search, FileText } from 'lucide-react';
+import { Settings, Download, Plus, X, Eye, Pencil, History, Search, FileText, Clock, Sparkles, RefreshCw, BrainCircuit } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
-import type { Client, IssuedDocument } from '../../types';
-import { saveDocNumbersCloud, subscribeDocNumbersCloud, saveIssuedDocument, subscribeIssuedDocuments } from '../../lib/db';
+import type { Client, IssuedDocument, Task } from '../../types';
+import { saveDocNumbersCloud, subscribeDocNumbersCloud, saveIssuedDocument, subscribeIssuedDocuments, deleteIssuedDocument, getPdfBlobFromCloud } from '../../lib/db';
+import { DocumentStatusTracker } from '../widgets/DocumentStatusTracker';
+import { AgentBatonCenter } from '../widgets/AgentBatonCenter';
 
 interface DocFlowViewProps {
  // kept for API compatibility with App.tsx
@@ -11,6 +13,8 @@ interface DocFlowViewProps {
  settingsVersion?: number;
  showNotification: (msg: string, isError?: boolean) => void;
  clients: Client[];
+ tasks?: Task[];
+ onViewChange?: (view: any) => void;
 }
 
 // ─── Translations ──────────────────────────────────────────────────────────
@@ -157,7 +161,37 @@ function incrementDocNo(current: string): string {
   return current.substring(0, index) + padded + current.substring(index + digitsStr.length);
 }
 
-export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
+function extractNumericSuffix(str: string): number {
+  const matches = [...(str || '').matchAll(/\d+/g)];
+  if (matches.length === 0) return 0;
+  return parseInt(matches[matches.length - 1][0], 10);
+}
+
+function resolveNextDocNumber(type: DocType, currentNo: string, history: IssuedDocument[]): string {
+  const matching = (history || []).filter(d => d.docType === type && d.docNo);
+  if (matching.length === 0) return currentNo;
+
+  let maxDoc = matching[0];
+  let maxNum = extractNumericSuffix(maxDoc.docNo);
+
+  for (let i = 1; i < matching.length; i++) {
+    const n = extractNumericSuffix(matching[i].docNo);
+    if (n > maxNum) {
+      maxNum = n;
+      maxDoc = matching[i];
+    }
+  }
+
+  const currentNum = extractNumericSuffix(currentNo);
+  // If currentNo is <= maxNum in history, it means this number was ALREADY issued!
+  // We MUST advance it to (maxNum + 1) using incrementDocNo(maxDoc.docNo)
+  if (currentNum <= maxNum) {
+    return incrementDocNo(maxDoc.docNo);
+  }
+  return currentNo;
+}
+
+export function DocFlowView({ showNotification, clients, tasks = [], onViewChange }: DocFlowViewProps) {
  const [lang, setLangState] = useState<Lang>(() => lsGet('df_lang', 'th'));
  const [docType, setDocTypeState] = useState<DocType>('quotation');
  const [font, setFont] = useState<string>(() => lsGet('df_font', "'Prompt', sans-serif"));
@@ -178,6 +212,8 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  // Issued Documents History state
  const [issuedDocs, setIssuedDocs] = useState<IssuedDocument[]>([]);
  const [showHistory, setShowHistory] = useState(false);
+ const [showStatusTracker, setShowStatusTracker] = useState(false);
+ const [showAgentBaton, setShowAgentBaton] = useState(false);
  const [historySearch, setHistorySearch] = useState('');
  const [historyFilter, setHistoryFilter] = useState<'all' | 'quotation' | 'invoice' | 'receipt'>('all');
 
@@ -185,16 +221,46 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  useEffect(() => {
    const unsub = subscribeDocNumbersCloud(cloudNumbers => {
      if (cloudNumbers && typeof cloudNumbers === 'object') {
-       setDocNumbers(prev => ({
-         quotation: cloudNumbers.quotation || prev.quotation,
-         invoice: cloudNumbers.invoice || prev.invoice,
-         receipt: cloudNumbers.receipt || prev.receipt,
-       }));
+       setDocNumbers(prev => {
+         const next = {
+           quotation: cloudNumbers.quotation || prev.quotation,
+           invoice: cloudNumbers.invoice || prev.invoice,
+           receipt: cloudNumbers.receipt || prev.receipt,
+         };
+         lsSet('df_docNo_quotation', next.quotation);
+         lsSet('df_docNo_invoice', next.invoice);
+         lsSet('df_docNo_receipt', next.receipt);
+         return next;
+       });
      }
    });
    const unsubDocs = subscribeIssuedDocuments(docs => setIssuedDocs(docs));
    return () => { unsub(); unsubDocs(); };
  }, []);
+
+ const hasInitialSyncedRef = useRef(false);
+
+ // Ground-Truth Sync: Run once on initial load with issuedDocs to ensure docNumbers is at least (highest issued + 1)
+ useEffect(() => {
+   if (!issuedDocs || issuedDocs.length === 0 || hasInitialSyncedRef.current) return;
+   hasInitialSyncedRef.current = true;
+   setDocNumbers(prev => {
+     const nextQuotation = resolveNextDocNumber('quotation', prev.quotation, issuedDocs);
+     const nextInvoice = resolveNextDocNumber('invoice', prev.invoice, issuedDocs);
+     const nextReceipt = resolveNextDocNumber('receipt', prev.receipt, issuedDocs);
+
+     if (nextQuotation !== prev.quotation || nextInvoice !== prev.invoice || nextReceipt !== prev.receipt) {
+       const resolved = {
+         quotation: nextQuotation,
+         invoice: nextInvoice,
+         receipt: nextReceipt,
+       };
+       saveDocNumbersCloud(resolved);
+       return resolved;
+     }
+     return prev;
+   });
+ }, [issuedDocs]);
 
  const [docDate, setDocDate] = useState(() => new Date().toISOString().split('T')[0]);
  const [meta3, setMeta3] = useState('30');
@@ -217,6 +283,39 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  const [sigRDate, setSigRDate] = useState(() => new Date().toISOString().split('T')[0]);
  const [items, setItems] = useState<ItemRow[]>([{ id: 1, desc: 'รายละเอียดสินค้า / บริการ', qty: 1, price: 0 }]);
  const [whPct, setWhPct] = useState(3);
+
+ // ── Auto-prefill document from Autonomous Agent baton handoff ──
+ useEffect(() => {
+   try {
+     const prefillRaw = sessionStorage.getItem('df_prefill_document');
+     if (prefillRaw) {
+       sessionStorage.removeItem('df_prefill_document');
+       const p = JSON.parse(prefillRaw);
+       if (p.docType) setDocType(p.docType);
+       if (p.customerName) setCustName(p.customerName);
+       if (p.customerAddr) setCustAddr(p.customerAddr);
+       if (p.customerTaxId) setCustTax(p.customerTaxId);
+       if (p.customerContact) setCustContact(p.customerContact);
+       if (p.customerPhone) setCustPhone(p.customerPhone);
+       if (p.whtPercent !== undefined) setWhPct(p.whtPercent);
+       if (p.items && p.items.length > 0) {
+         setItems(p.items.map((it: any, idx: number) => ({
+           id: idx + 1,
+           desc: it.desc,
+           qty: it.qty,
+           price: it.price
+         })));
+       }
+       showNotification(
+         lang === 'th' 
+           ? '⚡ AI นำส่งข้อมูลดีลเข้าสู่แบบฟอร์มแล้ว! คุณสามารถตรวจทานและกดดาวน์โหลด PDF ได้ทันที'
+           : '⚡ AI baton pre-filled document form successfully!'
+       );
+     }
+   } catch (e) {
+     console.warn('[DocFlow prefill error]', e);
+   }
+ }, []);
 
  // Settings modal state
  const [setForm, setSetForm] = useState<IssuerConfig>(issuerCfg[lang]);
@@ -308,7 +407,7 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  };
 
  const changeDocType = (dt: DocType) => {
- setDocTypeState(dt);
+   setDocTypeState(dt);
  };
 
  const changeFont = (f: string) => {
@@ -437,17 +536,18 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  pdf.addImage(imgData, 'JPEG', 0, 0, pw, ph, undefined, 'FAST');
  pdf.save(`${DICT[lang].docTitles[docType]}_${docNo}.pdf`);
 
- // Save PDF blob to localStorage (≤1MB)
+ // Save PDF blob to localStorage (≤1MB) and Supabase Cloud
  const docIdForBlob = `doc_${Date.now()}_${docNo.replace(/[^a-zA-Z0-9_-]/g, '')}`;
  const pdfDataUrl = pdf.output('datauristring');
- const saved = savePdfBlob(docIdForBlob, pdfDataUrl);
+ savePdfBlob(docIdForBlob, pdfDataUrl);
  showNotification(
- lang === 'th'
- ? `ดาวน์โหลด PDF สำเร็จ${saved ? ' (บันทึกไว้ในประวัติแล้ว)' : ' (ไฟล์ใหญ่เกิน 1MB — ไม่บันทึกใน PDF viewer)'}`
- : `PDF downloaded${saved ? ' (saved to history)' : ' (>1MB — not saved in viewer)'}`
+   lang === 'th'
+     ? 'ดาวน์โหลด PDF และบันทึกข้อมูลพร้อมไฟล์ขึ้น Supabase Cloud สำเร็จ'
+     : 'PDF downloaded & saved to Supabase Cloud'
  );
 
  // Save complete document record to Supabase Database!
+ const followUpDueDate = new Date(new Date(docDate || new Date()).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
  const docRecord: IssuedDocument = {
    id: docIdForBlob,
    docNo,
@@ -469,14 +569,94 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
    termsDesc,
    bankDesc,
    createdAt: new Date().toISOString(),
+   pdfDataUrl,
+   // Tracking & Automation fields:
+   status: docType === 'quotation' ? 'pending_signature' : docType === 'invoice' ? 'pending_payment' : 'issued',
+   followUpDueDate,
  };
  await saveIssuedDocument(docRecord);
+
+ // ── Auto-generate Receipt from Invoice + Send Email Notification ──
+ if (docType === 'invoice') {
+   try {
+     const receiptPrefix = docNo.replace(/^INV/i, 'RC');
+     const receiptDocId = `doc_${Date.now()}_${receiptPrefix.replace(/[^a-zA-Z0-9_-]/g, '')}`;
+     const receiptRecord: IssuedDocument = {
+       id: receiptDocId,
+       docNo: receiptPrefix,
+       docType: 'receipt',
+       lang,
+       currency,
+       docDate: new Date().toISOString().split('T')[0],
+       customerName: custName || 'ไม่ได้ระบุ',
+       customerAddr: custAddr,
+       customerTaxId: custTax,
+       customerContact: custContact,
+       customerPhone: custPhone,
+       subtotal,
+       whtAmount: wht,
+       whtPercent: whPct,
+       netTotal: net,
+       items: items.map(i => ({ desc: i.desc, qty: i.qty, price: i.price })),
+       issuerName,
+       termsDesc: lang === 'th' ? 'ได้รับชำระเงินเรียบร้อยแล้ว ขอบคุณที่ใช้บริการ' : 'Payment received. Thank you for your business.',
+       bankDesc,
+       createdAt: new Date().toISOString(),
+       pdfDataUrl,
+       // Auto-generated fields:
+       status: 'issued',
+       followUpDueDate,
+       linkedDocNo: docNo,
+       linkedDocId: docIdForBlob,
+       autoGenerated: true,
+       emailSentTo: 'sasiwanjandaeng@gmail.com',
+     };
+     await saveIssuedDocument(receiptRecord);
+
+     // Send receipt email notification
+     try {
+       const emailRes = await fetch('/api/documents/send-receipt-email', {
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify({
+           receiptNo: receiptPrefix,
+           invoiceNo: docNo,
+           customerName: custName || 'ไม่ได้ระบุ',
+           netTotal: net,
+           currency,
+           recipientEmail: 'sasiwanjandaeng@gmail.com',
+           docDate: new Date().toISOString().split('T')[0],
+           dueDate: followUpDueDate,
+           items: items.map(i => ({ desc: i.desc, qty: i.qty, price: i.price })),
+         })
+       });
+       const emailData = await emailRes.json();
+       if (emailData.success) {
+         receiptRecord.emailSentAt = new Date().toISOString();
+         receiptRecord.emailStatus = 'sent';
+         await saveIssuedDocument(receiptRecord);
+         showNotification(`✨ สร้างใบเสร็จ ${receiptPrefix} อัตโนมัติ + ส่งเมลไปที่ sasiwanjandaeng@gmail.com สำเร็จ!`);
+       }
+     } catch (emailErr) {
+       console.warn('[Auto Receipt Email] Failed:', emailErr);
+       showNotification(`✨ สร้างใบเสร็จ ${receiptPrefix} อัตโนมัติสำเร็จ (ส่งเมลไม่สำเร็จ — ลองส่งอีกครั้งได้ที่หน้า "สถานะเอกสาร")`);
+     }
+   } catch (autoErr) {
+     console.warn('[Auto Receipt] Failed:', autoErr);
+   }
+ }
 
  // Increment document number for this docType & sync to Cloud!
  setDocNumbers(prev => {
    const currentNo = prev[docType];
    const nextNo = incrementDocNo(currentNo);
    const nextNumbers = { ...prev, [docType]: nextNo };
+   // When invoice is issued, an auto-receipt was created as well!
+   // So receipt number MUST ALSO advance to next running number!
+   if (docType === 'invoice') {
+     const currentReceipt = prev.receipt || docNo.replace(/^INV/i, 'RC');
+     nextNumbers.receipt = incrementDocNo(currentReceipt);
+   }
    saveDocNumbersCloud(nextNumbers);
    return nextNumbers;
  });
@@ -485,6 +665,41 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  showNotification(lang === 'th' ? 'เกิดข้อผิดพลาดในการสร้าง PDF' : 'PDF generation failed', true);
  }
  setExporting(false);
+ };
+
+ const handleLoadDocument = (doc: IssuedDocument) => {
+   try {
+     if (doc.docType) setDocType(doc.docType as any);
+     if (doc.lang) setLang(doc.lang as any);
+     if (doc.currency) setCurrency(doc.currency as any);
+     if (doc.docDate) setDocDate(doc.docDate);
+     if (doc.customerName) setCustName(doc.customerName === 'ไม่ได้ระบุ' ? '' : doc.customerName);
+     if (doc.customerAddr) setCustAddr(doc.customerAddr);
+     if (doc.customerTaxId) setCustTax(doc.customerTaxId);
+     if (doc.customerContact) setCustContact(doc.customerContact);
+     if (doc.customerPhone) setCustPhone(doc.customerPhone);
+     if (doc.whtPercent !== undefined) setWhPct(doc.whtPercent);
+     if (doc.issuerName) setIssuerName(doc.issuerName);
+     if (doc.termsDesc) setTermsDesc(doc.termsDesc);
+     if (doc.bankDesc) setBankDesc(doc.bankDesc);
+     if (doc.docNo) {
+       setDocNumbers(prev => ({ ...prev, [doc.docType]: doc.docNo }));
+     }
+     if (doc.items && doc.items.length > 0) {
+       setItems(doc.items.map((it, idx) => ({
+         id: idx + 1,
+         desc: it.desc,
+         qty: it.qty,
+         price: it.price
+       })));
+     }
+     setShowStatusTracker(false);
+     setShowHistory(false);
+     setMobileTab('preview');
+     showNotification(`📄 โหลดเอกสาร ${doc.docNo} เข้าสู่แบบฟอร์มแล้ว! คุณสามารถตรวจทานและกดปุ่ม "ดาวน์โหลด PDF" ได้ทันที`);
+   } catch (e: any) {
+     showNotification(`ไม่สามารถโหลดเอกสารได้: ${e.message}`, true);
+   }
  };
 
  // Dynamic meta3 label
@@ -536,6 +751,28 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  ))}
  </div>
  <div className="flex gap-1.5 shrink-0">
+ <button
+ onClick={() => setShowAgentBaton(true)}
+ className="flex items-center gap-1.5 px-2.5 md:px-3 py-1.5 text-white rounded-lg text-xs font-bold transition cursor-pointer hover:brightness-110 active:scale-98"
+ style={{
+ background: 'var(--btn-primary-bg, linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%))',
+ color: 'var(--btn-primary-text, #ffffff)',
+ borderRadius: 'var(--btn-radius, 8px)',
+ boxShadow: 'var(--btn-primary-shadow, 0 2px 8px rgba(37, 99, 235, 0.2))'
+ }}
+ >
+ <BrainCircuit className="w-3.5 h-3.5 opacity-90" />
+ <span className="hidden md:inline">ศูนย์เอเจนท์ส่งต่องาน</span>
+ <span className="md:hidden">เอเจนท์</span>
+ </button>
+ <button
+ onClick={() => setShowStatusTracker(true)}
+ className="flex items-center gap-1 px-2.5 md:px-3 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-xs font-semibold hover:bg-blue-100 transition cursor-pointer"
+ >
+ <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+ <span className="hidden md:inline">สถานะเอกสาร</span>
+ <span className="md:hidden">สถานะ</span>
+ </button>
  <button
  onClick={() => setShowHistory(true)}
  className="flex items-center gap-1 px-2.5 md:px-3 py-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg text-xs font-semibold hover:bg-indigo-100 transition cursor-pointer"
@@ -651,20 +888,59 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  </div>
  <div style={{ display: 'grid', gridTemplateColumns: 'auto auto', gap: '4px 10px', alignItems: 'center', justifyContent: 'end', fontSize: '12px', marginTop: '12px' }}>
  <label style={{ fontWeight: 600, color: '#4b5563', textAlign: 'right', whiteSpace: 'nowrap' }}>{d.lbl_no}</label>
- <input
-   value={docNo}
-   onChange={e => {
-     const val = e.target.value;
-     setDocNumbers(prev => {
-       const next = { ...prev, [docType]: val };
-       saveDocNumbersCloud(next);
-       return next;
-     });
-   }}
-   style={{ ...inputInPaper, width: '120px', textAlign: 'right', fontWeight: 600 }}
-   className={fieldCls}
-   placeholder={docType === 'invoice' ? 'INV26-001' : docType === 'receipt' ? 'RC26-001' : 'QT26-001'}
- />
+ <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px' }}>
+   <input
+     value={docNo ?? ''}
+     onChange={e => {
+       const val = e.target.value;
+       setDocNumbers(prev => {
+         const next = { ...prev, [docType]: val };
+         lsSet(`df_docNo_${docType}`, val);
+         return next;
+       });
+     }}
+     onBlur={() => {
+       saveDocNumbersCloud(docNumbers);
+     }}
+     style={{ ...inputInPaper, width: '120px', textAlign: 'right', fontWeight: 600 }}
+     className={fieldCls}
+     placeholder={docType === 'invoice' ? 'INV26-001' : docType === 'receipt' ? 'RC26-001' : 'QT26-001'}
+   />
+   {docNo ? (
+     <button
+       type="button"
+       title="ล้างเลขที่เอกสารเพื่อพิมพ์ใหม่"
+       onClick={() => {
+         setDocNumbers(prev => {
+           const next = { ...prev, [docType]: '' };
+           lsSet(`df_docNo_${docType}`, '');
+           saveDocNumbersCloud(next);
+           return next;
+         });
+       }}
+       className="no-print p-0.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 transition cursor-pointer"
+     >
+       <X className="w-3.5 h-3.5" />
+     </button>
+   ) : null}
+   <button
+     type="button"
+     title="รีเซ็ตเป็นเลขที่ล่าสุดที่พร้อมออก (คำนวณจากประวัติเอกสารอัตโนมัติ)"
+     onClick={() => {
+       const next = resolveNextDocNumber(docType, docNo || '001', issuedDocs);
+       setDocNumbers(prev => {
+         const updated = { ...prev, [docType]: next };
+         lsSet(`df_docNo_${docType}`, next);
+         saveDocNumbersCloud(updated);
+         return updated;
+       });
+       showNotification(`🔄 ปรับเลขที่ ${d.docTitles[docType]} เป็น ${next} เรียบร้อย`);
+     }}
+     className="no-print p-0.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition cursor-pointer"
+   >
+     <RefreshCw className="w-3 h-3" />
+   </button>
+ </div>
  <label style={{ fontWeight: 600, color: '#4b5563', textAlign: 'right', whiteSpace: 'nowrap' }}>{d.lbl_date}</label>
  <input type="date" value={docDate} onChange={e => { setDocDate(e.target.value); setSigRDate(e.target.value); }} style={{ ...inputInPaper, width: '120px', textAlign: 'right' }} className={fieldCls} />
  {docType !== 'receipt' && <>
@@ -1000,7 +1276,7 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  }
 
  return filtered.map(doc => {
- const hasPdf = !!getPdfBlob(doc.id);
+ const hasPdf = !!getPdfBlob(doc.id) || !!doc.pdfDataUrl;
  const typeLabel: Record<string, string> = { quotation: 'ใบเสนอราคา', invoice: 'ใบแจ้งหนี้', receipt: 'ใบเสร็จ' };
  const typeColor: Record<string, string> = { quotation: 'bg-blue-100 text-blue-700', invoice: 'bg-amber-100 text-amber-700', receipt: 'bg-emerald-100 text-emerald-700' };
  const dateStr = doc.createdAt ? new Date(doc.createdAt).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
@@ -1016,7 +1292,7 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  <div className="flex-1 min-w-0">
  <div className="flex items-center gap-2">
  <span className="font-bold text-sm text-gray-900 truncate">{doc.docNo}</span>
- {!hasPdf && <span className="text-[10px] text-orange-500 font-semibold shrink-0">⚠ ไม่มี PDF (&gt;1MB)</span>}
+ {!hasPdf && <span className="text-[10px] text-amber-500 font-medium shrink-0">☁️ กำลังซิงค์</span>}
  </div>
  <p className="text-xs text-gray-500 truncate">{doc.customerName} · {dateStr}</p>
  </div>
@@ -1033,45 +1309,64 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
  {hasPdf ? (
  <>
  <button
- title="ดูเอกสาร"
- onClick={() => {
- const blob = getPdfBlob(doc.id);
- if (!blob) return;
- const win = window.open();
- if (win) {
- win.document.write(`<iframe width='100%' height='100%' style='border:none' src='${blob}'></iframe>`);
- }
+ title="ดูเอกสาร PDF จาก Supabase Cloud"
+ onClick={async () => {
+   let blob = getPdfBlob(doc.id) || doc.pdfDataUrl;
+   if (!blob) {
+     blob = await getPdfBlobFromCloud(doc.id);
+   }
+   if (!blob) {
+     showNotification('ไม่พบไฟล์ PDF ในระบบ', true);
+     return;
+   }
+   const win = window.open();
+   if (win) {
+     win.document.write(`<iframe width='100%' height='100%' style='border:none' src='${blob}'></iframe>`);
+   }
  }}
- className="p-1.5 rounded-lg bg-indigo-100 text-indigo-600 hover:bg-indigo-200 transition"
+ className="p-1.5 rounded-lg bg-indigo-100 text-indigo-600 hover:bg-indigo-200 transition cursor-pointer"
  >
  <Eye className="w-3.5 h-3.5" />
  </button>
  <button
  title="ดาวน์โหลด PDF ซ้ำ"
- onClick={() => {
- const blob = getPdfBlob(doc.id);
- if (!blob) return;
- const a = document.createElement('a');
- a.href = blob;
- a.download = `${typeLabel[doc.docType]}_${doc.docNo}.pdf`;
- a.click();
+ onClick={async () => {
+   let blob = getPdfBlob(doc.id) || doc.pdfDataUrl;
+   if (!blob) {
+     blob = await getPdfBlobFromCloud(doc.id);
+   }
+   if (!blob) {
+     showNotification('ไม่พบไฟล์ PDF ในระบบ', true);
+     return;
+   }
+   const a = document.createElement('a');
+   a.href = blob;
+   a.download = `${typeLabel[doc.docType] || 'doc'}_${doc.docNo}.pdf`;
+   a.click();
  }}
- className="p-1.5 rounded-lg bg-emerald-100 text-emerald-600 hover:bg-emerald-200 transition"
+ className="p-1.5 rounded-lg bg-emerald-100 text-emerald-600 hover:bg-emerald-200 transition cursor-pointer"
  >
  <Download className="w-3.5 h-3.5" />
  </button>
  </>
- ) : (
- <div className="w-16" />
- )}
+ ) : null}
  <button
- title="ลบออกจากประวัติ"
- onClick={() => {
- if (!window.confirm(`ลบ ${doc.docNo} ออกจากประวัติ?`)) return;
- deletePdfBlob(doc.id);
- showNotification('ลบ PDF ออกจากประวัติแล้ว');
+ title="โหลดข้อมูลเข้าแบบฟอร์มเพื่อแก้ไขหรือดาวน์โหลด PDF"
+ onClick={() => handleLoadDocument(doc)}
+ className="p-1.5 rounded-lg bg-blue-100 text-blue-600 hover:bg-blue-200 transition cursor-pointer"
+ >
+ <FileText className="w-3.5 h-3.5" />
+ </button>
+ <button
+ title="ลบออกจากประวัติและ Supabase Cloud"
+ onClick={async () => {
+   if (!window.confirm(`ลบ ${doc.docNo} ออกจากประวัติและ Supabase Cloud ถาวร?`)) return;
+   await deleteIssuedDocument(doc.id);
+   deletePdfBlob(doc.id);
+   setIssuedDocs(prev => prev.filter(d => d.id !== doc.id));
+   showNotification(`ลบ ${doc.docNo} และ PDF ออกจาก Supabase Cloud เรียบร้อย`);
  }}
- className="p-1.5 rounded-lg text-gray-300 hover:bg-red-100 hover:text-red-500 transition"
+ className="p-1.5 rounded-lg text-gray-300 hover:bg-red-100 hover:text-red-500 transition cursor-pointer"
  >
  <X className="w-3.5 h-3.5" />
  </button>
@@ -1084,8 +1379,90 @@ export function DocFlowView({ showNotification, clients }: DocFlowViewProps) {
 
  {/* Footer */}
  <div className="p-3 bg-gray-50 rounded-b-2xl border-t border-gray-100 flex justify-between items-center">
- <p className="text-[10px] text-gray-400">PDF ถูกบันทึกใน Browser (localStorage) · ล้างได้ที่ปุ่มลบ</p>
- <button onClick={() => setShowHistory(false)} className="px-4 py-1.5 bg-gray-200 text-gray-700 hover:bg-gray-300 rounded-lg text-xs font-semibold transition">ปิด</button>
+ <p className="text-[11px] text-emerald-600 font-medium flex items-center gap-1.5"><span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>เอกสารและ PDF ถูกบันทึกบน Supabase Cloud แบบเรียลไทม์ · ลบออกจาก Cloud ได้ที่ปุ่มลบ (×)</p>
+ <button onClick={() => setShowHistory(false)} className="px-4 py-1.5 bg-gray-200 text-gray-700 hover:bg-gray-300 rounded-lg text-xs font-semibold transition cursor-pointer">ปิด</button>
+ </div>
+ </div>
+ </div>
+ )}
+
+ {/* ─── Agent Baton Center Modal ──────────────────────── */}
+ {showAgentBaton && (
+ <div
+ className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center backdrop-blur-sm p-3 md:p-6"
+ onClick={e => e.target === e.currentTarget && setShowAgentBaton(false)}
+ >
+ <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border border-slate-200">
+ <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gradient-to-r from-blue-50/80 via-indigo-50/40 to-white">
+ <div className="flex items-center gap-3">
+ <div 
+ className="w-9 h-9 rounded-xl flex items-center justify-center text-white shadow-xs"
+ style={{ 
+ background: 'var(--btn-primary-bg, linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%))',
+ borderRadius: 'var(--btn-radius, 12px)'
+ }}
+ >
+ <BrainCircuit className="w-5 h-5" />
+ </div>
+ <div>
+ <h2 className="text-base font-bold text-gray-900">Autonomous Agent Baton Center (ศูนย์เอเจนท์ส่งต่องาน)</h2>
+ <p className="text-xs text-gray-500">ระบบเอเจนท์ตรวจจับเอกสาร และส่งต่องานให้อัตโนมัติสำหรับคนทำงานคนเดียว</p>
+ </div>
+ </div>
+ <button onClick={() => setShowAgentBaton(false)} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition cursor-pointer">
+ <X className="w-5 h-5" />
+ </button>
+ </div>
+ <div className="overflow-y-auto flex-1 p-3 md:p-5 bg-slate-50/40">
+ <AgentBatonCenter
+ tasks={tasks || []}
+ documents={issuedDocs}
+ clients={clients}
+ contentPlans={[]}
+ onOpenDocFlowWithData={(data) => {
+ setShowAgentBaton(false);
+ if (data.customerName) setCustName(data.customerName);
+ if (data.customerAddr) setCustAddr(data.customerAddr);
+ if (data.customerTaxId) setCustTax(data.customerTaxId);
+ if (data.customerPhone) setCustPhone(data.customerPhone);
+ if (data.customerContact) setCustContact(data.customerContact);
+ if (data.items && data.items.length > 0) {
+ setItems(data.items.map((it, idx) => ({ id: idx + 1, desc: it.desc, qty: it.qty, price: it.price })));
+ }
+ if (data.docType) changeDocType(data.docType);
+ showNotification('🤖 เอเจนท์ส่งข้อมูลเข้าแบบฟอร์มเอกสารเรียบร้อยแล้ว');
+ }}
+ showNotification={showNotification}
+ />
+ </div>
+ </div>
+ </div>
+ )}
+
+ {/* ─── Document Status Tracker Modal ──────────────────────── */}
+ {showStatusTracker && (
+ <div
+ className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center backdrop-blur-sm p-4"
+ onClick={e => e.target === e.currentTarget && setShowStatusTracker(false)}
+ >
+ <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+ {/* Header */}
+ <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gradient-to-r from-blue-50 to-indigo-50 rounded-t-2xl">
+ <div className="flex items-center gap-2">
+ <Sparkles className="w-5 h-5 text-blue-600" />
+ <div>
+ <h2 className="text-base font-bold text-gray-900">สถานะเอกสาร & ระบบอัตโนมัติ</h2>
+ <p className="text-xs text-gray-400">ติดตามใบเสนอราคา, ใบแจ้งหนี้, ใบเสร็จรับเงิน พร้อมระบบอัตโนมัติ 7 วัน</p>
+ </div>
+ </div>
+ <button onClick={() => setShowStatusTracker(false)} className="text-gray-400 hover:text-gray-600 transition cursor-pointer"><X className="w-5 h-5" /></button>
+ </div>
+ {/* Tracker Content */}
+ <div className="overflow-y-auto flex-1">
+ <DocumentStatusTracker
+ onOpenDocFlow={() => setShowStatusTracker(false)}
+ onLoadDocument={handleLoadDocument}
+ />
  </div>
  </div>
  </div>

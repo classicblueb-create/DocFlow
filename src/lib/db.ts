@@ -551,9 +551,9 @@ export async function deleteProduct(id: string): Promise<void> {
 export async function saveDocNumbersCloud(docNumbers: Record<string, string>): Promise<void> {
   // 1. LocalStorage
   try {
-    if (docNumbers.quotation) localStorage.setItem('df_docNo_quotation', JSON.stringify(docNumbers.quotation));
-    if (docNumbers.invoice) localStorage.setItem('df_docNo_invoice', JSON.stringify(docNumbers.invoice));
-    if (docNumbers.receipt) localStorage.setItem('df_docNo_receipt', JSON.stringify(docNumbers.receipt));
+    if (docNumbers.quotation !== undefined) localStorage.setItem('df_docNo_quotation', JSON.stringify(docNumbers.quotation));
+    if (docNumbers.invoice !== undefined) localStorage.setItem('df_docNo_invoice', JSON.stringify(docNumbers.invoice));
+    if (docNumbers.receipt !== undefined) localStorage.setItem('df_docNo_receipt', JSON.stringify(docNumbers.receipt));
   } catch (e) {}
 
   // 2. Supabase
@@ -621,9 +621,12 @@ export async function saveIssuedDocument(doc: IssuedDocument): Promise<void> {
     const list: IssuedDocument[] = JSON.parse(listStr);
     const filtered = list.filter(d => d.id !== doc.id);
     localStorage.setItem('df_issued_documents', JSON.stringify([doc, ...filtered]));
+    if (doc.pdfDataUrl) {
+      localStorage.setItem(`df_pdf_${doc.id}`, doc.pdfDataUrl);
+    }
   } catch (e) {}
 
-  // Save to Supabase
+  // Save to Supabase (Record details + PDF Data)
   try {
     const row = {
       id: doc.id,
@@ -632,9 +635,48 @@ export async function saveIssuedDocument(doc: IssuedDocument): Promise<void> {
       details: JSON.stringify(doc),
     };
     await supabase.from('templates').upsert(row);
+
+    // Save PDF blob explicitly as dedicated template row for fast cross-device retrieval
+    if (doc.pdfDataUrl) {
+      await supabase.from('templates').upsert({
+        id: `pdf_${doc.id}`,
+        name: `PDF: ${doc.docNo}`,
+        price: 0,
+        details: doc.pdfDataUrl,
+      });
+    }
   } catch (err) {
     console.warn('[Supabase] Save issued document failed:', err);
   }
+}
+
+export async function getPdfBlobFromCloud(docId: string): Promise<string | null> {
+  // 1. Check local storage
+  try {
+    const local = localStorage.getItem(`df_pdf_${docId}`);
+    if (local) return local;
+  } catch {}
+
+  // 2. Fetch from Supabase
+  try {
+    const { data } = await supabase.from('templates').select('details').eq('id', `pdf_${docId}`).single();
+    if (data?.details) {
+      try { localStorage.setItem(`df_pdf_${docId}`, data.details); } catch {}
+      return data.details;
+    }
+    // Fallback: check doc row itself
+    const { data: docData } = await supabase.from('templates').select('details').eq('id', docId).single();
+    if (docData?.details) {
+      const parsed = JSON.parse(docData.details);
+      if (parsed?.pdfDataUrl) {
+        try { localStorage.setItem(`df_pdf_${docId}`, parsed.pdfDataUrl); } catch {}
+        return parsed.pdfDataUrl;
+      }
+    }
+  } catch (err) {
+    console.warn('[Supabase] Fetch PDF blob failed:', err);
+  }
+  return null;
 }
 
 export function subscribeIssuedDocuments(cb: (docs: IssuedDocument[]) => void): Unsubscribe {
@@ -660,8 +702,9 @@ export function subscribeIssuedDocuments(cb: (docs: IssuedDocument[]) => void): 
     }
   });
 
-  // Supabase Realtime channel
-  const channel = supabase.channel('issued-docs-changes')
+  // Supabase Realtime channel (unique channel ID per subscription to avoid reuse errors)
+  const channelId = `issued-docs-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const channel = supabase.channel(channelId)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'templates' }, async () => {
       const { data } = await supabase.from('templates').select('*').like('id', 'doc_%').order('name');
       if (data) cb(mapData(data));
@@ -671,6 +714,27 @@ export function subscribeIssuedDocuments(cb: (docs: IssuedDocument[]) => void): 
   return () => {
     supabase.removeChannel(channel);
   };
+}
+
+export async function updateIssuedDocument(doc: IssuedDocument): Promise<void> {
+  await saveIssuedDocument(doc);
+}
+
+export async function deleteIssuedDocument(docId: string): Promise<void> {
+  try {
+    const listStr = localStorage.getItem('df_issued_documents') || '[]';
+    const list: IssuedDocument[] = JSON.parse(listStr);
+    const filtered = list.filter(d => d.id !== docId);
+    localStorage.setItem('df_issued_documents', JSON.stringify(filtered));
+    localStorage.removeItem(`df_pdf_${docId}`);
+  } catch (e) {}
+
+  try {
+    await supabase.from('templates').delete().eq('id', docId);
+    await supabase.from('templates').delete().eq('id', `pdf_${docId}`);
+  } catch (err) {
+    console.warn('[Supabase] Delete issued document failed:', err);
+  }
 }
 
 // ── Expenses (Supabase) ───────────────────────────────────────────────────────

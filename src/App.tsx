@@ -567,6 +567,8 @@ export default function App() {
  onOpenSettings={() => setIsDocSettingsOpen(true)}
  showNotification={showNotification}
  clients={filteredClients}
+ tasks={filteredTasks}
+ onViewChange={setCurrentView}
  settingsVersion={settingsVersion}
  />
  );
