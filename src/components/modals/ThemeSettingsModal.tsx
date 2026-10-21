@@ -155,11 +155,11 @@ export function ThemeSettingsModal({ onClose, onThemeChanged }: ThemeSettingsMod
                         </div>
                         <div className="grid grid-cols-2 gap-1 flex-1">
                           <div className="bg-white rounded-md p-1 border border-slate-200 flex items-center gap-1">
-                            <div className="w-3 h-3 rounded-full bg-indigo-100 flex items-center justify-center text-[5px] text-indigo-700">★</div>
+                            <div className="w-3 h-3 rounded-full bg-indigo-100 flex items-center justify-center"><span className="w-1.5 h-1.5 rounded-full bg-indigo-500" /></div>
                             <div className="text-[6px] font-bold text-slate-800">1,589</div>
                           </div>
                           <div className="bg-white rounded-md p-1 border border-slate-200 flex items-center gap-1">
-                            <div className="w-3 h-3 rounded-full bg-emerald-100 flex items-center justify-center text-[5px] text-emerald-700">★</div>
+                            <div className="w-3 h-3 rounded-full bg-emerald-100 flex items-center justify-center"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /></div>
                             <div className="text-[6px] font-bold text-slate-800">$160k</div>
                           </div>
                         </div>

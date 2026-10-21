@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { 
   Sparkles, Clock, CheckCircle2, ChevronDown, 
   Calendar, ArrowUpRight, Search, Plus, Filter, 
-  Layers, FolderKanban, ShieldCheck, Zap
+  Layers, FolderKanban, ShieldCheck, Zap, DollarSign, TrendingUp, Rocket, Flame, Award, CheckCircle
 } from 'lucide-react';
 import { Task, ProjectCategory, Expense } from '../../types';
 
@@ -54,11 +54,11 @@ export function DeiBentoThemeDashboard({ tasks, categories, expenses = [], onOpe
           </div>
           <div className="hidden md:flex items-center gap-4 text-xs font-semibold text-slate-400">
             <span className="text-white flex items-center gap-1.5 font-bold cursor-pointer">
-              ⚡ ภาพรวมงาน
+              <Zap className="w-3.5 h-3.5 inline mr-1 text-emerald-400" />ภาพรวมงาน
             </span>
-            <span className="hover:text-white transition-colors cursor-pointer">📋 กระดานงาน</span>
-            <span className="hover:text-white transition-colors cursor-pointer">💰 ปิดการขาย</span>
-            <span className="hover:text-white transition-colors cursor-pointer">📊 ค่าใช้จ่าย</span>
+            <span className="hover:text-white transition-colors cursor-pointer"><FolderKanban className="w-3.5 h-3.5 inline mr-1" />กระดานงาน</span>
+            <span className="hover:text-white transition-colors cursor-pointer"><DollarSign className="w-3.5 h-3.5 inline mr-1" />ปิดการขาย</span>
+            <span className="hover:text-white transition-colors cursor-pointer"><TrendingUp className="w-3.5 h-3.5 inline mr-1" />ค่าใช้จ่าย</span>
           </div>
         </div>
 
@@ -83,7 +83,7 @@ export function DeiBentoThemeDashboard({ tasks, categories, expenses = [], onOpe
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-              ภาพรวมโครงการ & ไทม์ไลน์ ⏱️
+              ภาพรวมโครงการ & ไทม์ไลน์
             </h1>
           </div>
 
@@ -95,11 +95,11 @@ export function DeiBentoThemeDashboard({ tasks, categories, expenses = [], onOpe
             </div>
             <div className="px-3.5 py-1.5 rounded-xl bg-white border border-slate-200/80 shadow-2xs flex items-center gap-2 whitespace-nowrap">
               <span className="text-xs font-black text-emerald-600">{completedTasks.length}</span>
-              <span className="text-xs font-semibold text-slate-500">เสร็จแล้ว 🎉</span>
+              <span className="text-xs font-semibold text-slate-500">เสร็จแล้ว</span>
             </div>
             <div className="px-3.5 py-1.5 rounded-xl bg-white border border-slate-200/80 shadow-2xs flex items-center gap-2 whitespace-nowrap">
               <span className="text-xs font-black text-indigo-600">{inProgressTasks.length}</span>
-              <span className="text-xs font-semibold text-slate-500">กำลังทำ ⏱️</span>
+              <span className="text-xs font-semibold text-slate-500">กำลังทำ</span>
             </div>
           </div>
         </div>
@@ -117,7 +117,7 @@ export function DeiBentoThemeDashboard({ tasks, categories, expenses = [], onOpe
               <div className="flex flex-col justify-between max-w-sm z-10">
                 <div>
                   <span className="px-3 py-1 rounded-full bg-white/10 text-white text-[10px] font-bold uppercase tracking-wider inline-block mb-3">
-                    🚀 โครงการสำคัญ (Primary Milestone)
+                    <Rocket className="w-3.5 h-3.5 inline mr-1" />โครงการสำคัญ (Primary Milestone)
                   </span>
                   <h2 className="text-xl md:text-2xl font-black text-white leading-tight">
                     {heroTask.name}
@@ -146,7 +146,7 @@ export function DeiBentoThemeDashboard({ tasks, categories, expenses = [], onOpe
                 >
                   <div className="flex items-center justify-between">
                     <span className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-xs font-black">
-                      ⚡
+                      <Zap className="w-3.5 h-3.5 text-white" />
                     </span>
                     <span className="text-[10px] font-bold bg-white/20 px-2 py-0.5 rounded-full">
                       Priority High
@@ -196,13 +196,13 @@ export function DeiBentoThemeDashboard({ tasks, categories, expenses = [], onOpe
 
           </div>
 
-          {/* Right Column (4 Cols): "My Events 🧐" Card List */}
+          {/* Right Column (4 Cols): "My Events" Card List */}
           <div className="lg:col-span-4 flex flex-col gap-4">
             
             <div className="rounded-3xl p-6 bg-white border border-slate-200/90 shadow-2xs flex flex-col gap-4">
               <div className="flex items-center justify-between">
                 <h3 className="font-black text-base text-slate-900 flex items-center gap-1.5">
-                  กิจกรรมและกำหนดส่ง 🧐
+                  กิจกรรมและกำหนดส่ง
                 </h3>
                 <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
                   Upcoming
@@ -224,7 +224,7 @@ export function DeiBentoThemeDashboard({ tasks, categories, expenses = [], onOpe
                     <div key={t.id} className={`rounded-2xl p-4 border ${c} flex flex-col gap-2 transition-all hover:scale-[1.01]`}>
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] font-black uppercase tracking-wider">
-                          📅 {t.endDate || t.startDate || 'สัปดาห์นี้'}
+                          <Calendar className="w-3 h-3 inline mr-1" />{t.endDate || t.startDate || 'สัปดาห์นี้'}
                         </span>
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/70">
                           {t.status}
@@ -262,13 +262,13 @@ export function DeiBentoThemeDashboard({ tasks, categories, expenses = [], onOpe
           
           <div className="flex items-center gap-2">
             <span className="w-7 h-7 rounded-full bg-[#f43f5e] text-white flex items-center justify-center text-xs font-bold shadow-xs cursor-pointer hover:scale-105 transition-transform" title="งานด่วน">
-              🔥
+              <Flame className="w-3.5 h-3.5 text-white" />
             </span>
             <span className="w-7 h-7 rounded-full bg-[#8b5cf6] text-white flex items-center justify-center text-xs font-bold shadow-xs cursor-pointer hover:scale-105 transition-transform" title="สรุปบัญชี">
-              💎
+              <Award className="w-3.5 h-3.5 text-white" />
             </span>
             <span className="w-7 h-7 rounded-full bg-[#10b981] text-white flex items-center justify-center text-xs font-bold shadow-xs cursor-pointer hover:scale-105 transition-transform" title="ปิดดีลแล้ว">
-              🎉
+              <CheckCircle className="w-3.5 h-3.5 text-white" />
             </span>
           </div>
         </div>

@@ -95,7 +95,7 @@ export function SoloFollowUpRadar({
         signedAt: new Date().toISOString()
       };
       await updateIssuedDocument(updated);
-      showNotification?.(`✨ อัปเดตใบเสนอราคา ${doc.docNo} เป็น "เซ็นกลับมาแล้ว" เรียบร้อย!`);
+      showNotification?.(`อัปเดตใบเสนอราคา ${doc.docNo} เป็น "เซ็นกลับมาแล้ว" เรียบร้อย!`);
     } catch (e: any) {
       showNotification?.(`เกิดข้อผิดพลาด: ${e.message}`, true);
     }
@@ -109,21 +109,21 @@ export function SoloFollowUpRadar({
 
     if (isQuotation) {
       if (tone === 'friendly') {
-        return `สวัสดีครับคุณ ${custName} 😊\n\nขออนุญาตสอบถามความคืบหน้าเรื่องใบเสนอราคาเลขที่ ${doc.docNo} (ยอดรวม ${totalFormatted}) ที่ส่งไปเมื่อสัปดาห์ก่อนครับ\n\nหากทางคุณ ${custName} มีข้อสงสัยหรือต้องการปรับลด/เพิ่มส่วนไหนในขอบเขตงาน สามารถแจ้งผมได้ตลอดเลยนะครับ ยินดีปรับให้เหมาะสมที่สุดครับ ขอบคุณมากครับ! 🙏✨`;
+        return `สวัสดีครับคุณ ${custName}\n\nขออนุญาตสอบถามความคืบหน้าเรื่องใบเสนอราคาเลขที่ ${doc.docNo} (ยอดรวม ${totalFormatted}) ที่ส่งไปเมื่อสัปดาห์ก่อนครับ\n\nหากทางคุณ ${custName} มีข้อสงสัยหรือต้องการปรับลด/เพิ่มส่วนไหนในขอบเขตงาน สามารถแจ้งผมได้ตลอดเลยนะครับ ยินดีปรับให้เหมาะสมที่สุดครับ ขอบคุณมากครับ`;
       }
       if (tone === 'formal') {
         return `เรียน คุณ ${custName}\n\nเรื่อง: ติดตามความคืบหน้าใบเสนอราคาเลขที่ ${doc.docNo}\n\nอ้างถึงใบเสนอราคาเลขที่ ${doc.docNo} มูลค่า ${totalFormatted} ที่ได้นำส่งให้ท่านพิจารณา กระผมขออนุญาตติดตามผลการพิจารณาเอกสารดังกล่าว หากท่านต้องการข้อมูลเพิ่มเติมหรือประสงค์จะปรับแก้รายละเอียดประการใด กรุณาติดต่อกลับได้ทันทีครับ\n\nขอแสดงความนับถือ`;
       }
-      return `สวัสดีครับคุณ ${custName} แวะมาอัปเดตเรื่องใบเสนอราคา ${doc.docNo} (${totalFormatted}) ครับ หากสะดวกพิจารณาเซ็นอนุมัติแล้วแจ้งได้เลยนะครับ จะได้รีบเริ่มงานให้ทันทีครับ ขอบคุณครับ! 🙌`;
+      return `สวัสดีครับคุณ ${custName} แวะมาอัปเดตเรื่องใบเสนอราคา ${doc.docNo} (${totalFormatted}) ครับ หากสะดวกพิจารณาเซ็นอนุมัติแล้วแจ้งได้เลยนะครับ จะได้รีบเริ่มงานให้ทันทีครับ ขอบคุณครับ`;
     } else {
       // Invoice follow-up
       if (tone === 'friendly') {
-        return `สวัสดีครับคุณ ${custName} 😊\n\nขออนุญาตส่งข้อความแจ้งเตือนรอบการชำระเงินตามใบแจ้งหนี้เลขที่ ${doc.docNo} ยอดชำระ ${totalFormatted} ครับ\n\nหากชำระเงินเรียบร้อยแล้ว รบกวนส่งสลิปแจ้งผมได้เลยนะครับ ระบบจะออกใบเสร็จรับเงินให้ทันทีครับ ขอบคุณมากครับ! 🙏`;
+        return `สวัสดีครับคุณ ${custName}\n\nขออนุญาตส่งข้อความแจ้งเตือนรอบการชำระเงินตามใบแจ้งหนี้เลขที่ ${doc.docNo} ยอดชำระ ${totalFormatted} ครับ\n\nหากชำระเงินเรียบร้อยแล้ว รบกวนส่งสลิปแจ้งผมได้เลยนะครับ ระบบจะออกใบเสร็จรับเงินให้ทันทีครับ ขอบคุณมากครับ`;
       }
       if (tone === 'formal') {
         return `เรียน คุณ ${custName}\n\nเรื่อง: แจ้งเตือนครบกำหนดชำระตามใบแจ้งหนี้เลขที่ ${doc.docNo}\n\nตามที่ได้ออกใบแจ้งหนี้เลขที่ ${doc.docNo} จำนวนเงิน ${totalFormatted} ทางเราขอแจ้งเตือนรอบกำหนดชำระเงิน ทั้งนี้หากท่านได้ดำเนินการโอนเรียบร้อยแล้ว กรุณาแจ้งหลักฐานการชำระเงินเพื่อดำเนินการออกใบเสร็จรับเงินต่อไป\n\nขอแสดงความนับถือ`;
       }
-      return `สวัสดีครับคุณ ${custName} ขออนุญาตเตือนยอดใบแจ้งหนี้ ${doc.docNo} ยอด ${totalFormatted} ครบกำหนดชำระครับ โอนแล้วส่งสลิปมาได้เลยนะครับ ขอบคุณครับ ✨`;
+      return `สวัสดีครับคุณ ${custName} ขออนุญาตเตือนยอดใบแจ้งหนี้ ${doc.docNo} ยอด ${totalFormatted} ครบกำหนดชำระครับ โอนแล้วส่งสลิปมาได้เลยนะครับ ขอบคุณครับ`;
     }
   };
 
@@ -131,7 +131,7 @@ export function SoloFollowUpRadar({
   const handleCopyScript = (text: string) => {
     navigator.clipboard.writeText(text);
     setCopied(true);
-    showNotification?.('📋 คัดลอกข้อความทักตามลูกค้าเข้า Clipboard แล้ว! นำไปวางใน LINE หรือแชทได้ทันที');
+    showNotification?.('คัดลอกข้อความทักตามลูกค้าเข้า Clipboard แล้ว! นำไปวางใน LINE หรือแชทได้ทันที');
     setTimeout(() => setCopied(false), 3000);
   };
 
@@ -180,7 +180,7 @@ export function SoloFollowUpRadar({
       const data = await res.json();
       if (res.ok && data.ok) {
         setTelegramStatus('ส่งสรุปเข้า Telegram สำเร็จ!');
-        showNotification?.('📲 ส่งสรุปเช้าวันนี้เข้า Telegram สำเร็จแล้ว!');
+        showNotification?.('ส่งสรุปเช้าวันนี้เข้า Telegram สำเร็จแล้ว!');
       } else {
         setTelegramStatus(data.error || 'ส่งไม่สำเร็จ');
         showNotification?.(`แจ้งเตือน Telegram: ${data.error || 'ไม่สำเร็จ'}`, true);
@@ -634,9 +634,9 @@ export function SoloFollowUpRadar({
               <span className="text-xs font-bold text-slate-600">สไตล์ข้อความ:</span>
               <div className="flex items-center gap-1.5 flex-1">
                 {[
-                  { id: 'friendly', label: '🌸 สุภาพเป็นกันเอง (แนะนำ)' },
-                  { id: 'formal', label: '💼 เป็นทางการ' },
-                  { id: 'quick', label: '⚡ กระชับรวดเร็ว' },
+                  { id: 'friendly', label: 'สุภาพเป็นกันเอง (แนะนำ)' },
+                  { id: 'formal', label: 'เป็นทางการ' },
+                  { id: 'quick', label: 'กระชับรวดเร็ว' },
                 ].map(t => (
                   <button
                     key={t.id}

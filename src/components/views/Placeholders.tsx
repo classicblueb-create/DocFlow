@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, BarChartHorizontal, CalendarDays, Link2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, BarChartHorizontal, CalendarDays, Link2, Check } from 'lucide-react';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isToday, subWeeks, addMonths as addM, isBefore, isAfter } from 'date-fns';
 import { useState, useEffect, useRef } from 'react';
 import { cn } from '../../lib/utils';
@@ -115,8 +115,8 @@ export function CalendarView({ tasks, onTaskClick }: ViewProps) {
             )}
             {gcalConnected && (
               <span className="flex items-center gap-1.5 px-2 md:px-3 py-1 md:py-1.5 bg-green-500/20 rounded-lg text-[9px] md:text-xs font-bold text-green-700 border border-green-500/30">
-                <CalendarDays className="w-3 md:w-3.5 h-3 md:h-3.5" />
-                Google ✓
+                <Check className="w-3 md:w-3.5 h-3 md:h-3.5" />
+                Google Connected
               </span>
             )}
           </div>
@@ -160,7 +160,7 @@ export function CalendarView({ tasks, onTaskClick }: ViewProps) {
                       return (
                         <a key={idx} href={chip.ev.htmlLink || '#'} target="_blank" rel="noopener noreferrer"
                           className={cn('block text-[7px] md:text-[9px] px-0.5 py-0.5 md:px-1 rounded truncate border font-bold hover:opacity-80 transition-opacity', chip.color)}>
-                          📅 {chip.label}
+                          {chip.label}
                         </a>
                       );
                     })}

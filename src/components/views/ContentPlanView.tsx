@@ -369,7 +369,7 @@ export function ContentPlanView({
                      className="text-rose-500 hover:text-rose-700 font-bold ml-1 cursor-pointer shrink-0"
                      title="ล้างระดับปัง"
                    >
-                     ✕
+                     <X className="w-2.5 h-2.5" />
                    </button>
                  </div>
                ))}
@@ -408,7 +408,7 @@ export function ContentPlanView({
                      className="text-amber-500 hover:text-amber-700 font-bold ml-1 cursor-pointer shrink-0"
                      title="ล้างระดับปัง"
                    >
-                     ✕
+                     <X className="w-2.5 h-2.5" />
                    </button>
                  </div>
                ))}

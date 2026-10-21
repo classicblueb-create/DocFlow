@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { 
   Plus, Filter, Calendar, Users as UsersIcon, CheckCircle2, 
-  Clock, ArrowUpRight, DollarSign, FolderKanban, CheckCircle
+  Clock, ArrowUpRight, DollarSign, FolderKanban, CheckCircle,
+  Target, Rocket, Pin, CreditCard
 } from 'lucide-react';
 import { Task, ProjectCategory, Expense } from '../../types';
 
@@ -64,7 +65,7 @@ export function SaddamThemeDashboard({ tasks, categories, expenses = [], onOpenT
 
           <div className="flex items-center gap-2 self-end md:self-auto">
             <span className="text-xs font-semibold text-slate-500 bg-white px-3 py-1.5 rounded-full border border-slate-200 shadow-2xs flex items-center gap-1.5">
-              📅 <span>ModtyTasks 2026</span>
+              <Calendar className="w-3.5 h-3.5 text-slate-500" /> <span>ModtyTasks 2026</span>
             </span>
           </div>
         </div>
@@ -73,7 +74,7 @@ export function SaddamThemeDashboard({ tasks, categories, expenses = [], onOpenT
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">
-              สวัสดี Modty 👋 (Saddam Tablet Dashboard)
+              สวัสดี Modty (Saddam Tablet Dashboard)
             </h1>
             <p className="text-xs text-slate-500 font-medium mt-1">
               สรุปภาพรวมความคืบหน้างานและโครงสร้างโปรเจกต์ของคุณในสไตล์ Tablet OS
@@ -118,7 +119,7 @@ export function SaddamThemeDashboard({ tasks, categories, expenses = [], onOpenT
           <div className="rounded-2xl bg-white p-5 border border-slate-200/90 shadow-2xs flex flex-col justify-between">
             <div className="flex items-center gap-2.5 mb-2">
               <div className="w-8 h-8 rounded-full bg-[#ede9fe] text-[#6366f1] flex items-center justify-center font-bold text-sm shadow-2xs">
-                📁
+                <FolderKanban className="w-4 h-4 text-[#6366f1]" />
               </div>
               <span className="text-xs font-bold text-slate-600">งานทั้งหมดในระบบ</span>
             </div>
@@ -137,7 +138,7 @@ export function SaddamThemeDashboard({ tasks, categories, expenses = [], onOpenT
           <div className="rounded-2xl bg-white p-5 border border-slate-200/90 shadow-2xs flex flex-col justify-between">
             <div className="flex items-center gap-2.5 mb-2">
               <div className="w-8 h-8 rounded-full bg-[#dcfce7] text-[#16a34a] flex items-center justify-center font-bold text-sm shadow-2xs">
-                💵
+                <DollarSign className="w-4 h-4 text-[#16a34a]" />
               </div>
               <span className="text-xs font-bold text-slate-600">รายรับปิดการขาย (Won)</span>
             </div>
@@ -156,7 +157,7 @@ export function SaddamThemeDashboard({ tasks, categories, expenses = [], onOpenT
           <div className="rounded-2xl bg-white p-5 border border-slate-200/90 shadow-2xs flex flex-col justify-between">
             <div className="flex items-center gap-2.5 mb-2">
               <div className="w-8 h-8 rounded-full bg-[#fee2e2] text-[#ef4444] flex items-center justify-center font-bold text-sm shadow-2xs">
-                🎯
+                <Target className="w-4 h-4 text-[#ef4444]" />
               </div>
               <span className="text-xs font-bold text-slate-600">อัตรางานสำเร็จ</span>
             </div>
@@ -259,7 +260,7 @@ export function SaddamThemeDashboard({ tasks, categories, expenses = [], onOpenT
             <div className="rounded-2xl bg-gradient-to-r from-slate-900 to-indigo-950 text-white p-5 flex items-center justify-between shadow-xs">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-xl">
-                  🚀
+                  <Rocket className="w-6 h-6 text-indigo-400" />
                 </div>
                 <div>
                   <h3 className="font-black text-sm text-white">ประสิทธิภาพส่งมอบงาน {completionRate}%</h3>
@@ -298,7 +299,7 @@ export function SaddamThemeDashboard({ tasks, categories, expenses = [], onOpenT
                     <div key={t.id} className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between hover:bg-indigo-50/40 hover:border-indigo-100 transition-all">
                       <div className="flex items-center gap-2.5 truncate">
                         <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-xs font-bold text-slate-700 shrink-0">
-                          📌
+                          <Pin className="w-3.5 h-3.5 text-indigo-600" />
                         </div>
                         <div className="truncate pr-2">
                           <p className="text-xs font-bold text-slate-800 truncate">{t.name}</p>
@@ -326,7 +327,7 @@ export function SaddamThemeDashboard({ tasks, categories, expenses = [], onOpenT
                 <span className="text-[10px] text-slate-400">หักออกจากรายรับอัตโนมัติ</span>
               </div>
               <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold text-lg">
-                💳
+                <CreditCard className="w-5 h-5 text-rose-600" />
               </div>
             </div>
 

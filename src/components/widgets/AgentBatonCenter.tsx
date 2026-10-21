@@ -87,7 +87,7 @@ export function AgentBatonCenter({
         setRefreshKey(k => k + 1);
         if (onOpenDocFlowWithData && handoff.actionPayload?.suggestedDoc) {
           onOpenDocFlowWithData(handoff.actionPayload.suggestedDoc);
-          showNotification?.(`⚡ ส่งข้อมูลดีลเข้า DocFlow แล้ว! ตรวจทานใบเสนอราคาและกดดาวน์โหลดได้ทันที`);
+          showNotification?.(`ส่งข้อมูลดีลเข้า DocFlow แล้ว! ตรวจทานใบเสนอราคาและกดดาวน์โหลดได้ทันที`);
         } else if (onOpenDocFlow) {
           onOpenDocFlow();
         }
@@ -111,7 +111,7 @@ export function AgentBatonCenter({
             whtPercent: doc.whtPercent,
             linkedDocNo: doc.docNo,
           });
-          showNotification?.(`⚡ เปลี่ยนใบเสนอราคา ${doc.docNo} เป็นใบแจ้งหนี้ใน DocFlow แล้ว! พร้อมออกใบเสร็จรับเงินอัตโนมัติ`);
+          showNotification?.(`เปลี่ยนใบเสนอราคา ${doc.docNo} เป็นใบแจ้งหนี้ใน DocFlow แล้ว! พร้อมออกใบเสร็จรับเงินอัตโนมัติ`);
         }
       } else if (handoff.actionType === 'create_content_plan') {
         const suggested = handoff.actionPayload.suggestedContent;
@@ -126,7 +126,7 @@ export function AgentBatonCenter({
           });
           markHandoffExecuted(handoff.id);
           setRefreshKey(k => k + 1);
-          showNotification?.(`✨ ฝ่ายการตลาดบันทึก Case Study เข้าสู่ Content Plan เรียบร้อยแล้ว!`);
+          showNotification?.(`ฝ่ายการตลาดบันทึก Case Study เข้าสู่ Content Plan เรียบร้อยแล้ว!`);
           if (onOpenContentPlan) onOpenContentPlan();
         }
       }
@@ -141,7 +141,7 @@ export function AgentBatonCenter({
   const handleCopyScript = (text: string) => {
     navigator.clipboard.writeText(text);
     setCopied(true);
-    showNotification?.('📋 คัดลอกข้อความทักตามลูกค้าเข้า Clipboard เรียบร้อย!');
+    showNotification?.('คัดลอกข้อความทักตามลูกค้าเข้า Clipboard เรียบร้อย!');
     setTimeout(() => setCopied(false), 3000);
   };
 
@@ -398,11 +398,11 @@ export function AgentBatonCenter({
 
             <div className="p-4">
               <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200 text-xs text-slate-800 leading-relaxed font-sans whitespace-pre-line select-all">
-{`สวัสดีครับคุณ ${scriptModalDoc.customerName || 'ลูกค้า'} 😊
+{`สวัสดีครับคุณ ${scriptModalDoc.customerName || 'ลูกค้า'}
 
 ขออนุญาตสอบถามความคืบหน้าเรื่องใบเสนอราคาเลขที่ ${scriptModalDoc.docNo} (ยอดรวม ฿${Number(scriptModalDoc.netTotal || 0).toLocaleString()}) ที่ส่งไปเมื่อสัปดาห์ก่อนครับ
 
-หากทางคุณ ${scriptModalDoc.customerName || 'ลูกค้า'} มีข้อสงสัยหรือต้องการปรับส่วนไหนในขอบเขตงาน สามารถแจ้งผมได้ตลอดเลยนะครับ ยินดีปรับให้เหมาะสมที่สุดครับ ขอบคุณมากครับ! 🙏✨`}
+หากทางคุณ ${scriptModalDoc.customerName || 'ลูกค้า'} มีข้อสงสัยหรือต้องการปรับส่วนไหนในขอบเขตงาน สามารถแจ้งผมได้ตลอดเลยนะครับ ยินดีปรับให้เหมาะสมที่สุดครับ ขอบคุณมากครับ`}
               </div>
             </div>
 
@@ -411,7 +411,7 @@ export function AgentBatonCenter({
                 กดคัดลอกแล้วนำไปวางใน LINE หรือแชทได้ทันที
               </span>
               <button
-                onClick={() => handleCopyScript(`สวัสดีครับคุณ ${scriptModalDoc.customerName || 'ลูกค้า'} 😊\n\nขออนุญาตสอบถามความคืบหน้าเรื่องใบเสนอราคาเลขที่ ${scriptModalDoc.docNo} (ยอดรวม ฿${Number(scriptModalDoc.netTotal || 0).toLocaleString()}) ที่ส่งไปเมื่อสัปดาห์ก่อนครับ\n\nหากทางคุณ ${scriptModalDoc.customerName || 'ลูกค้า'} มีข้อสงสัยหรือต้องการปรับส่วนไหน สามารถแจ้งผมได้ตลอดเลยนะครับ ขอบคุณมากครับ! 🙏✨`)}
+                onClick={() => handleCopyScript(`สวัสดีครับคุณ ${scriptModalDoc.customerName || 'ลูกค้า'}\n\nขออนุญาตสอบถามความคืบหน้าเรื่องใบเสนอราคาเลขที่ ${scriptModalDoc.docNo} (ยอดรวม ฿${Number(scriptModalDoc.netTotal || 0).toLocaleString()}) ที่ส่งไปเมื่อสัปดาห์ก่อนครับ\n\nหากทางคุณ ${scriptModalDoc.customerName || 'ลูกค้า'} มีข้อสงสัยหรือต้องการปรับส่วนไหน สามารถแจ้งผมได้ตลอดเลยนะครับ ขอบคุณมากครับ`)}
                 className={cn(
                   "flex items-center gap-1.5 px-4 py-2 text-xs font-bold transition-all cursor-pointer shadow-xs",
                   copied ? "bg-emerald-600 text-white" : "hover:brightness-110 active:scale-98"

@@ -829,7 +829,7 @@ export function DashboardView({ tasks, categories, expenses: expensesProp, onOpe
           <KpiChip
             label="กำไรสุทธิรอบนี้"
             value={`${periodNetProfit >= 0 ? '+' : '-'}฿${Math.abs(Math.round(periodNetProfit)).toLocaleString()}`}
-            sub={periodNetProfit >= 0 ? '✅ มีกำไร' : '⚠️ ขาดทุน'}
+            sub={periodNetProfit >= 0 ? 'มีกำไร' : 'ขาดทุน'}
             accent={periodNetProfit >= 0 ? 'border-emerald-500' : 'border-rose-600'}
           />
           <KpiChip label="งานทั้งหมด"   value={`${tasks.length}`}                     sub={`เสร็จ ${doneCount} งาน`} accent="border-indigo-400" />

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Settings, Download, Plus, X, Eye, Pencil, History, Search, FileText, Clock, Sparkles, RefreshCw, BrainCircuit } from 'lucide-react';
+import { Settings, Download, Plus, X, Eye, Pencil, History, Search, FileText, Clock, Sparkles, RefreshCw, BrainCircuit, Cloud } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import type { Client, IssuedDocument, Task } from '../../types';
@@ -308,8 +308,8 @@ export function DocFlowView({ showNotification, clients, tasks = [], onViewChang
        }
        showNotification(
          lang === 'th' 
-           ? '⚡ AI นำส่งข้อมูลดีลเข้าสู่แบบฟอร์มแล้ว! คุณสามารถตรวจทานและกดดาวน์โหลด PDF ได้ทันที'
-           : '⚡ AI baton pre-filled document form successfully!'
+           ? 'AI นำส่งข้อมูลดีลเข้าสู่แบบฟอร์มแล้ว! คุณสามารถตรวจทานและกดดาวน์โหลด PDF ได้ทันที'
+           : 'AI baton pre-filled document form successfully!'
        );
      }
    } catch (e) {
@@ -635,11 +635,11 @@ export function DocFlowView({ showNotification, clients, tasks = [], onViewChang
          receiptRecord.emailSentAt = new Date().toISOString();
          receiptRecord.emailStatus = 'sent';
          await saveIssuedDocument(receiptRecord);
-         showNotification(`✨ สร้างใบเสร็จ ${receiptPrefix} อัตโนมัติ + ส่งเมลไปที่ sasiwanjandaeng@gmail.com สำเร็จ!`);
+         showNotification(`สร้างใบเสร็จ ${receiptPrefix} อัตโนมัติ + ส่งเมลไปที่ sasiwanjandaeng@gmail.com สำเร็จ!`);
        }
      } catch (emailErr) {
        console.warn('[Auto Receipt Email] Failed:', emailErr);
-       showNotification(`✨ สร้างใบเสร็จ ${receiptPrefix} อัตโนมัติสำเร็จ (ส่งเมลไม่สำเร็จ — ลองส่งอีกครั้งได้ที่หน้า "สถานะเอกสาร")`);
+       showNotification(`สร้างใบเสร็จ ${receiptPrefix} อัตโนมัติสำเร็จ (ส่งเมลไม่สำเร็จ — ลองส่งอีกครั้งได้ที่หน้า "สถานะเอกสาร")`);
      }
    } catch (autoErr) {
      console.warn('[Auto Receipt] Failed:', autoErr);
@@ -696,7 +696,7 @@ export function DocFlowView({ showNotification, clients, tasks = [], onViewChang
      setShowStatusTracker(false);
      setShowHistory(false);
      setMobileTab('preview');
-     showNotification(`📄 โหลดเอกสาร ${doc.docNo} เข้าสู่แบบฟอร์มแล้ว! คุณสามารถตรวจทานและกดปุ่ม "ดาวน์โหลด PDF" ได้ทันที`);
+     showNotification(`โหลดเอกสาร ${doc.docNo} เข้าสู่แบบฟอร์มแล้ว! คุณสามารถตรวจทานและกดปุ่ม "ดาวน์โหลด PDF" ได้ทันที`);
    } catch (e: any) {
      showNotification(`ไม่สามารถโหลดเอกสารได้: ${e.message}`, true);
    }
@@ -934,7 +934,7 @@ export function DocFlowView({ showNotification, clients, tasks = [], onViewChang
          saveDocNumbersCloud(updated);
          return updated;
        });
-       showNotification(`🔄 ปรับเลขที่ ${d.docTitles[docType]} เป็น ${next} เรียบร้อย`);
+       showNotification(`ปรับเลขที่ ${d.docTitles[docType]} เป็น ${next} เรียบร้อย`);
      }}
      className="no-print p-0.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition cursor-pointer"
    >
@@ -1292,7 +1292,7 @@ export function DocFlowView({ showNotification, clients, tasks = [], onViewChang
  <div className="flex-1 min-w-0">
  <div className="flex items-center gap-2">
  <span className="font-bold text-sm text-gray-900 truncate">{doc.docNo}</span>
- {!hasPdf && <span className="text-[10px] text-amber-500 font-medium shrink-0">☁️ กำลังซิงค์</span>}
+ {!hasPdf && <span className="text-[10px] text-amber-500 font-medium shrink-0"><Cloud className="w-3 h-3 text-amber-500 animate-pulse inline mr-1" />กำลังซิงค์</span>}
  </div>
  <p className="text-xs text-gray-500 truncate">{doc.customerName} · {dateStr}</p>
  </div>
@@ -1430,7 +1430,7 @@ export function DocFlowView({ showNotification, clients, tasks = [], onViewChang
  setItems(data.items.map((it, idx) => ({ id: idx + 1, desc: it.desc, qty: it.qty, price: it.price })));
  }
  if (data.docType) changeDocType(data.docType);
- showNotification('🤖 เอเจนท์ส่งข้อมูลเข้าแบบฟอร์มเอกสารเรียบร้อยแล้ว');
+ showNotification('เอเจนท์ส่งข้อมูลเข้าแบบฟอร์มเอกสารเรียบร้อยแล้ว');
  }}
  showNotification={showNotification}
  />

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Task, Client } from '../../types';
-import { Plus, DollarSign, Calendar, User, ChevronRight } from 'lucide-react';
+import { Plus, DollarSign, Calendar, User, ChevronRight, AlertCircle, Trophy } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
@@ -66,8 +66,9 @@ function PipelineCard({ task, clients, onClick }: { task: Task; clients: Client[
  </div>
 
  {task.pipelineStage === 'lost' && lostReason && (
- <div className="mt-2.5 text-[11px] text-rose-700 bg-rose-50/70 p-2.5 rounded-xl border border-rose-100/50 leading-relaxed font-semibold">
- 😞 {lostReason}
+ <div className="mt-2.5 text-[11px] text-rose-700 bg-rose-50/70 p-2.5 rounded-xl border border-rose-100/50 leading-relaxed font-semibold flex items-center gap-1.5">
+ <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+ <span>{lostReason}</span>
  </div>
  )}
 
@@ -222,7 +223,10 @@ export function PipelineView({ tasks, clients, onTaskClick, onUpdateTask, onNewT
        const recentWon = [...pipelineTasks.filter(t => t.pipelineStage === 'won')].reverse().slice(0, 3);
        return (
          <div className="glass-card rounded-2xl p-4 flex flex-col">
-           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Recent Won 🏆</p>
+           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+ <Trophy className="w-3.5 h-3.5 text-amber-500" />
+ <span>Recent Won</span>
+ </p>
            {recentWon.length === 0 ? (
              <p className="text-xs text-slate-300 font-semibold flex-1 flex items-center">ยังไม่มีดีลที่ปิดได้</p>
            ) : (

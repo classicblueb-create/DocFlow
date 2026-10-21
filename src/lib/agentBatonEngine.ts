@@ -215,7 +215,7 @@ export function computeBatonHandoffs(params: {
   });
 
   // ──────────────────────────────────────────────────────────────────────────
-  // BATON 3: Finance Agent (Signed Quotations ➔ Auto-Convert to Invoice & Receipt)
+  // BATON 3: Finance Agent (Signed Quotations -> Auto-Convert to Invoice & Receipt)
   // ──────────────────────────────────────────────────────────────────────────
   documents.forEach(doc => {
     if (doc.docType === 'quotation' && doc.status === 'signed') {
@@ -232,8 +232,8 @@ export function computeBatonHandoffs(params: {
           id: handoffId,
           fromAgent: 'follow_up_agent',
           toAgent: 'finance_agent',
-          badgeText: 'เซ็นแล้ว ➔ ออกบิล',
-          title: `ฝ่ายการเงิน: ใบเสนอราคา ${doc.docNo} เซ็นกลับแล้ว ➔ แปลงเป็นใบแจ้งหนี้ & ใบเสร็จ`,
+          badgeText: 'เซ็นแล้ว -> ออกบิล',
+          title: `ฝ่ายการเงิน: ใบเสนอราคา ${doc.docNo} เซ็นกลับแล้ว -> แปลงเป็นใบแจ้งหนี้ & ใบเสร็จ`,
           description: `ลูกค้า "${doc.customerName}" อนุมัติยอด ฿${Number(doc.netTotal || 0).toLocaleString()} แล้ว — ฝ่ายการเงินพร้อมเปลี่ยนเป็นใบแจ้งหนี้ (INV) และออกใบเสร็จรับเงิน (RC) ล่วงหน้าให้ทันที`,
           actionType: 'auto_convert_invoice',
           actionPayload: { doc },
@@ -245,7 +245,7 @@ export function computeBatonHandoffs(params: {
   });
 
   // ──────────────────────────────────────────────────────────────────────────
-  // BATON 4: Marketing Agent (Completed Project ➔ Content Plan Case Study)
+  // BATON 4: Marketing Agent (Completed Project -> Content Plan Case Study)
   // ──────────────────────────────────────────────────────────────────────────
   tasks.forEach(task => {
     const isCompleted = task.status === 'Done' || task.status === 'เสร็จสิ้น';

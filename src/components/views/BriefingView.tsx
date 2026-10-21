@@ -718,7 +718,7 @@ ${categoriesListStr}
                 </div>
               )}
               {todayMeetings.length === 0 && upcomingMeetings.length === 0 && (
-                <div className="py-4 text-center text-xs text-slate-400 font-semibold">ไม่มีนัดหมายใน 7 วันนี้ 🎉</div>
+                <div className="py-4 text-center text-xs text-slate-400 font-semibold">ไม่มีนัดหมายใน 7 วันนี้</div>
               )}
             </div>
           )}
@@ -784,7 +784,10 @@ ${categoriesListStr}
               </div>
               {/* Next Action */}
               <div className="bg-emerald-50/60 border border-emerald-100 rounded-xl p-3">
-                <p className="text-[9px] font-black text-emerald-700 uppercase tracking-widest mb-1">🎯 Next Action</p>
+                <p className="text-[9px] font-black text-emerald-700 uppercase tracking-widest mb-1 flex items-center gap-1.5">
+                  <Target className="w-3 h-3 text-emerald-600" />
+                  <span>Next Action</span>
+                </p>
                 <p className="text-xs text-emerald-800 font-semibold">{contentPriority.nextAction}</p>
               </div>
               <button
@@ -828,7 +831,7 @@ ${categoriesListStr}
             <span className="text-xs font-semibold">กำลังโหลด Reminders...</span>
           </div>
         ) : reminders.length === 0 ? (
-          <div className="py-4 text-center text-xs text-slate-400 font-semibold">ไม่มี Reminder ที่ยังค้างอยู่ 🎉</div>
+          <div className="py-4 text-center text-xs text-slate-400 font-semibold">ไม่มี Reminder ที่ยังค้างอยู่</div>
         ) : (
           <div className="flex flex-col gap-1.5 max-h-[200px] overflow-y-auto hide-scrollbar">
             {reminders.map((r, i) => (
