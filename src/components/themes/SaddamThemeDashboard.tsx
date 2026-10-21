@@ -144,7 +144,7 @@ export function SaddamThemeDashboard({ tasks, categories, expenses = [], onOpenT
             </div>
             <div>
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-black text-slate-900">฿{totalRevenue.toLocaleString()}</span>
+                <span className="text-2xl font-black text-slate-900 privacy-blur">฿{totalRevenue.toLocaleString()}</span>
                 <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
                   +{completionRate}%
                 </span>
@@ -321,7 +321,7 @@ export function SaddamThemeDashboard({ tasks, categories, expenses = [], onOpenT
             <div className="rounded-2xl bg-white p-5 border border-slate-200/90 shadow-2xs flex items-center justify-between">
               <div>
                 <span className="text-xs font-bold text-slate-400">ค่าใช้จ่ายรวมรอบนี้</span>
-                <p className="text-xl font-black text-rose-600 mt-1">
+                <p className="text-xl font-black text-rose-600 mt-1 privacy-blur">
                   ฿{totalExpenses.toLocaleString()}
                 </p>
                 <span className="text-[10px] text-slate-400">หักออกจากรายรับอัตโนมัติ</span>

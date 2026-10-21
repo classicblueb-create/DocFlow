@@ -121,7 +121,7 @@ export function SalesMonkThemeDashboard({ tasks, categories, expenses = [] }: Th
           </div>
           <div className="relative z-10 my-3">
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl md:text-3xl font-black text-white tracking-tight">
+              <span className="text-2xl md:text-3xl font-black text-white tracking-tight privacy-blur">
                 ฿{netProfit.toLocaleString()}
               </span>
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-blue-400/40 text-blue-100 flex items-center gap-0.5">
@@ -129,7 +129,7 @@ export function SalesMonkThemeDashboard({ tasks, categories, expenses = [] }: Th
               </span>
             </div>
             <p className="text-[11px] text-blue-200 font-medium mt-1">
-              จากรายรับรวม ฿{totalRevenue.toLocaleString()}
+              จากรายรับรวม <span className="privacy-blur"><span className="privacy-blur">฿{totalRevenue.toLocaleString()}</span></span>
             </p>
           </div>
         </div>
@@ -198,7 +198,7 @@ export function SalesMonkThemeDashboard({ tasks, categories, expenses = [] }: Th
               </span>
             </div>
             <p className="text-[11px] text-slate-400 font-medium mt-0.5">
-              หลังหักค่าใช้จ่าย ฿{totalExpenses.toLocaleString()}
+              หลังหักค่าใช้จ่าย <span className="privacy-blur">฿{totalExpenses.toLocaleString()}</span>
             </p>
           </div>
           {/* Sparkline Wave Chart */}
@@ -267,7 +267,7 @@ export function SalesMonkThemeDashboard({ tasks, categories, expenses = [] }: Th
             {/* Pillar 1 */}
             <div className="flex flex-col gap-2">
               <span className="text-xs font-bold text-slate-400">ปิดดีลแล้ว (Won)</span>
-              <p className="text-xl font-black text-slate-900">฿{totalRevenue.toLocaleString()}</p>
+              <p className="text-xl font-black text-slate-900 privacy-blur"><span className="privacy-blur">฿{totalRevenue.toLocaleString()}</span></p>
               <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                 <div className="bg-[#2563eb] h-full rounded-full" style={{ width: '85%' }} />
               </div>
@@ -277,7 +277,7 @@ export function SalesMonkThemeDashboard({ tasks, categories, expenses = [] }: Th
             {/* Pillar 2 */}
             <div className="flex flex-col gap-2">
               <span className="text-xs font-bold text-slate-400">กำลังดำเนินการ</span>
-              <p className="text-xl font-black text-slate-900">฿{pendingValue.toLocaleString()}</p>
+              <p className="text-xl font-black text-slate-900 privacy-blur">฿{pendingValue.toLocaleString()}</p>
               <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                 <div className="bg-[#38bdf8] h-full rounded-full" style={{ width: '60%' }} />
               </div>
@@ -287,7 +287,7 @@ export function SalesMonkThemeDashboard({ tasks, categories, expenses = [] }: Th
             {/* Pillar 3 */}
             <div className="flex flex-col gap-2">
               <span className="text-xs font-bold text-slate-400">ค่าใช้จ่ายรวม</span>
-              <p className="text-xl font-black text-slate-900">฿{totalExpenses.toLocaleString()}</p>
+              <p className="text-xl font-black text-slate-900 privacy-blur">฿{totalExpenses.toLocaleString()}</p>
               <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                 <div className="bg-[#f43f5e] h-full rounded-full" style={{ width: '40%' }} />
               </div>
@@ -297,7 +297,7 @@ export function SalesMonkThemeDashboard({ tasks, categories, expenses = [] }: Th
             {/* Pillar 4 */}
             <div className="flex flex-col gap-2">
               <span className="text-xs font-bold text-slate-400">กำไรสุทธิ</span>
-              <p className="text-xl font-black text-emerald-600">฿{netProfit.toLocaleString()}</p>
+              <p className="text-xl font-black text-emerald-600 privacy-blur">฿{netProfit.toLocaleString()}</p>
               <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                 <div className="bg-[#10b981] h-full rounded-full" style={{ width: '90%' }} />
               </div>
@@ -437,7 +437,7 @@ export function SalesMonkThemeDashboard({ tasks, categories, expenses = [] }: Th
                         </span>
                       </td>
                       <td className="py-3 text-right font-black text-slate-900">
-                        ฿{Number(t.price || 0).toLocaleString()}
+                        <span className="privacy-blur">฿{Number(t.price || 0).toLocaleString()}</span>
                       </td>
                     </tr>
                   );
@@ -453,7 +453,7 @@ export function SalesMonkThemeDashboard({ tasks, categories, expenses = [] }: Th
             <div>
               <h2 className="text-base font-black text-slate-900">สัดส่วนงานตามหมวดหมู่ (Categories)</h2>
               <p className="text-lg font-black text-[#2563eb] mt-0.5">
-                ฿{totalRevenue.toLocaleString()}
+                <span className="privacy-blur">฿{totalRevenue.toLocaleString()}</span>
               </p>
               <p className="text-[10px] text-slate-400 font-semibold">ยอดรวมจากทุกประเภทโครงการ</p>
             </div>

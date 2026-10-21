@@ -132,7 +132,7 @@ export function DeiBentoThemeDashboard({ tasks, categories, expenses = [], onOpe
                     <Clock className="w-3.5 h-3.5 text-indigo-300" />
                     <span>กำหนดส่ง: {heroTask.endDate || 'เร็วๆ นี้'}</span>
                   </div>
-                  <span className="text-sm font-black text-emerald-400">
+                  <span className="text-sm font-black text-emerald-400 privacy-blur">
                     ฿{Number(heroTask.price || 0).toLocaleString()}
                   </span>
                 </div>
@@ -154,7 +154,7 @@ export function DeiBentoThemeDashboard({ tasks, categories, expenses = [], onOpe
                   </div>
                   <div>
                     <span className="text-[10px] font-bold text-purple-100 uppercase">ยอดปิดการขาย</span>
-                    <p className="text-xl font-black text-white">฿{totalRevenue.toLocaleString()}</p>
+                    <p className="text-xl font-black text-white privacy-blur">฿{totalRevenue.toLocaleString()}</p>
                     <div className="w-full bg-white/20 h-1.5 rounded-full mt-2 overflow-hidden">
                       <div className="bg-white h-full rounded-full" style={{ width: '75%' }} />
                     </div>
@@ -186,7 +186,7 @@ export function DeiBentoThemeDashboard({ tasks, categories, expenses = [], onOpe
                     </div>
 
                     <div className="pt-4 mt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                      <span className="font-bold text-slate-900">฿{Number(t.price || 0).toLocaleString()}</span>
+                      <span className="font-bold text-slate-900 privacy-blur">฿{Number(t.price || 0).toLocaleString()}</span>
                       <span className="text-[10px] font-semibold text-slate-400">{t.endDate || 'ไม่มีกำหนด'}</span>
                     </div>
                   </div>

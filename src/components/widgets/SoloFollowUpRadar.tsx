@@ -285,7 +285,7 @@ export function SoloFollowUpRadar({
               <span className="text-xl font-black text-slate-900">{pendingQuotations.length}</span>
               <span className="text-[11px] text-slate-500 font-medium ml-1">ฉบับ</span>
             </div>
-            <span className="text-xs font-bold text-amber-600">
+            <span className="text-xs font-bold text-amber-600 privacy-blur">
               ฿{pendingQuotationTotal.toLocaleString()}
             </span>
           </div>
@@ -315,7 +315,7 @@ export function SoloFollowUpRadar({
               <span className="text-xl font-black text-slate-900">{pendingInvoices.length}</span>
               <span className="text-[11px] text-slate-500 font-medium ml-1">ฉบับ</span>
             </div>
-            <span className="text-xs font-bold text-blue-600">
+            <span className="text-xs font-bold text-blue-600 privacy-blur">
               ฿{pendingInvoiceTotal.toLocaleString()}
             </span>
           </div>

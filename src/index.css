@@ -422,3 +422,30 @@ input, select, textarea {
   to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 .ds-fade-in-up { animation: dsSlideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+/* ══════════════════════════════════════════════════════════════════
+   PRIVACY MODE (โหมดปิดข้อมูลตัวเลข & เนื้อหาชั่วคราว)
+   ══════════════════════════════════════════════════════════════════ */
+[data-privacy-mode="true"] .privacy-blur,
+[data-privacy-mode="true"] .privacy-mask,
+[data-privacy-mode="true"] [data-privacy="true"],
+[data-privacy-mode="true"] .docflow-paper input:not([type="checkbox"]):not([type="radio"]),
+[data-privacy-mode="true"] .docflow-paper textarea,
+[data-privacy-mode="true"] .docflow-paper .price-cell,
+[data-privacy-mode="true"] .docflow-paper .total-cell,
+[data-privacy-mode="true"] .docflow-privacy-target,
+[data-privacy-mode="true"] .stat-amount,
+[data-privacy-mode="true"] .money-amount {
+  filter: blur(6px) !important;
+  user-select: none !important;
+  transition: filter 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes privacyPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+.privacy-pulse {
+  animation: privacyPulse 2s ease-in-out infinite;
+}
+

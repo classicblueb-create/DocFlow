@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Settings, Download, Plus, X, Eye, Pencil, History, Search, FileText, Clock, Sparkles, RefreshCw, BrainCircuit, Cloud } from 'lucide-react';
+import { Settings, Download, Plus, X, Eye, EyeOff, Pencil, History, Search, FileText, Clock, Sparkles, RefreshCw, BrainCircuit, Cloud } from 'lucide-react';
+import { usePrivacyMode } from '../../lib/privacy';
+import { cn } from '../../lib/utils';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import type { Client, IssuedDocument, Task } from '../../types';
@@ -210,6 +212,7 @@ export function DocFlowView({ showNotification, clients, tasks = [], onViewChang
  const docNo = docNumbers[docType];
 
  // Issued Documents History state
+ const { isPrivacy, togglePrivacy } = usePrivacyMode();
  const [issuedDocs, setIssuedDocs] = useState<IssuedDocument[]>([]);
  const [showHistory, setShowHistory] = useState(false);
  const [showStatusTracker, setShowStatusTracker] = useState(false);
@@ -782,6 +785,28 @@ export function DocFlowView({ showNotification, clients, tasks = [], onViewChang
  <span className="md:hidden">ประวัติ ({issuedDocs.length})</span>
  </button>
  <button
+ onClick={() => {
+   const next = !isPrivacy;
+   togglePrivacy();
+   showNotification(next ? 'เปิดโหมดซ่อนตัวเลขและเนื้อหาชั่วคราวแล้ว' : 'ปิดโหมดซ่อนข้อมูล (แสดงตัวเลขตามปกติ)');
+ }}
+ title={isPrivacy ? "กำลังเปิดโหมดซ่อนข้อมูล (คลิกเพื่อแสดงปกติ)" : "ปิดข้อมูลตัวเลข & เนื้อหาชั่วคราว (Privacy Mode)"}
+ className={cn(
+ "flex items-center gap-1 px-2.5 md:px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer",
+ isPrivacy
+ ? "bg-amber-100 border border-amber-300 text-amber-900 shadow-xs ring-2 ring-amber-300/40"
+ : "bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700"
+ )}
+ >
+ {isPrivacy ? (
+ <EyeOff className="w-3.5 h-3.5 text-amber-600" />
+ ) : (
+ <Eye className="w-3.5 h-3.5 text-slate-500" />
+ )}
+ <span className="hidden md:inline">{isPrivacy ? 'ซ่อนตัวเลขอยู่' : 'ปิดตัวเลขชั่วคราว'}</span>
+ <span className="md:hidden">{isPrivacy ? 'ซ่อนอยู่' : 'ปิดข้อมูล'}</span>
+ </button>
+ <button
  onClick={openSettings}
  className="flex items-center gap-1 px-2.5 md:px-3 py-1.5 bg-gray-100 border border-gray-200 text-gray-600 rounded-lg text-xs font-semibold hover:bg-gray-200 transition"
  >
@@ -1089,7 +1114,7 @@ export function DocFlowView({ showNotification, clients, tasks = [], onViewChang
  <tbody>
  <tr>
  <td style={{ border: '1px solid #e5e7eb', padding: '8px 10px', color: '#374151', fontWeight: 600 }}>{d.lbl_sub}</td>
- <td style={{ border: '1px solid #e5e7eb', padding: '8px 10px', textAlign: 'right', fontWeight: 600, color: '#111827' }}>{fmt(subtotal)}</td>
+ <td className="privacy-blur" style={{ border: '1px solid #e5e7eb', padding: '8px 10px', textAlign: 'right', fontWeight: 600, color: '#111827' }}>{fmt(subtotal)}</td>
  </tr>
  <tr>
  <td style={{ border: '1px solid #e5e7eb', padding: '8px 10px', color: '#374151', fontWeight: 600 }}>
@@ -1099,13 +1124,13 @@ export function DocFlowView({ showNotification, clients, tasks = [], onViewChang
  </span>
  <span style={{ fontSize: '11px', color: '#6b7280', marginLeft: '4px' }}>({whPct}%)</span>
  </td>
- <td style={{ border: '1px solid #e5e7eb', padding: '8px 10px', textAlign: 'right', fontWeight: 600, color: '#111827' }}>{fmt(wht)}</td>
+ <td className="privacy-blur" style={{ border: '1px solid #e5e7eb', padding: '8px 10px', textAlign: 'right', fontWeight: 600, color: '#111827' }}>{fmt(wht)}</td>
  </tr>
  <tr style={{ background: '#f3f4f6' }}>
  <td style={{ border: '1px solid #e5e7eb', padding: '10px 10px', fontWeight: 800, fontSize: '13px', color: '#111827' }}>
  {docType === 'receipt' ? d.lbl_net_recv : d.lbl_net_due}
  </td>
- <td style={{ border: '1px solid #e5e7eb', padding: '10px 10px', textAlign: 'right', fontWeight: 800, fontSize: '14px', color: '#111827' }}>{fmt(net)}</td>
+ <td className="privacy-blur" style={{ border: '1px solid #e5e7eb', padding: '10px 10px', textAlign: 'right', fontWeight: 800, fontSize: '14px', color: '#111827' }}>{fmt(net)}</td>
  </tr>
  </tbody>
  </table>

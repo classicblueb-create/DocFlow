@@ -40,6 +40,7 @@ import {
 } from './lib/db';
 import { getSession, onAuthStateChange } from './lib/auth';
 import { applyTheme } from './lib/theme';
+import { applyPrivacyMode, togglePrivacyMode } from './lib/privacy';
 
 // ── localStorage keys ─────────────────────────────────────────────────────────
 const LS_TASKS = 'docflow_local_tasks';
@@ -95,15 +96,26 @@ export default function App() {
  const [categories, setCategories] = useState<ProjectCategory[]>([]);
  const [expenses, setExpenses] = useState<Expense[]>(() => lsGet(LS_EXPENSES, []));
 
- // ── Apply theme on mount ──────────────────────────────────────────────────
- useEffect(() => { applyTheme(); }, []);
+ // ── Apply theme & privacy mode on mount ───────────────────────────────────
+ useEffect(() => { 
+   applyTheme(); 
+   applyPrivacyMode();
+ }, []);
 
- // ── Global Search shortcut (Cmd+K / Ctrl+K) ───────────────────────────────
+ // ── Global Shortcuts (Cmd+K: Search / Alt+P: Privacy Mode) ───────────────
  useEffect(() => {
    const onKey = (e: KeyboardEvent) => {
      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
        e.preventDefault();
        setIsSearchOpen(s => !s);
+     }
+     if (e.altKey && (e.key === 'p' || e.key === 'P' || e.code === 'KeyP')) {
+       e.preventDefault();
+       const next = togglePrivacyMode();
+       setNotifications(prev => [
+         ...prev, 
+         { id: Date.now(), message: next ? 'เปิดโหมดซ่อนตัวเลขและเนื้อหาชั่วคราวแล้ว' : 'ปิดโหมดซ่อนข้อมูล (แสดงตัวเลขตามปกติ)', isError: false }
+       ]);
      }
    };
    window.addEventListener('keydown', onKey);

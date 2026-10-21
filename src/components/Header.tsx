@@ -1,7 +1,9 @@
 import { useRef, useState, useEffect } from 'react';
-import { Search, Plus, Menu, ImageIcon, X, Palette } from 'lucide-react';
+import { Search, Plus, Menu, ImageIcon, X, Palette, Eye, EyeOff } from 'lucide-react';
 import { ViewType } from '../types';
 import { getTheme, THEMES } from '../lib/theme';
+import { usePrivacyMode } from '../lib/privacy';
+import { cn } from '../lib/utils';
 
 interface HeaderProps {
   currentView: ViewType;
@@ -52,6 +54,7 @@ export function Header({
   const bgFileRef = useRef<HTMLInputElement>(null);
   const [hasBg, setHasBg] = useState(() => !!localStorage.getItem('modty_bg_image'));
   const [currentThemeId, setCurrentThemeId] = useState(() => getTheme());
+  const { isPrivacy, togglePrivacy } = usePrivacyMode();
 
   useEffect(() => {
     const onThemeChange = (e: any) => {
@@ -113,6 +116,27 @@ export function Header({
             <kbd className="hidden md:inline text-[10px] text-slate-400 font-bold">⌘K</kbd>
           </button>
         )}
+
+        {/* Privacy Mode Toggle Button */}
+        <button
+          onClick={togglePrivacy}
+          title={isPrivacy ? "กำลังเปิดโหมดซ่อนตัวเลข & เนื้อหา (คลิกเพื่อแสดงปกติ)" : "ปิดข้อมูลตัวเลข & เนื้อหาชั่วคราว (Privacy Mode)"}
+          className={cn(
+            "flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer shadow-2xs",
+            isPrivacy 
+              ? "bg-amber-500/15 border-amber-400 text-amber-800 ring-2 ring-amber-400/25" 
+              : "border-slate-200/80 bg-white/80 hover:bg-white text-slate-700 hover:text-slate-900"
+          )}
+        >
+          {isPrivacy ? (
+            <EyeOff className="w-3.5 h-3.5 text-amber-600" />
+          ) : (
+            <Eye className="w-3.5 h-3.5 text-slate-500" />
+          )}
+          <span className="hidden sm:inline text-[11px] font-bold">
+            {isPrivacy ? 'ซ่อนตัวเลขอยู่' : 'ปิดตัวเลข'}
+          </span>
+        </button>
 
         {/* Theme Selector Button */}
         {onOpenTheme && (
