@@ -424,28 +424,101 @@ input, select, textarea {
 .ds-fade-in-up { animation: dsSlideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
 /* ══════════════════════════════════════════════════════════════════
-   PRIVACY MODE (โหมดปิดข้อมูลตัวเลข & เนื้อหาชั่วคราว)
+   PRIVACY MODE (โหมดปิดข้อมูลตัวเลข & เนื้อหาชั่วคราวทั้งหมดของหน้าเว็บ)
    ══════════════════════════════════════════════════════════════════ */
+
+/* 1. Explicit privacy elements & auto-tagged numbers/details */
 [data-privacy-mode="true"] .privacy-blur,
 [data-privacy-mode="true"] .privacy-mask,
 [data-privacy-mode="true"] [data-privacy="true"],
+[data-privacy-mode="true"] [data-privacy-auto="true"],
+[data-privacy-mode="true"] [data-privacy-target="true"],
+[data-privacy-mode="true"] .stat-amount,
+[data-privacy-mode="true"] .money-amount,
+[data-privacy-mode="true"] .kpi-value {
+  filter: blur(7px) !important;
+  user-select: none !important;
+  transition: filter 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 2. All document paper details (DocFlow Paper Editor & Preview) */
 [data-privacy-mode="true"] .docflow-paper input:not([type="checkbox"]):not([type="radio"]),
 [data-privacy-mode="true"] .docflow-paper textarea,
+[data-privacy-mode="true"] .docflow-paper select,
+[data-privacy-mode="true"] .docflow-paper table tbody td,
 [data-privacy-mode="true"] .docflow-paper .price-cell,
 [data-privacy-mode="true"] .docflow-paper .total-cell,
-[data-privacy-mode="true"] .docflow-privacy-target,
-[data-privacy-mode="true"] .stat-amount,
-[data-privacy-mode="true"] .money-amount {
+[data-privacy-mode="true"] .docflow-paper .doc-val,
+[data-privacy-mode="true"] .docflow-paper img,
+[data-privacy-mode="true"] #df-doc-paper input:not([type="checkbox"]):not([type="radio"]),
+[data-privacy-mode="true"] #df-doc-paper textarea,
+[data-privacy-mode="true"] #df-doc-paper select,
+[data-privacy-mode="true"] #df-doc-paper table tbody td {
+  filter: blur(8px) !important;
+  user-select: none !important;
+  transition: filter 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 3. All charts and data visualizations */
+[data-privacy-mode="true"] .recharts-responsive-container,
+[data-privacy-mode="true"] .recharts-wrapper,
+[data-privacy-mode="true"] svg.recharts-surface {
+  filter: blur(8px) !important;
+  opacity: 0.25 !important;
+  pointer-events: none !important;
+  user-select: none !important;
+  transition: filter 0.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+}
+
+/* 4. All table data rows across all views (List, Expenses, Ledger, History) */
+[data-privacy-mode="true"] main tbody tr td,
+[data-privacy-mode="true"] main table tbody td,
+[data-privacy-mode="true"] .privacy-table tbody td {
+  filter: blur(6px) !important;
+  user-select: none !important;
+  transition: filter 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 5. All KPI metric values and numbers in cards across all themes */
+[data-privacy-mode="true"] main .glass-card [class*="font-black"]:not(h1):not(h2),
+[data-privacy-mode="true"] main .glass-card [class*="font-extrabold"],
+[data-privacy-mode="true"] main .glass-card [class*="text-2xl"]:not(h1):not(h2),
+[data-privacy-mode="true"] main .glass-card [class*="text-3xl"]:not(h1):not(h2),
+[data-privacy-mode="true"] main .glass-card [class*="text-xl"]:not(h1):not(h2) {
+  filter: blur(7px) !important;
+  user-select: none !important;
+  transition: filter 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 6. Kanban cards, Pipeline cards, and Follow-up Radar items */
+[data-privacy-mode="true"] main .kanban-card h4,
+[data-privacy-mode="true"] main .kanban-card p,
+[data-privacy-mode="true"] main .kanban-card span.font-bold,
+[data-privacy-mode="true"] main .pipeline-card h4,
+[data-privacy-mode="true"] main .pipeline-card p,
+[data-privacy-mode="true"] main .pipeline-card span.font-bold,
+[data-privacy-mode="true"] main .radar-item,
+[data-privacy-mode="true"] main .baton-card,
+[data-privacy-mode="true"] main .product-rev-item {
+  filter: blur(6px) !important;
+  user-select: none !important;
+  transition: filter 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 7. Input and textarea contents in main view */
+[data-privacy-mode="true"] main input:not([type="checkbox"]):not([type="radio"]):not([type="search"]):not([data-no-privacy="true"]),
+[data-privacy-mode="true"] main textarea:not([data-no-privacy="true"]) {
   filter: blur(6px) !important;
   user-select: none !important;
   transition: filter 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @keyframes privacyPulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.96); }
 }
 .privacy-pulse {
   animation: privacyPulse 2s ease-in-out infinite;
 }
+
 

@@ -120,7 +120,7 @@ export function Header({
         {/* Privacy Mode Toggle Button */}
         <button
           onClick={togglePrivacy}
-          title={isPrivacy ? "กำลังเปิดโหมดซ่อนตัวเลข & เนื้อหา (คลิกเพื่อแสดงปกติ)" : "ปิดข้อมูลตัวเลข & เนื้อหาชั่วคราว (Privacy Mode)"}
+          title={isPrivacy ? "กำลังเปิดโหมดซ่อนตัวเลข & เนื้อหาทั้งหมด (คลิกเพื่อแสดงปกติ)" : "ปิดข้อมูลตัวเลข & เนื้อหาทั้งหมดชั่วคราว (Privacy Mode)"}
           className={cn(
             "flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer shadow-2xs",
             isPrivacy 
@@ -129,13 +129,16 @@ export function Header({
           )}
         >
           {isPrivacy ? (
-            <EyeOff className="w-3.5 h-3.5 text-amber-600" />
+            <EyeOff className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
           ) : (
             <Eye className="w-3.5 h-3.5 text-slate-500" />
           )}
           <span className="hidden sm:inline text-[11px] font-bold">
-            {isPrivacy ? 'ซ่อนตัวเลขอยู่' : 'ปิดตัวเลข'}
+            {isPrivacy ? 'ซ่อนข้อมูลอยู่' : 'ปิดข้อมูล'}
           </span>
+          {isPrivacy && (
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping inline-block ml-0.5" />
+          )}
         </button>
 
         {/* Theme Selector Button */}

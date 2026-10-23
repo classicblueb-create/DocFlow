@@ -90,7 +90,7 @@ export function BoardView({ tasks, onTaskDrop, onTaskClick }: BoardViewProps) {
                     draggable
                     onDragStart={e => handleDragStart(e, task.id.toString())}
                     onClick={() => onTaskClick(task)}
-                    className="rounded-xl p-3.5 shadow-sm cursor-pointer hover:-translate-y-0.5 transition-all duration-200"
+                    className="kanban-card rounded-xl p-3.5 shadow-sm cursor-pointer hover:-translate-y-0.5 transition-all duration-200"
                     style={{ ...deadlineStyle(task), backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)' }}
                   >
                     <div className="flex justify-between items-start mb-2 gap-2">

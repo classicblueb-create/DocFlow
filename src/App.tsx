@@ -686,7 +686,7 @@ export default function App() {
  onOpenTheme={() => setIsThemeOpen(true)}
  />
 
- <main className="flex-1 relative overflow-hidden flex flex-col">
+ <main id="app-main-content" className="app-main-content flex-1 relative overflow-hidden flex flex-col">
  {renderView()}
  </main>
  </div>

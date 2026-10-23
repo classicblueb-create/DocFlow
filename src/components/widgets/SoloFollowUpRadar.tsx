@@ -381,7 +381,7 @@ export function SoloFollowUpRadar({
                     <div 
                       key={doc.id}
                       className={cn(
-                        "p-3.5 rounded-xl border flex flex-col md:flex-row md:items-center justify-between gap-3 transition-all",
+                        "radar-item p-3.5 rounded-xl border flex flex-col md:flex-row md:items-center justify-between gap-3 transition-all",
                         followUp.isOverdue
                           ? "bg-rose-50/50 border-rose-200 hover:border-rose-300"
                           : followUp.isToday
@@ -490,7 +490,7 @@ export function SoloFollowUpRadar({
                   return (
                     <div 
                       key={doc.id}
-                      className="p-3.5 rounded-xl border border-slate-200/90 bg-white hover:border-blue-200 flex flex-col md:flex-row md:items-center justify-between gap-3 transition-all"
+                      className="radar-item p-3.5 rounded-xl border border-slate-200/90 bg-white hover:border-blue-200 flex flex-col md:flex-row md:items-center justify-between gap-3 transition-all"
                     >
                       <div className="flex items-start gap-3">
                         <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-800 border border-blue-200 flex items-center justify-center shrink-0 font-black text-xs">
@@ -557,7 +557,7 @@ export function SoloFollowUpRadar({
                 {autoReceipts.slice(0, 5).map(doc => (
                   <div 
                     key={doc.id}
-                    className="p-3.5 rounded-xl border border-slate-200/90 bg-white flex flex-col md:flex-row md:items-center justify-between gap-3"
+                    className="radar-item p-3.5 rounded-xl border border-slate-200/90 bg-white flex flex-col md:flex-row md:items-center justify-between gap-3"
                   >
                     <div className="flex items-start gap-3">
                       <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center justify-center shrink-0 font-black text-xs">

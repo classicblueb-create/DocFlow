@@ -803,7 +803,7 @@ export function DocFlowView({ showNotification, clients, tasks = [], onViewChang
  ) : (
  <Eye className="w-3.5 h-3.5 text-slate-500" />
  )}
- <span className="hidden md:inline">{isPrivacy ? 'ซ่อนตัวเลขอยู่' : 'ปิดตัวเลขชั่วคราว'}</span>
+ <span className="hidden md:inline">{isPrivacy ? 'ซ่อนข้อมูลอยู่' : 'ปิดข้อมูลชั่วคราว'}</span>
  <span className="md:hidden">{isPrivacy ? 'ซ่อนอยู่' : 'ปิดข้อมูล'}</span>
  </button>
  <button
@@ -878,6 +878,8 @@ export function DocFlowView({ showNotification, clients, tasks = [], onViewChang
   >
   <div
   ref={paperRef}
+  id="df-doc-paper"
+  className="docflow-paper"
   style={{
   ...paperStyle,
   ...(scale < 1 ? {
@@ -1319,12 +1321,12 @@ export function DocFlowView({ showNotification, clients, tasks = [], onViewChang
  <span className="font-bold text-sm text-gray-900 truncate">{doc.docNo}</span>
  {!hasPdf && <span className="text-[10px] text-amber-500 font-medium shrink-0"><Cloud className="w-3 h-3 text-amber-500 animate-pulse inline mr-1" />กำลังซิงค์</span>}
  </div>
- <p className="text-xs text-gray-500 truncate">{doc.customerName} · {dateStr}</p>
+ <p className="text-xs text-gray-500 truncate privacy-blur">{doc.customerName} · {dateStr}</p>
  </div>
 
  {/* Amount */}
  <div className="shrink-0 text-right">
- <p className="text-sm font-black text-gray-900">
+ <p className="text-sm font-black text-gray-900 privacy-blur">
  {doc.currency === 'USD' ? '$' : '฿'}{doc.netTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
  </p>
  </div>

@@ -266,7 +266,7 @@ export function AgentBatonCenter({
               <div
                 key={handoff.id}
                 className={cn(
-                  "p-4 rounded-xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-3.5",
+                  "baton-card p-4 rounded-xl border transition-all flex flex-col md:flex-row md:items-center justify-between gap-3.5",
                   isPending
                     ? "bg-white border-slate-200/90 hover:border-blue-400 hover:shadow-xs"
                     : "bg-slate-50/60 border-slate-200/60 opacity-80"

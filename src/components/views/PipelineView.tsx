@@ -40,7 +40,7 @@ function PipelineCard({ task, clients, onClick }: { task: Task; clients: Client[
  onClick={onClick}
  draggable
  onDragStart={e => e.dataTransfer.setData('taskId', task.id.toString())}
- className="glass-card rounded-2xl p-4 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group"
+ className="pipeline-card glass-card rounded-2xl p-4 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group"
  >
  <p className="text-sm font-bold text-slate-800 leading-snug group-hover:text-indigo-700 transition-colors line-clamp-2 mb-2">{task.name}</p>
 

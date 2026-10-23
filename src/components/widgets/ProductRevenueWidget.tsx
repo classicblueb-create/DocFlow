@@ -185,7 +185,7 @@ export function ProductRevenueWidget({ showNotification }: Props) {
           const isEdit     = editing === p.id;
 
           return (
-            <div key={p.id} className="bg-white/60 border border-slate-100 rounded-2xl p-4 flex flex-col gap-3">
+            <div key={p.id} className="product-rev-item bg-white/60 border border-slate-100 rounded-2xl p-4 flex flex-col gap-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
                   {isEdit ? (
